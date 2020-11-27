@@ -38,28 +38,20 @@ https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
 	3. Build and Copy to Project Folder
 
 ## Feature:
-- intelligent drag and drop
+- Intelligent drag and drop that bypasses UIPI
 - Commandline interface
 - Hotkeys
-- shortcute generater
+- Shortcute generater
 
 ## ToDo:
-- Recode unzip (zip_lib)
-- shortcute generator
+- shortcut generator
+- x86 static build
+- cleaning up this mess of a project
 
 ## Bugs:
-- c++17 download problems!!!!
 - command output does not show (only debug)
-- Sort pid by number not alphabetical (not static)
-
-## Rejected:
-- No auto update on x86 version, only update check 
--- Solution 1: need to compile x86 version with open ssl 
--- Solution 2: Use URLDownloadToFile instead of QT download manager
-
 
 ## Credits:
-- https://github.com/Broihon/GH-Injector-Library
 - https://guidedhacking.com/resources/guided-hacking-dll-injector.4/
 - https://github.com/Jorgen-VikingGod/Qt-Frameless-Window-DarkStyle
 - https://github.com/jarro2783/cxxopts
