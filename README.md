@@ -7,7 +7,7 @@
 https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
 
 ## Picture
-![alt_text](QT_GH_Injector/gh_resource/Injector_v4.png)
+![alt_text](GH-Injector-GUI/gh_resource/screenshotv5.png)
 
 ## How to build
 1. Visual Studio 2019
