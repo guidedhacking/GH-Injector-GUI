@@ -405,7 +405,7 @@ bool GuiMain::update_injector(std::string version)
 	printf("%s\n", download_url.c_str());
 
 	DownloadProgress progress;
-	if (FAILED(URLDownloadToFileA(nullptr, "https://uc1208b6ae34cee13145eed3cea0.dl.dropboxusercontent.com/cd/0/get/BD_oAueDU1PKhC2lUpYv44hzi_kwvV--zt2CxfBJ7MFPfSfAehXWZCA_KXljkAreAV5GRfPkAPJTJ98iLN8XtAOG_X73q_WgV-vMMwU_Z8aNl63o98xuMhj3OZ2HuQra13w/file?_download_id=6741020631930074940516212334141166088639773889205474175912723489&_notify_domain=www.dropbox.com&dl=1", GH_INJECTOR_ZIP, 0, &progress)))
+	if (FAILED(URLDownloadToFileA(nullptr, download_url.c_str(), GH_INJECTOR_ZIP, 0, &progress)))
 	{
 		FreeConsole();
 
@@ -1519,7 +1519,7 @@ void GuiMain::check_online_version()
 	std::string online_version = getVersionFromIE();
 	std::string current_version = GH_INJ_VERSIONA;
 
-	if (online_version.compare(current_version) < 0)
+	if (online_version.compare(current_version) > 0)
 	{
 		std::string update_msg = "This version of the GH Injector is outdated.\nThe newest version is V";
 		update_msg += online_version;
