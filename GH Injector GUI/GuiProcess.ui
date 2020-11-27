@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>frm_proc</class>
+ <widget class="QWidget" name="frm_proc">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>360</width>
+    <height>420</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Select a process</string>
+  </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>:/GuiMain/GH Icon.ico</normaloff>:/GuiMain/GH Icon.ico</iconset>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QGridLayout" name="grid_proc">
+     <item row="1" column="0">
+      <widget class="QLabel" name="lbl_filter">
+       <property name="text">
+        <string>Filter process list:</string>
+       </property>
+       <property name="buddy">
+        <cstring>txt_filter</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2">
+      <widget class="QCheckBox" name="cb_session">
+       <property name="text">
+        <string>Current session only</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0" colspan="2">
+      <widget class="QPushButton" name="btn_select">
+       <property name="text">
+        <string>Select</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="2">
+      <widget class="QPushButton" name="btn_refresh">
+       <property name="text">
+        <string>Refresh</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0" colspan="3">
+      <widget class="QTreeWidget" name="tree_process">
+       <property name="sortingEnabled">
+        <bool>true</bool>
+       </property>
+       <attribute name="headerMinimumSectionSize">
+        <number>40</number>
+       </attribute>
+       <attribute name="headerDefaultSectionSize">
+        <number>40</number>
+       </attribute>
+       <attribute name="headerStretchLastSection">
+        <bool>true</bool>
+       </attribute>
+       <column>
+        <property name="text">
+         <string/>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>PID</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Name</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Type</string>
+        </property>
+       </column>
+       <item>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="text">
+         <string>123456</string>
+        </property>
+        <property name="text">
+         <string>xxxxxxxxxxxxxxxxxxxxxxx</string>
+        </property>
+        <property name="text">
+         <string>NONE</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="3" column="0" colspan="2">
+      <widget class="QComboBox" name="cmb_arch">
+       <item>
+        <property name="text">
+         <string>All processes</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>x64 processes only</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>x86 processes only</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="1" column="1" colspan="2">
+      <widget class="QLineEdit" name="txt_filter"/>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="GuiMain.qrc"/>
+ </resources>
+ <connections/>
+</ui>

@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/GuiMain">
+        <file>gh_resource/GH Icon.ico</file>
+    </qresource>
+</RCC>
