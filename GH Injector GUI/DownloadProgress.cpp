@@ -52,23 +52,32 @@ HRESULT __stdcall DownloadProgress::OnObjectAvailable(const IID & riid, IUnknown
 
 HRESULT __stdcall DownloadProgress::OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText)
 {
-    TDownloadStatus status = (TDownloadStatus)ulStatusCode;
+    BINDSTATUS status = (BINDSTATUS)ulStatusCode;
+
     switch (status)
     {
-        case TDownloadStatus::dsConnecting:
+        case BINDSTATUS::BINDSTATUS_CONNECTING:
             printf("Connecting to server\n");
             break;
 
-        case TDownloadStatus::dsBegindownloaddata:
-            printf("Beginning download\n");
-            break;
-
-        case TDownloadStatus::dsEnddownloaddata:
-        case TDownloadStatus::dsDownloadingdata:
+        case BINDSTATUS::BINDSTATUS_BEGINDOWNLOADDATA:
+        case BINDSTATUS::BINDSTATUS_DOWNLOADINGDATA:
+        case BINDSTATUS::BINDSTATUS_ENDDOWNLOADDATA:
         {
+            if (status == BINDSTATUS::BINDSTATUS_BEGINDOWNLOADDATA)
+            {
+                printf("Beginning download\n");
+            }
+
             float percentage        = (float)ulProgress / ulProgressMax;
             float mibs_downloaded   = (float)ulProgress / 1024 / 1024;
             float mibs_max          = (float)ulProgressMax / 1024 / 1024;
+
+            if (status == BINDSTATUS_ENDDOWNLOADDATA)
+            {
+                percentage = 1;
+                mibs_downloaded = mibs_max;
+            }
 
             int char_count = 50;
 
@@ -90,9 +99,9 @@ HRESULT __stdcall DownloadProgress::OnProgress(ULONG ulProgress, ULONG ulProgres
 
             std::cout.flush();
 
-            if (status == TDownloadStatus::dsEnddownloaddata)
+            if (status == BINDSTATUS_ENDDOWNLOADDATA)
             {
-                printf("Download finished\n");
+                printf("\nDownload finished\n");
             }
         }
         break;

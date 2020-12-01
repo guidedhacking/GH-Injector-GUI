@@ -10,7 +10,7 @@
 #include <qmimedata.h>
 #include <QtGui>
 
-#include <urlmon.h>
+#include <Urlmon.h>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -31,9 +31,15 @@ GuiMain::GuiMain(QWidget* parent)
 {
 	ui.setupUi(this);
 
+	if (this->statusBar())
+	{
+		this->statusBar()->hide();
+	}
+
 	parent->layout()->setSizeConstraint(QLayout::SetFixedSize);
 	ui.grp_settings->layout()->setSizeConstraint(QLayout::SetFixedSize);
 	ui.tree_files->setFixedWidth(800);
+	ui.tree_files->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
 
 	// Settings
 	connect(ui.rb_proc,  SIGNAL(clicked()), this, SLOT(rb_process_set()));
@@ -46,9 +52,10 @@ GuiMain::GuiMain(QWidget* parent)
 	connect(ui.btn_hooks, SIGNAL(clicked()), this, SLOT(hook_Scan()));
 
 	// Method, Cloaking, Advanced
-	connect(ui.cmb_load,	SIGNAL(currentIndexChanged(int)),	this, SLOT(load_change(int)));
-	connect(ui.cmb_create,	SIGNAL(currentIndexChanged(int)),	this, SLOT(create_change(int)));
-	connect(ui.cb_main,		SIGNAL(clicked()),					this, SLOT(cb_main_clicked()));
+	connect(ui.cmb_load,		SIGNAL(currentIndexChanged(int)),	this, SLOT(load_change(int)));
+	connect(ui.cmb_create,		SIGNAL(currentIndexChanged(int)),	this, SLOT(create_change(int)));
+	connect(ui.cb_main,			SIGNAL(clicked()),					this, SLOT(cb_main_clicked()));
+	connect(ui.cb_protection,	SIGNAL(clicked()),					this, SLOT(cb_page_protection_clicked()));
 
 	// Files
 	connect(ui.btn_add,    SIGNAL(clicked()), this, SLOT(add_file_dialog()));
@@ -116,9 +123,8 @@ GuiMain::GuiMain(QWidget* parent)
 
 	ui.tree_files->setColumnWidth(0, 50);
 	ui.tree_files->setColumnWidth(1, 178);
-	ui.tree_files->setColumnWidth(2, 470);
+	ui.tree_files->setColumnWidth(2, 454);
 	ui.tree_files->setColumnWidth(3, 100);
-	ui.tree_files->setColumnWidth(4, 0);
 
 	ui.tree_files->clear();
 			
@@ -397,17 +403,24 @@ bool GuiMain::update_injector(std::string version)
 	FILE * pFile = nullptr;
 	freopen_s(&pFile, "CONOUT$", "w", stdout);
 
+	auto path = QCoreApplication::applicationDirPath().toStdString();
+	path += "/";
+
+	auto zip_path = path + GH_INJECTOR_ZIP;
+
+	DeleteFileA(zip_path.c_str());
+
 	printf("Downloading new version...\n");
 
 	std::string download_url = GH_DOWNLOAD_PREFIX;
 	download_url += version;
-	download_url += "/GH Injector.zip";
-	printf("%s\n", download_url.c_str());
+	download_url += GH_DOWNLOAD_SUFFIX;
 
 	DownloadProgress progress;
-	if (FAILED(URLDownloadToFileA(nullptr, download_url.c_str(), GH_INJECTOR_ZIP, 0, &progress)))
+	HRESULT hr = URLDownloadToFileA(nullptr, download_url.c_str(), GH_INJECTOR_ZIP, BINDF_GETNEWESTVERSION, &progress);
+	if (FAILED(hr))
 	{
-		FreeConsole();
+		printf("Download failed with error code %08X\n", hr);
 
 		return false;
 	}
@@ -429,15 +442,10 @@ bool GuiMain::update_injector(std::string version)
 	DeleteFileW(GH_INJ_MOD_NAME86W);
 	DeleteFileW(GH_INJ_MOD_NAME64W);
 	DeleteFileA(GH_INJECTOR_SM_X86);
-	DeleteFileA(GH_INJECTOR_SM_X64);
-
-	auto path = QCoreApplication::applicationDirPath().toStdString();
-	path += "/";
+	DeleteFileA(GH_INJECTOR_SM_X64);	
 
 	auto old_path = path + "OLD.exe";
 	MoveFileA(QCoreApplication::applicationFilePath().toStdString().c_str(), old_path.c_str());
-
-	auto zip_path = path + GH_INJECTOR_ZIP;
 
 	printf("Extracting new files...\n");
 
@@ -457,6 +465,8 @@ bool GuiMain::update_injector(std::string version)
 
 	printf("Launching updated version...\n");
 	CreateProcessA(nullptr, (char*)new_path.c_str(), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
+
+	Sleep(1000);
 
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
@@ -863,7 +873,10 @@ void GuiMain::load_settings()
 {
 	QFile iniFile((QCoreApplication::applicationName() + ".ini"));
 	if (!iniFile.exists())
+	{
+		ignoreUpdate = false;
 		return;
+	}
 
 	QSettings settings((QCoreApplication::applicationName() + ".ini"), QSettings::IniFormat);
 
@@ -970,6 +983,8 @@ void GuiMain::load_change(int i)
 			ui.grp_adv->setVisible(true);
 			ui.cb_unlink->setEnabled(false);
 			ui.cb_unlink->setChecked(false);
+			cb_main_clicked();
+			cb_page_protection_clicked();
 			break;
 	}
 }
@@ -1015,6 +1030,19 @@ void GuiMain::cb_main_clicked()
 	}
 }
 
+void GuiMain::cb_page_protection_clicked()
+{
+	if (ui.cb_protection->isChecked())
+	{
+		ui.cb_clean->setEnabled(false);
+		ui.cb_clean->setChecked(false);
+	}
+	else
+	{
+		ui.cb_clean->setEnabled(true);
+	}
+}
+
 void GuiMain::add_file_dialog()
 {
 	QFileDialog fDialog(this, "Select dll files", lastPathStr, "Dynamic Link Libraries (*.dll)");
@@ -1024,7 +1052,7 @@ void GuiMain::add_file_dialog()
 	if (fDialog.selectedFiles().empty())
 		return;
 
-	for (auto l : fDialog.selectedFiles())
+	for (auto & l : fDialog.selectedFiles())
 			GuiMain::add_file_to_list(l, "");
 
 	lastPathStr = QFileInfo(fDialog.selectedFiles().first()).path();
@@ -1516,31 +1544,40 @@ void GuiMain::open_log()
 
 void GuiMain::check_online_version()
 {
-	std::string online_version = getVersionFromIE();
+	std::string online_version = "3.4";// getVersionFromIE();
 	std::string current_version = GH_INJ_VERSIONA;
 
-	if (online_version.compare(current_version) > 0)
+	if (online_version.compare(current_version) > 0 || true)
 	{
 		std::string update_msg = "This version of the GH Injector is outdated.\nThe newest version is V";
 		update_msg += online_version;
 		update_msg += ".\n";
 		update_msg += "Do you want to update?";
 
-		QMessageBox::StandardButton update_box;
-		update_box = QMessageBox::information(nullptr, "New version available", update_msg.c_str(), QMessageBox::Yes | QMessageBox::No | QMessageBox::Ignore);
+		QMessageBox box;
+		box.setWindowTitle("New version available");
+		box.setText(update_msg.c_str());
+		box.addButton(QMessageBox::Yes);
+		box.addButton(QMessageBox::No);
+		box.addButton(QMessageBox::Ignore);
+		box.setDefaultButton(QMessageBox::Yes);
+		box.setIcon(QMessageBox::Icon::Information);
+		
+		auto res = box.exec();
 
-		if (update_box == QMessageBox::No)
-			return;
-
-		if (update_box == QMessageBox::Ignore)
+		if (res == QMessageBox::Yes)
 		{
-			ignoreUpdate = true;
+			ignoreUpdate = false;
+
+			update_injector(online_version);
+
 			return;
 		}
-
-		ignoreUpdate = false;
-
-		update_injector(online_version);
+				
+		if (res == QMessageBox::Ignore)
+		{
+			ignoreUpdate = true;
+		}
 	}
 
 	return;	

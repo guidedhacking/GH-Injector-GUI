@@ -136,6 +136,7 @@ private slots:
 	void load_change(int i);
 	void create_change(int i);
 	void cb_main_clicked();
+	void cb_page_protection_clicked();
 
 	// Files
 	void add_file_dialog();

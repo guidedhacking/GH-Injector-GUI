@@ -5,7 +5,6 @@
 #include "GuiMain.h"
 #include "CmdArg.hpp"
 #include "InjectionLib.hpp"
-
 #include "DragDropWindow.h"
 
 #pragma comment (lib, "URLMon.lib")
@@ -21,9 +20,9 @@ char* argument_value3[]{ "val1", "-f", "C:\\temp\\HelloWorld_x64.dll", "-p", "no
 
 int main(int argc, char* argv[]) {
 
-	//AllocConsole();
-	//FILE * pFile = nullptr;
-	//freopen_s(&pFile, "CONOUT$", "w", stdout);
+	/*AllocConsole();
+	FILE * pFile = nullptr;
+	freopen_s(&pFile, "CONOUT$", "w", stdout);*/
 
 #ifdef DEBUG_CMD_ARG
 	int res = CmdArg(ARRAYSIZE(argument_value1), argument_value1);
@@ -36,14 +35,7 @@ int main(int argc, char* argv[]) {
 	{
 		return res;
 	}
-
-	//InjectionLib inj;
-	//inj.Init();
-    //std::vector<std::string> l;
-
-	//inj.ScanHook(9652, l);
-	//inj.RestoreHook();
-
+		
 	// Restart Application loop
 	int currentExitCode = 0;
 	do {
@@ -51,11 +43,10 @@ int main(int argc, char* argv[]) {
 		QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
 		QApplication a(argc, argv);
-
+		
 		FramelessWindow framelessWindow;
 		if (!res)
 		{
-
 			DarkStyle* dark = new DarkStyle;
 			QApplication::setStyle(dark);
 			QApplication::setPalette(QApplication::style()->standardPalette());
@@ -68,7 +59,7 @@ int main(int argc, char* argv[]) {
 			MainWindow->statusBar()->setSizeGripEnabled(false);
 			
 			HWND hDragnDrop = CreateDragDropWindow((HWND)framelessWindow.winId(), MainWindow);
-										
+
 			framelessWindow.setContent(MainWindow);
 			framelessWindow.show();
 

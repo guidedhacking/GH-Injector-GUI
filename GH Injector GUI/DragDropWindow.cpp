@@ -99,15 +99,19 @@ DWORD __stdcall UpdateDragDropWnd_Thread(void * pParam)
 		}
 		else
 		{
+			float scaling = g_WinPosNew.cx / 1250.0f;
+			int y_offset = 200 * scaling;
+			int x_offset = 85 * scaling;
+
 			if (g_Active)
 			{
-				SetWindowPos(g_hDropWnd, HWND_TOPMOST, g_WinPosNew.x + g_WinPosNew.cx - 77, g_WinPosNew.y + g_WinPosNew.cy - 216, 30, 30, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+				SetWindowPos(g_hDropWnd, HWND_TOPMOST, g_WinPosNew.x + g_WinPosNew.cx - x_offset, g_WinPosNew.y + g_WinPosNew.cy - y_offset, 30, 30, SWP_SHOWWINDOW | SWP_NOACTIVATE);
 
 				g_WinPosOld = g_WinPosNew;
 			}
 			else
 			{					
-				SetWindowPos(g_hDropWnd, g_hMainWnd, g_WinPosNew.x + g_WinPosNew.cx - 77, g_WinPosNew.y + g_WinPosNew.cy - 216, 30, 30, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+				SetWindowPos(g_hDropWnd, g_hMainWnd, g_WinPosNew.x + g_WinPosNew.cx - x_offset, g_WinPosNew.y + g_WinPosNew.cy - y_offset, 30, 30, SWP_SHOWWINDOW | SWP_NOACTIVATE);
 				SetWindowPos(g_hMainWnd, g_hDropWnd, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
 
 				g_WinPosOld = g_WinPosNew;

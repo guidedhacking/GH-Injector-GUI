@@ -1,7 +1,4 @@
 #include <Windows.h>
-#include <tchar.h>
-
-#include <iostream>
 
 #define INJ_86 TEXT("GH Injector - x86.exe")
 #define INJ_64 TEXT("GH Injector - x64.exe")
@@ -10,7 +7,6 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 {
 	UNREFERENCED_PARAMETER(hInstance);
 	UNREFERENCED_PARAMETER(hPrevInstance);
-	UNREFERENCED_PARAMETER(lpCmdLine);
 	UNREFERENCED_PARAMETER(nCmdShow);
 
 	if (strlen(lpCmdLine))
@@ -18,11 +14,18 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		int pid = atoi(lpCmdLine);
 
 		HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-		while (hProc)
+		
+		if (hProc)
 		{
+			DWORD ExitCode = STILL_ACTIVE;
+			while (GetExitCodeProcess(hProc, &ExitCode) && ExitCode == STILL_ACTIVE)
+			{
+				Sleep(10);
+			}
+
 			CloseHandle(hProc);
-			hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
 		}
+
 	}
 
 	BOOL WoW64 = FALSE;

@@ -7,14 +7,6 @@
 #include <windows.h>
 #include <iostream>
 
-enum class TDownloadStatus : ULONG
-{
-    dsConnecting        = 2,
-    dsBegindownloaddata = 7,
-    dsDownloadingdata   = 13,
-    dsEnddownloaddata   = 20
-};
-
 class DownloadProgress : public IBindStatusCallback 
 {
 
