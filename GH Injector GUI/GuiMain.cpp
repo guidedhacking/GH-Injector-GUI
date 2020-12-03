@@ -173,6 +173,8 @@ GuiMain::GuiMain(QWidget* parent)
 
 	ui.txt_delay->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
 
+	ui.txt_timeout->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
+
 	platformCheck();
 
 	bool status = SetDebugPrivilege(true);
@@ -417,7 +419,7 @@ bool GuiMain::update_injector(std::string version)
 	download_url += GH_DOWNLOAD_SUFFIX;
 
 	DownloadProgress progress;
-	HRESULT hr = URLDownloadToFileA(nullptr, download_url.c_str(), GH_INJECTOR_ZIP, BINDF_GETNEWESTVERSION, &progress);
+	HRESULT hr = URLDownloadToFileA(nullptr, download_url.c_str(), zip_path.c_str(), BINDF_GETNEWESTVERSION, &progress);
 	if (FAILED(hr))
 	{
 		printf("Download failed with error code %08X\n", hr);
@@ -437,6 +439,15 @@ bool GuiMain::update_injector(std::string version)
 		mod = GetModuleHandleA("GH Injector - x64.dll");
 	}
 
+	auto old_path = path + "OLD.exe";
+	DeleteFileA(old_path.c_str());
+	if (!MoveFileA(QCoreApplication::applicationFilePath().toStdString().c_str(), old_path.c_str()))
+	{
+		printf("Failed to rename file. Please unzip the new files manually and delete the old files.\n.");
+
+		return false;
+	}
+
 	printf("Removing old files...\n");
 
 	DeleteFileW(GH_INJ_MOD_NAME86W);
@@ -444,12 +455,14 @@ bool GuiMain::update_injector(std::string version)
 	DeleteFileA(GH_INJECTOR_SM_X86);
 	DeleteFileA(GH_INJECTOR_SM_X64);	
 
-	auto old_path = path + "OLD.exe";
-	MoveFileA(QCoreApplication::applicationFilePath().toStdString().c_str(), old_path.c_str());
-
 	printf("Extracting new files...\n");
 
-	Unzip(zip_path.c_str(), path.c_str());
+	if (Unzip(zip_path.c_str(), path.c_str()) != 0)
+	{
+		printf("Failed to unzip files. Please unzip the new files manually.\n.");
+
+		return false;
+	}
 
 	DeleteFileA(zip_path.c_str());
 	
@@ -476,7 +489,6 @@ bool GuiMain::update_injector(std::string version)
 
 void GuiMain::platformCheck()
 {
-#ifndef _DEBUG
 #ifndef _WIN64
 
 	// windows 64-bit == gh64.exe
@@ -488,7 +500,6 @@ void GuiMain::platformCheck()
 	ui.cb_hijack->setChecked(false);
 	ui.cb_hijack->setDisabled(true);
 
-
 	QMessageBox::StandardButton reply;
 	reply = QMessageBox::warning(nullptr, "Warning architecture conflict", "Since you're using a \
 64-bit version of Windows it's recommended to use the 64-bit version of the injector. \
@@ -496,18 +507,23 @@ Do you want to switch to the 64-bit version?", QMessageBox::Yes | QMessageBox::N
 
 	if (reply == QMessageBox::No)
 		return;
-		
-	bool bStart = StartProcess(GH_INJ_EXE_NAME64A);
-	if (bStart == false)
-		return; // can't start, maybe msgbox
+	
+	STARTUPINFOA si{ 0 };
+	PROCESS_INFORMATION pi{ 0 };
 
+	auto x64_path = QCoreApplication::applicationDirPath().toStdString();
+	x64_path += "/";
+	x64_path += GH_INJECTOR_EXE_X64;
+	CreateProcessA(nullptr, (char*)x64_path.c_str(), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
+
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
 
 	//qApp->quit();
 	// I am qt and do not want to close
 	QTimer::singleShot(250, qApp, SLOT(quit()));
 
 #endif // _WIN64
-#endif _DEBUG
 }
 
 void GuiMain::rb_process_set()
@@ -826,6 +842,8 @@ void GuiMain::save_settings()
 	settings.setValue("DELAY",			ui.txt_delay->text());	
 	settings.setValue("AUTOINJ",		ui.cb_auto->isChecked());
 	settings.setValue("CLOSEONINJ",		ui.cb_close->isChecked());
+	settings.setValue("TIMEOUT",		ui.txt_timeout->text());	
+	settings.setValue("ERRORLOG",		ui.cb_error->isChecked());	
 
 	// Method
 	settings.setValue("MODE",			ui.cmb_load->currentIndex());
@@ -915,6 +933,8 @@ void GuiMain::load_settings()
 	ui.txt_delay	->setText(settings.value("DELAY").toString());
 	ui.cb_auto		->setChecked(settings.value("AUTOINJ").toBool());
 	ui.cb_close		->setChecked(settings.value("CLOSEONINJ").toBool());
+	ui.txt_timeout	->setText(settings.value("TIMEOUT").toString());
+	ui.cb_error		->setChecked(settings.value("ERRORLOG").toBool());
 
 	// Method
 	ui.cmb_load		->setCurrentIndex(settings.value("MODE").toInt());
@@ -1094,7 +1114,6 @@ void GuiMain::remove_file()
 	}
 }
 
-
 void GuiMain::select_file()
 {
 	QList<QTreeWidgetItem*> item = ui.tree_files->selectedItems();
@@ -1118,7 +1137,6 @@ void GuiMain::delay_inject()
 		emit inject_file();
 	}
 }
-
 
 void GuiMain::inject_file()
 {
@@ -1201,7 +1219,7 @@ void GuiMain::inject_file()
 	}
 
 
-	data.GenerateErrorLog = true;
+	data.GenerateErrorLog = ui.cb_error->isChecked();
 
 	if (!InjLib.LoadingStatus())
 	{
@@ -1239,7 +1257,7 @@ void GuiMain::inject_file()
 			continue;
 		}
 
-		data.Timeout = 2000;
+		data.Timeout = ui.txt_timeout->text().toInt();;
 		DWORD res = InjLib.InjectFuncW(&data);
 		if (res)
 		{
@@ -1322,6 +1340,9 @@ void GuiMain::tooltip_change()
 	ui.txt_delay->setToolTipDuration(duration);
 	ui.cb_close->setToolTipDuration(duration);
 	ui.cb_auto->setToolTipDuration(duration);
+	ui.lbl_timeout->setToolTipDuration(duration);
+	ui.txt_timeout->setToolTipDuration(duration);
+	ui.cb_error->setToolTipDuration(duration);
 
 	// Method
 	ui.cmb_load->setToolTipDuration(duration);
@@ -1533,7 +1554,6 @@ void GuiMain::open_log()
 		QMessageBox messageBox;
 		messageBox.information(0, "Success", msg);
 		messageBox.setFixedSize(500, 200);
-
 	}
 	else
 	{

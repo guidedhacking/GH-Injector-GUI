@@ -90,10 +90,10 @@
     <ClInclude Include="cxxopts.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="InjectionLib.hpp">
-      <Filter>Quelldateien</Filter>
-    </ClInclude>
     <ClInclude Include="Zip.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="InjectionLib.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

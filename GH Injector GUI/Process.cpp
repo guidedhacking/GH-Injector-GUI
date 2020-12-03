@@ -260,6 +260,11 @@ bool getProcessList(std::vector<Process_Struct>& pl)
         {
             do
             {
+                if (!procEntry.th32ProcessID || procEntry.th32ProcessID == 4)
+                {
+                    continue;
+                }
+
                 Process_Struct ps_item;
                 memset(&ps_item, 0, sizeof(Process_Struct));
 
