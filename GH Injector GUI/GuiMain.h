@@ -1,8 +1,6 @@
 #pragma once
 
 #include <QtWidgets/QMainWindow>
-#include <qnetworkaccessmanager.h>
-#include <qnetworkreply.h>
 #include <qtimer.h>
 #include <qtreewidget.h>
 #include <qevent.h>

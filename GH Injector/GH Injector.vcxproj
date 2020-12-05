@@ -44,7 +44,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>..\Static\x64\</OutDir>
+    <OutDir>$(SolutionDir)$(Configuration)\$(PlatformShortName)\</OutDir>
+    <IntDir>$(Configuration)\$(PlatformShortName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
