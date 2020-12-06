@@ -15,9 +15,6 @@ InjectionLib::~InjectionLib()
 
 bool InjectionLib::Init()
 {
-	if (GetModuleHandle(GH_INJ_MOD_NAME) != NULL && hInjectionMod)
-		return true;
-
     hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
     if (hInjectionMod == nullptr)
         return false;

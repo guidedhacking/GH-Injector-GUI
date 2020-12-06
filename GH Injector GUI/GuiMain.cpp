@@ -453,7 +453,13 @@ bool GuiMain::update_injector(std::string version)
 	DeleteFileW(GH_INJ_MOD_NAME86W);
 	DeleteFileW(GH_INJ_MOD_NAME64W);
 	DeleteFileA(GH_INJECTOR_SM_X86);
-	DeleteFileA(GH_INJECTOR_SM_X64);	
+	DeleteFileA(GH_INJECTOR_SM_X64);
+
+#ifdef _WIN64
+	DeleteFileA(GH_INJECTOR_EXE_X86);
+#else
+	DeleteFileA(GH_INJECTOR_EXE_X64);
+#endif
 
 	printf("Extracting new files...\n");
 

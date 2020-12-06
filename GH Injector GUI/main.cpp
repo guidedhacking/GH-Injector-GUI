@@ -39,7 +39,6 @@ int main(int argc, char* argv[]) {
 	// Restart Application loop
 	int currentExitCode = 0;
 	do {
-
 		QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
 		QApplication a(argc, argv);
@@ -72,13 +71,12 @@ int main(int argc, char* argv[]) {
 			mainWindow->show();
 		}
 
-
 		currentExitCode = a.exec();
 
 		CloseDragDropWindow();
 
 		int i = 42;
 	} while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
-
+		
 	return currentExitCode;
 }
