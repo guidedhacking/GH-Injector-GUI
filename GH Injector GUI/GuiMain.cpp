@@ -179,6 +179,18 @@ GuiMain::GuiMain(QWidget* parent)
 
 	bool status = SetDebugPrivilege(true);
 
+	Process_Struct byName	= getProcessByName(ui.cmb_proc->currentText().toStdString().c_str());
+	Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toInt());
+
+	if (ui.rb_pid->isChecked() && byPID.pid)
+	{
+		txt_pid_change();
+	}
+	else if (ui.rb_proc->isChecked() && byName.pid)
+	{
+		cmb_proc_name_change();
+	}
+
 	OnExit = false;
 	process_update_thread = std::thread(&GuiMain::UpdateProcess, this, 100);
 
@@ -195,10 +207,23 @@ GuiMain::~GuiMain()
 		save_settings();
 
 	delete gui_Picker;
+	delete gui_Scanner;
 	delete t_Auto_Inj;
 	delete t_Delay_Inj;
 	delete pss;
 	delete ps_picker;
+
+	//force unload module because std::async increases LDR_DDAG_NODE::LoadCount
+	//but std::async threads get terminated without calling the DllMain with DLL_THREAD_DETACH
+	//so there's no way to free dependencies properly
+	//wtf bill??????
+
+	HINSTANCE hMod = GetModuleHandle(GH_INJ_MOD_NAME);
+	while (hMod)
+	{
+		FreeLibrary(hMod);
+		hMod = GetModuleHandle(GH_INJ_MOD_NAME);
+	}
 }
 
 void GuiMain::UpdateProcess(int Interval)
@@ -363,7 +388,6 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 			QKeyEvent * keyEvent = static_cast<QKeyEvent*>(event);
 			if (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_9 || keyEvent->key() == Qt::Key_Backspace || keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Space)
 			{
-				printf("triggered event handler\n");
 				onUserInput = true;
 			}
 		}
@@ -432,15 +456,9 @@ bool GuiMain::update_injector(std::string version)
 	gui_Scanner->InjLib.Unload();
 	InjLib.Unload();
 
-	auto mod = GetModuleHandle(GH_INJ_MOD_NAME);
-	while (mod)
-	{
-		FreeLibrary(mod);
-		mod = GetModuleHandleA("GH Injector - x64.dll");
-	}
-
 	auto old_path = path + "OLD.exe";
 	DeleteFileA(old_path.c_str());
+
 	if (!MoveFileA(QCoreApplication::applicationFilePath().toStdString().c_str(), old_path.c_str()))
 	{
 		printf("Failed to rename file. Please unzip the new files manually and delete the old files.\n.");
@@ -649,6 +667,7 @@ void GuiMain::get_from_picker(Process_State_Struct* procStateStruct, Process_Str
 		ui.cmb_proc->setCurrentIndex(ui.cmb_proc->findText(ps_picker->name));
 		ui.txt_pid->setText(QString::number(ps_picker->pid));
 		ui.txt_arch->setText(GuiMain::arch_to_str(ps_picker->arch));
+		txt_pid_change();
 		rb_pid_set();
 	}
 }
@@ -778,8 +797,7 @@ void GuiMain::reset_settings()
 	QFileDialog fDialog(this, "Select dll files", QApplication::applicationDirPath(), "Dynamic Link Libraries (*.dll)");
 	
 	// delete file
-	QString iniName = QCoreApplication::applicationName() + ".ini";
-	QFile iniFile(iniName);
+	QFile iniFile(GH_SETTINGS_INI);
 	if (iniFile.exists())
 	{
 		iniFile.remove();
@@ -813,7 +831,7 @@ void GuiMain::save_settings()
 		return;
 	}
 
-	QSettings settings((QCoreApplication::applicationName() + ".ini"), QSettings::IniFormat);
+	QSettings settings(GH_SETTINGS_INI, QSettings::IniFormat);
 
 	settings.beginWriteArray("FILES");
 	int i = 0;
@@ -825,7 +843,7 @@ void GuiMain::save_settings()
 
 		settings.setArrayIndex(i);
 		settings.setValue(QString::number(0), (*it)->text(2));
-		settings.setValue(QString::number(1), (*it)->checkState(0) == Qt::CheckState::Checked);
+		settings.setValue(QString::number(1), (*it)->checkState(0) != Qt::CheckState::Unchecked);
 	}
 	settings.endArray();
 
@@ -836,7 +854,6 @@ void GuiMain::save_settings()
 		settings.setValue(QString::number(0), ui.cmb_proc->itemText(i));
 	}
 	settings.endArray();
-
 
 	settings.beginGroup("CONFIG");
 
@@ -895,14 +912,15 @@ void GuiMain::save_settings()
 
 void GuiMain::load_settings()
 {
-	QFile iniFile((QCoreApplication::applicationName() + ".ini"));
+	GH_DOWNLOAD_PREFIX;
+	QFile iniFile(GH_SETTINGS_INI);
 	if (!iniFile.exists())
 	{
 		ignoreUpdate = false;
 		return;
 	}
 
-	QSettings settings((QCoreApplication::applicationName() + ".ini"), QSettings::IniFormat);
+	QSettings settings(GH_SETTINGS_INI, QSettings::IniFormat);
 
 	int fileSize = settings.beginReadArray("FILES");
 	for (int i = 0; i < fileSize; ++i)
@@ -1108,6 +1126,14 @@ void GuiMain::add_file_to_list(QString str, bool active)
 	{
 		item->setCheckState(0, Qt::CheckState::Checked);
 	}
+
+#ifndef _WIN64
+	if (arch != ARCH::X86)
+	{
+		item->setDisabled(true);
+		item->setCheckState(0, Qt::CheckState::Unchecked);
+	}
+#endif
 }
 
 void GuiMain::remove_file()
@@ -1565,7 +1591,6 @@ void GuiMain::open_log()
 	{
 		emit injec_status(false, "Shortcut generation failed");
 	}
-
 }
 
 void GuiMain::check_online_version()

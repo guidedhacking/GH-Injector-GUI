@@ -10,7 +10,7 @@ InjectionLib::InjectionLib()
 
 InjectionLib::~InjectionLib()
 {
-    BOOL fFreeResult = FreeLibrary(hInjectionMod);
+    FreeLibrary(hInjectionMod);
 }
 
 bool InjectionLib::Init()

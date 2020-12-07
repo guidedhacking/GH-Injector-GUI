@@ -26,9 +26,8 @@ GuiScanHook::GuiScanHook(QWidget* parent)
 
 	model->setStringList(List);
 	ui.lv_scanhook->setModel(model);
-
-	InjLib.Init();
-	if (!InjLib.LoadingStatus())
+	
+	if (!InjLib.Init())
 	{
 		emit injec_status(false, "Library or Function not found!");
 		return;
@@ -38,7 +37,6 @@ GuiScanHook::GuiScanHook(QWidget* parent)
 GuiScanHook::~GuiScanHook()
 {
 
-	
 }
 
 void GuiScanHook::setItem(const std::vector<std::string>& item)

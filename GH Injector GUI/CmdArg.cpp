@@ -228,7 +228,7 @@ int CmdArg(int argc, char* argv[])
 		std::cout << "InjectA failed with " << iInject << std::endl;
 		return err::inject_fail;
 	}
-	
+		
 	int i = 42;
 	std::cout << "Success" << std::endl;
 	return  ok;

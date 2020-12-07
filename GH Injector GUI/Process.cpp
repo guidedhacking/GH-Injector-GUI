@@ -188,10 +188,16 @@ Process_Struct getProcessByName(const char* proc)
                 int ret = wcstombs(name, procEntry.szExeFile, sizeof(name));
                 if (!strcmp(name, proc))
                 {
-
                     ps.arch = getProcArch(procEntry.th32ProcessID);
                     if (ps.arch != ARCH::NONE)
                     {
+#ifndef _WIN64
+                        if (ps.arch != ARCH::X86)
+                        {
+                            continue;
+                        }
+#endif
+                        
                         ps.pid = procEntry.th32ProcessID;
                         strcpy(ps.name, name);
                         getProcFullPath(ps.fullName, sizeof(ps.fullName), ps.pid);
@@ -230,6 +236,12 @@ Process_Struct getProcessByPID(const int pid)
                     ps.arch = getProcArch(procEntry.th32ProcessID);
                     if (ps.arch != ARCH::NONE)
                     {
+#ifndef _WIN64
+                        if (ps.arch != ARCH::X86)
+                        {
+                            continue;
+                        }
+#endif
                         ps.pid = procEntry.th32ProcessID;
                         int ret = wcstombs(name, procEntry.szExeFile, sizeof(name));
                         strcpy(ps.name, name);

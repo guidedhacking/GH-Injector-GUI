@@ -6,6 +6,7 @@
 #include "CmdArg.hpp"
 #include "InjectionLib.hpp"
 #include "DragDropWindow.h"
+#include "resource.h"
 
 #pragma comment (lib, "URLMon.lib")
 
@@ -26,7 +27,6 @@ int main(int argc, char* argv[]) {
 
 #ifdef DEBUG_CMD_ARG
 	int res = CmdArg(ARRAYSIZE(argument_value1), argument_value1);
-
 #else	
 	int res = CmdArg(argc, argv);
 #endif //DEBUG CMD
@@ -35,21 +35,21 @@ int main(int argc, char* argv[]) {
 	{
 		return res;
 	}
-		
+	
 	// Restart Application loop
 	int currentExitCode = 0;
 	do {
-		QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-
 		QApplication a(argc, argv);
-		
+
+		QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+		QApplication::setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
+
 		FramelessWindow framelessWindow;
 		if (!res)
 		{
 			DarkStyle* dark = new DarkStyle;
 			QApplication::setStyle(dark);
 			QApplication::setPalette(QApplication::style()->standardPalette());
-			//a.setStyle(dark);
 
 			framelessWindow.setWindowTitle("GH Injector");
 			framelessWindow.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));

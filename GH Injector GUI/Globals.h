@@ -24,4 +24,5 @@ constexpr auto GH_VERSION_URL = "https://guidedhacking.com/gh/inj/";
 constexpr auto GH_DOWNLOAD_PREFIX = "https://guidedhacking.com/gh/inj/V";
 constexpr auto GH_DOWNLOAD_SUFFIX = "/GH Injector.zip";
 constexpr auto GH_VERSION_URL = "https://guidedhacking.com/gh/inj/";
+constexpr auto GH_SETTINGS_INI = "Settings.ini";
 #endif
