@@ -1,0 +1,9 @@
+1. Update function properly free dependencies before unzipping = FIXED
+2. Fix wow64 to x64 reboot = FIXED
+3. Check ini loading = FIXED
+4. Prepare better info in scan hook window = FIXED
+5. Handle hijacking crash? Probably due to shitty dependencies (rip lsass.exe), might already be fixed with #1
+6. Process list sorting case insensitive = FIXED
+7. Wow64 file system redirection (Sysnative vs. System32 / System32 vs SysWOW64) = FIXED
+8. Prevent wow64 variant to attach to x64 processes = FIXED
+9. Process picker should show process count in title = FIXED

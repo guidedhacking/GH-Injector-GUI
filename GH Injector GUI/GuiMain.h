@@ -68,6 +68,7 @@ private:
 	UPDATE		update;
 	bool		onReset;
 	bool		onUserInput;
+	bool		native;
 
 	std::thread process_update_thread;
 	bool OnExit;
@@ -105,7 +106,7 @@ signals:
 private slots:
 	// Titelbar
 	void closeEvent(QCloseEvent* event) override;
-	void platformCheck();
+	bool platformCheck();
 
 	// Settings
 	void rb_process_set();

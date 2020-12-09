@@ -29,6 +29,13 @@ int const GuiMain::EXIT_CODE_REBOOT = -123456789;
 GuiMain::GuiMain(QWidget* parent)
 	: QMainWindow(parent)
 {
+	if (!platformCheck())
+	{
+		ExitProcess(0);
+	}
+
+	native = is_native_process(GetCurrentProcessId());
+
 	ui.setupUi(this);
 
 	if (this->statusBar())
@@ -71,12 +78,15 @@ GuiMain::GuiMain(QWidget* parent)
 
 	ui.btn_version->setText("V" GH_INJ_VERSIONA);
 
-	gui_Picker  = new GuiProcess();
+	gui_Picker  = new GuiProcess(&framelessPicker);
 	gui_Scanner = new GuiScanHook();
 	t_Auto_Inj  = new QTimer(this);
 	t_Delay_Inj = new QTimer(this);
 	pss         = new Process_State_Struct;
 	ps_picker   = new Process_Struct;
+
+	//have to do this shit because qt is too dumb to forward setWindowTitle calls properly
+	gui_Picker->set_frameless_parent(&framelessPicker);
 
 	if (this->parentWidget())
 	{
@@ -175,9 +185,14 @@ GuiMain::GuiMain(QWidget* parent)
 
 	ui.txt_timeout->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
 
-	platformCheck();
-
 	bool status = SetDebugPrivilege(true);
+
+	if (!native)
+	{
+		// Won't work
+		ui.cb_hijack->setChecked(false);
+		ui.cb_hijack->setDisabled(true);
+	}
 
 	Process_Struct byName	= getProcessByName(ui.cmb_proc->currentText().toStdString().c_str());
 	Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toInt());
@@ -243,8 +258,30 @@ void GuiMain::UpdateProcess(int Interval)
 		}
 
 		int raw = ui.txt_pid->text().toInt();
-		Process_Struct byName	= getProcessByName(ui.cmb_proc->currentText().toStdString().c_str());
-		Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toInt());
+		Process_Struct byName = getProcessByName(ui.cmb_proc->currentText().toStdString().c_str());
+		Process_Struct byPID = getProcessByPID(ui.txt_pid->text().toInt());
+
+#ifndef _WIN64
+
+		if (!native)
+		{
+			if (byName.pid)
+			{
+				if (is_native_process(byName.pid))
+				{
+					byName.pid = 0;
+				}
+			}
+
+			if (byPID.pid)
+			{
+				if (is_native_process(byPID.pid))
+				{
+					byPID.pid = 0;
+				}
+			}
+		}
+#endif
 
 		if (ui.rb_pid->isChecked())
 		{
@@ -348,8 +385,6 @@ void GuiMain::keyPressEvent(QKeyEvent * k)
 
 void GuiMain::dragEnterEvent(QDragEnterEvent* e)
 {
-	
-	("dragEnterEvent\n");
 	if (e->mimeData()->hasUrls()) {
 		e->acceptProposedAction();
 	}
@@ -357,13 +392,11 @@ void GuiMain::dragEnterEvent(QDragEnterEvent* e)
 
 void GuiMain::dragMoveEvent(QDragMoveEvent* e)
 {
-	printf("dragMoveEvent\n");
 	int i = 42;
 }
 
 void GuiMain::dragLeaveEvent(QDragLeaveEvent* e)
 {
-	printf("dragLeaveEvent\n");
 	int i = 42;
 }
 
@@ -448,13 +481,19 @@ bool GuiMain::update_injector(std::string version)
 	{
 		printf("Download failed with error code %08X\n", hr);
 
+		FreeConsole();
+
 		return false;
 	}
 
 	save_settings();
 
-	gui_Scanner->InjLib.Unload();
-	InjLib.Unload();
+	HINSTANCE hMod = GetModuleHandle(GH_INJ_MOD_NAME);
+	while (hMod)
+	{
+		FreeLibrary(hMod);
+		hMod = GetModuleHandle(GH_INJ_MOD_NAME);
+	}
 
 	auto old_path = path + "OLD.exe";
 	DeleteFileA(old_path.c_str());
@@ -462,6 +501,8 @@ bool GuiMain::update_injector(std::string version)
 	if (!MoveFileA(QCoreApplication::applicationFilePath().toStdString().c_str(), old_path.c_str()))
 	{
 		printf("Failed to rename file. Please unzip the new files manually and delete the old files.\n.");
+
+		FreeConsole();
 
 		return false;
 	}
@@ -484,6 +525,8 @@ bool GuiMain::update_injector(std::string version)
 	if (Unzip(zip_path.c_str(), path.c_str()) != 0)
 	{
 		printf("Failed to unzip files. Please unzip the new files manually.\n.");
+
+		FreeConsole();
 
 		return false;
 	}
@@ -511,42 +554,36 @@ bool GuiMain::update_injector(std::string version)
 	ExitProcess(0);
 }
 
-void GuiMain::platformCheck()
+bool GuiMain::platformCheck()
 {
-#ifndef _WIN64
-
+#ifdef _WIN64
+	return true;
+#else
 	// windows 64-bit == gh64.exe
-	bool bPlatform = isCorrectPlatform();
+	bool bPlatform = is_native_process(GetCurrentProcessId());
 	if (bPlatform == true)
-		return;
-
-	// Won't work
-	ui.cb_hijack->setChecked(false);
-	ui.cb_hijack->setDisabled(true);
+		return true;
 
 	QMessageBox::StandardButton reply;
-	reply = QMessageBox::warning(nullptr, "Warning architecture conflict", "Since you're using a \
-64-bit version of Windows it's recommended to use the 64-bit version of the injector. \
-Do you want to switch to the 64-bit version?", QMessageBox::Yes | QMessageBox::No);
+	reply = QMessageBox::warning(nullptr, "Warning architecture conflict", "Since you're using a "\
+		"64-bit version of Windows it's recommended to use the 64-bit version of the injector. "\
+		"Do you want to switch to the 64-bit version?", QMessageBox::Yes | QMessageBox::No);
 
 	if (reply == QMessageBox::No)
-		return;
+		return true;
 	
 	STARTUPINFOA si{ 0 };
 	PROCESS_INFORMATION pi{ 0 };
 
 	auto x64_path = QCoreApplication::applicationDirPath().toStdString();
 	x64_path += "/";
-	x64_path += GH_INJECTOR_EXE_X64;
-	CreateProcessA(nullptr, (char*)x64_path.c_str(), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
-
+	x64_path += GH_INJ_EXE_NAME64A;
+	CreateProcessA(x64_path.c_str(), nullptr, nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
+	
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 
-	//qApp->quit();
-	// I am qt and do not want to close
-	QTimer::singleShot(250, qApp, SLOT(quit()));
-
+	return false;
 #endif // _WIN64
 }
 
@@ -929,9 +966,6 @@ void GuiMain::load_settings()
 		
 		auto path = settings.value(QString::number(0)).toString();
 
-		if (!FileExistsW(path.toStdWString().c_str()))
-			continue;
-
 		add_file_to_list(
 			path,
 			settings.value(QString::number(1)).toBool()
@@ -1109,6 +1143,15 @@ void GuiMain::add_file_to_list(QString str, bool active)
 		if ((*it)->text(2) == str)
 			return;
 
+#ifndef _WIN64
+	if (!native)
+	{
+		str.replace(":/Windows/System32/", ":/Windows/Sysnative/", Qt::CaseSensitivity::CaseInsensitive);
+	}
+#else
+	str.replace(":/Windows/Sysnative/", ":/Windows/System32/", Qt::CaseSensitivity::CaseInsensitive);
+#endif
+
 	QFileInfo fi(str);
 	int arch = (int)getFileArch(fi.absoluteFilePath().toStdWString().c_str());
 
@@ -1130,7 +1173,7 @@ void GuiMain::add_file_to_list(QString str, bool active)
 #ifndef _WIN64
 	if (arch != ARCH::X86)
 	{
-		item->setDisabled(true);
+		item->setHidden(true);
 		item->setCheckState(0, Qt::CheckState::Unchecked);
 	}
 #endif

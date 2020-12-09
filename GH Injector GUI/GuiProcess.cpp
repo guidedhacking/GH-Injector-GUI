@@ -16,8 +16,8 @@ GuiProcess::GuiProcess(QWidget* parent)
 	// Maybe sometime we need this
 	delete ui.tree_process;
 	ui.tree_process = new MyTreeWidget(this);
-	//ui.tree_process->headerItem()->setText(0, QString());
-	
+
+	//why is this necessary??
 	ui.grid_proc->addWidget(ui.tree_process, 0, 0, 1, 3);
 
 	QTreeWidgetItem* ___qtreewidgetitem = ui.tree_process->headerItem();
@@ -30,18 +30,18 @@ GuiProcess::GuiProcess(QWidget* parent)
 	___qtreewidgetitem1->setText(2, QCoreApplication::translate("frm_proc", "xxxxxxxxxxxxxxxxxxxxxxx", nullptr));
 	___qtreewidgetitem1->setText(1, QCoreApplication::translate("frm_proc", "123456", nullptr));
 
-
-	connect(ui.btn_refresh, SIGNAL(clicked()), this, SLOT(refresh_process()));
-	connect(ui.cmb_arch, SIGNAL(currentIndexChanged(int)), this, SLOT(filter_change(int)));
-	connect(ui.txt_filter, &QLineEdit::textChanged, this, &GuiProcess::name_change);
-	connect(ui.btn_select, SIGNAL(clicked()), this, SLOT(proc_select()));
-	connect(ui.cb_session, SIGNAL(stateChanged(int)), this, SLOT(session_change()));
-	connect(ui.tree_process->header(), SIGNAL(sectionClicked(int)), this, SLOT(customSort(int)));
-	connect(ui.tree_process, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(on_treeView_doubleClicked(QModelIndex)));
-	//connect(header(), SIGNAL(sectionClicked(int)), this, SLOT(customSortByColumn(int)));
+	connect(ui.btn_refresh,				SIGNAL(clicked()),							this, SLOT(refresh_process()));
+	connect(ui.cmb_arch,				SIGNAL(currentIndexChanged(int)),			this, SLOT(filter_change(int)));
+	connect(ui.txt_filter,				SIGNAL(textChanged(const QString &)),		this, SLOT(name_change(const QString &)));
+	connect(ui.btn_select,				SIGNAL(clicked()),							this, SLOT(proc_select()));
+	connect(ui.cb_session,				SIGNAL(stateChanged(int)),					this, SLOT(session_change()));
+	connect(ui.tree_process->header(),	SIGNAL(sectionClicked(int)),				this, SLOT(customSort(int)));
+	connect(ui.tree_process,			SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(on_treeView_doubleClicked(const QModelIndex &)));
 
 	//dummy in case nothing was selected
 	ps = new Process_Struct();
+
+	native = is_native_process(GetCurrentProcessId());
 
 	installEventFilter(this);
 	ui.tree_process->installEventFilter(this);
@@ -52,6 +52,7 @@ GuiProcess::GuiProcess(QWidget* parent)
 
 GuiProcess::~GuiProcess()
 {
+
 }
 
 bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
@@ -81,12 +82,13 @@ bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
 
 void GuiProcess::refresh_gui()
 {
-	// Architecture & session Filter
-	int index	= ui.cmb_arch->currentIndex();
-	int own_session = getProcSession(GetCurrentProcessId());
+	int index			= ui.cmb_arch->currentIndex();
+	int own_session		= getProcSession(GetCurrentProcessId());
+	QString filter		= ui.txt_filter->text();
+	int proc_count		= 0;
 
 	QTreeWidgetItemIterator it(ui.tree_process);
-	while (*it)
+	for (; *it; ++it)
 	{
 		QString strArch = (*it)->text(3);
 		int arch = GuiMain::str_to_arch(strArch);
@@ -94,24 +96,13 @@ void GuiProcess::refresh_gui()
 
 		if (pid == GetCurrentProcessId())
 		{
-			++it;
 			continue;
 		}
 
-		if (index == 0) // All process
+		if (index != 0 && arch != index)  // x86 or x64
 		{
-			(*it)->setHidden(false);
-		}
-		else // x86 or x64
-		{
-			if (arch == index) // show only selected
-			{
-				(*it)->setHidden(false);
-			}
-			else
-			{
-				(*it)->setHidden(true);
-			}
+			(*it)->setHidden(true);
+			continue;
 		}
 
 		if (ui.cb_session->isChecked())
@@ -120,42 +111,37 @@ void GuiProcess::refresh_gui()
 			if (target_session != own_session && own_session != -1)
 			{
 				(*it)->setHidden(true);
+				continue;
 			}
 		}
 
-		++it;
-	}
-
-	// Text Filter
-	QString txt = ui.txt_filter->text();
-	if (txt.isEmpty())
-		return;
-
-	
-	QTreeWidgetItemIterator it2(ui.tree_process);
-	while (*it2)
-	{
-		if (!(*it2)->isHidden())
+		if (!filter.isEmpty())
 		{
-			bool contain = (*it2)->text(2).contains(txt, Qt::CaseInsensitive);
-			if (!contain)
+			bool contains = (*it)->text(2).contains(filter, Qt::CaseInsensitive);
+			if (!contains)
 			{
-				(*it2)->setHidden(true);
+				(*it)->setHidden(true);
+				continue;
 			}
 		}
-		++it2;
-	}
 
-	int processCount = 0;
-	QTreeWidgetItemIterator it3(ui.tree_process);
-	while (*it3)
-	{
-		if (!(*it3)->isHidden())
-			processCount++;
-		++it3;
+		(*it)->setHidden(false);
+		++proc_count;
 	}
-	
-	this->setWindowTitle("Select a process (" + QString::number(processCount) + ')');
+		
+	if (parent)
+	{
+		parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
+	}
+	else
+	{
+		this->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
+	}
+}
+
+void GuiProcess::set_frameless_parent(FramelessWindow * p)
+{
+	parent = p;
 }
 
 void GuiProcess::refresh_process()
@@ -168,6 +154,11 @@ void GuiProcess::refresh_process()
 
 	for (const auto &proc : all_proc)
 	{
+		if (proc.pid == GetCurrentProcessId())
+		{
+			continue;
+		}
+
 		QTreeWidgetItem* item = new QTreeWidgetItem(ui.tree_process);
 
 		item->setText(1, QString::number(proc.pid));
@@ -176,12 +167,19 @@ void GuiProcess::refresh_process()
 
 		// https://forum.qt.io/topic/62866/getting-icon-from-external-applications/4
 		if (this->parentWidget())
-		{		
-			model.setRootPath(proc.fullName);
-			QIcon ic = model.fileIcon(model.index(proc.fullName));
+		{	
+			QString path = proc.fullName;
+
+#ifndef _WIN64
+			if (!native)
+			{
+				path.replace(":\\Windows\\System32\\", ":\\Windows\\Sysnative\\", Qt::CaseSensitivity::CaseInsensitive);
+			}
+#endif
+			model.setRootPath(path);
+			QIcon ic = model.fileIcon(model.index(path));
 			item->setIcon(0, ic);
 		}
-
 	}
 
 	emit refresh_gui();
@@ -189,17 +187,17 @@ void GuiProcess::refresh_process()
 
 void GuiProcess::filter_change(int i)
 {
-	emit refresh_gui();
+	emit refresh_process();
 }
 
 void GuiProcess::session_change()
 {
-	emit refresh_gui();
+	emit refresh_process();
 }
 
 void GuiProcess::name_change(const QString& str)
 {
-	emit refresh_gui();
+	emit refresh_process();
 }
 
 void GuiProcess::proc_select(bool ignore)
@@ -262,7 +260,6 @@ void GuiProcess::get_from_inj(Process_State_Struct* procStateStruct, Process_Str
 	ui.cmb_arch->setDisabled(true);
 	ui.cmb_arch->setCurrentIndex(ARCH::X86);
 #endif // WIN64
-
 	
 	refresh_process();
 }

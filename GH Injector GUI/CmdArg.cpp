@@ -105,7 +105,7 @@ int CmdArg(int argc, char* argv[])
 	
 	bool bDebug = SetDebugPrivilege(true);
 	
-	bool bPlatform = isCorrectPlatform();
+	bool bPlatform = is_native_process(GetCurrentProcessId());
 
 	
 	// Dll

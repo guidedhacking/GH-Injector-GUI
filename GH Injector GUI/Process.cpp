@@ -294,6 +294,20 @@ bool getProcessList(std::vector<Process_Struct>& pl)
     return true;
 }
 
+int strcicmp(const char * a, const char * b)
+{
+    for (;; a++, b++)
+    {
+        int c = tolower(*a) - tolower(*b);
+        if (c != 0 || !*a)
+        {
+            return c;
+        }
+    }
+
+    return 0;
+}
+
 bool sortProcessList(std::vector<Process_Struct>& pl, SORT_PS sort)
 {
     if (sort == NUM_LOW)
@@ -315,7 +329,7 @@ bool sortProcessList(std::vector<Process_Struct>& pl, SORT_PS sort)
 	else if (sort == ASCI_A)
 	{
 	    std::sort(pl.begin(), pl.end(), [](Process_Struct& p1, Process_Struct& p2) {
-            int res = strcmp(p1.name, p2.name);
+            int res = strcicmp(p1.name, p2.name);
             if(res < 0)
 			    return true;
 		    return false;
@@ -324,7 +338,7 @@ bool sortProcessList(std::vector<Process_Struct>& pl, SORT_PS sort)
 	else
 	{
 		std::sort(pl.begin(), pl.end(), [](Process_Struct& p1, Process_Struct& p2) {
-			int res = strcmp(p1.name, p2.name);
+			int res = strcicmp(p1.name, p2.name);
 			if (res > 0)
 				return true;
 			return false;
@@ -373,20 +387,25 @@ bool SetDebugPrivilege(bool Enable)
     return TRUE;
 }
 
-bool isCorrectPlatform()
+bool is_native_process(DWORD pid)
 {
-    SYSTEM_INFO stInfo;
-    GetSystemInfo(&stInfo);
-    int proccessArch = stInfo.wProcessorArchitecture;
+    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!hProc)
+    {
+        return false;
+    }
 
-    SYSTEM_INFO stInfo2;
-    GetNativeSystemInfo(&stInfo2);
-    int platformArch = stInfo2.wProcessorArchitecture;
+    BOOL bWOW64 = FALSE;
+    if (!IsWow64Process(hProc, &bWOW64))
+    {
+        CloseHandle(hProc);
 
-    if (proccessArch == platformArch)
-        return true;
+        return false;
+    }
 
-    return false;
+    CloseHandle(hProc);
+
+    return (bWOW64 == FALSE);
 }
 
 bool FileExistsW(const wchar_t * szFile)

@@ -1,9 +1,9 @@
 #pragma once
 
 constexpr auto GH_INJECTOR_ZIP = "GH Injector.zip";
-constexpr auto GH_INJECTOR_FOLDER = "GH_Injector\\";
-constexpr auto GH_INJECTOR_EXE_X86 = "GH_Injector_x86.exe";
-constexpr auto GH_INJECTOR_EXE_X64 = "GH_Injector_x64.exe";
+constexpr auto GH_INJECTOR_FOLDER = "GH Injector\\";
+constexpr auto GH_INJECTOR_EXE_X86 = "GH Injector - x86.exe";
+constexpr auto GH_INJECTOR_EXE_X64 = "GH Injector - x64.exe";
 
 constexpr auto GH_INJECTOR_SM_X86 = "GH Injector SM - x86.exe";
 constexpr auto GH_INJECTOR_SM_X64 = "GH Injector SM - x64.exe";

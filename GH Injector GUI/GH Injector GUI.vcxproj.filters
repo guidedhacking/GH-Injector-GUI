@@ -178,4 +178,7 @@
       <Filter>Ressourcendateien</Filter>
     </QtRcc>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="ToDo.txt" />
+  </ItemGroup>
 </Project>

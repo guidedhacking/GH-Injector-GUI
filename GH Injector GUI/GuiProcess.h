@@ -4,6 +4,7 @@
 #include <QWidget>
 #include "ui_GuiProcess.h"
 #include "Process.h"
+#include "framelesswindow.h"
 
 struct Process_State_Struct
 {
@@ -26,6 +27,8 @@ private:
 	Process_Struct*			ps;
 	QFileSystemModel		model;
 	SORT_PS					sort_prev;
+	bool					native;
+	FramelessWindow*		parent;
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
@@ -35,6 +38,8 @@ signals:
 
 public slots:
 	void get_from_inj(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
+
+	void set_frameless_parent(FramelessWindow * p);
 
 private slots:
 	

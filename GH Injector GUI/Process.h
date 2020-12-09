@@ -61,6 +61,6 @@ bool getProcessList(std::vector<Process_Struct>& pl);
 bool sortProcessList(std::vector<Process_Struct>& pl, SORT_PS sort);
 
 bool SetDebugPrivilege(bool Enable);
-bool isCorrectPlatform();
+bool is_native_process(DWORD pid);
 
 bool FileExistsW(const wchar_t * szFile);

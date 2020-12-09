@@ -20,7 +20,6 @@ GuiScanHook::GuiScanHook(QWidget* parent)
 
 
 	model = new QStringListModel(this);
-
 	
 	List << "Select a" << "process first";
 
@@ -71,7 +70,6 @@ void GuiScanHook::get_from_inj_to_sh(int pid, int error)
 {
 	m_pid = pid;
 	m_err = 0;
-	
 
 	ui.btn_scan->setText("Scan PID " + QString::number(pid));
 	
@@ -87,10 +85,33 @@ void GuiScanHook::scan_clicked()
 {	
 	if (m_pid == 0)
 	{
-		setItem({ "Select process" });
+		setItem({ "Please select a process" });
 		return;
 	}
-		
+
+	HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, m_pid);
+	if (!hProc)
+	{
+		setItem({ "Please select a process" });
+		return;
+	}
+	
+	DWORD dwExitCode = STILL_ACTIVE;
+	if (!GetExitCodeProcess(hProc, &dwExitCode))
+	{
+		setItem({ "Please select a process" });
+		return;
+	}
+
+	CloseHandle(hProc);
+
+	if (dwExitCode != STILL_ACTIVE)
+	{
+		CloseHandle(hProc);
+		setItem({ "Please select a process" });
+		return;
+	}
+			
 	std::vector<std::string> tempHookList;
 	
 	//tempHookList.push_back( "DLL.Function");
@@ -98,7 +119,7 @@ void GuiScanHook::scan_clicked()
 	int fail = InjLib.ScanHook(m_pid, tempHookList);
 	if (fail)
 	{
-		setItem({ "Failed" });		
+		setItem({ "Failed to scan for hooks" });		
 	}
 	else if (tempHookList.empty())
 	{
