@@ -9,6 +9,7 @@
 #include <codecvt>
 
 f_NtQueryInformationProcess p_NtQueryInformationProcess = nullptr;
+int strcicmp(const char * a, const char * b);
 
 enum ARCH getFileArch(const wchar_t* szDllFile)
 {
@@ -100,6 +101,8 @@ enum ARCH getProcArch(const int pid)
         BOOL bIsWow = IsWow64Process(hOpenProc, &tempWow64);
         if (bIsWow != 0)
         {
+            CloseHandle(hOpenProc);
+
             if (tempWow64 == TRUE)
             {
                 return X86;
@@ -110,6 +113,7 @@ enum ARCH getProcArch(const int pid)
             }
             return NONE;
         }
+
         CloseHandle(hOpenProc);
     }
 
@@ -186,7 +190,7 @@ Process_Struct getProcessByName(const char* proc)
             do
             {
                 int ret = wcstombs(name, procEntry.szExeFile, sizeof(name));
-                if (!strcmp(name, proc))
+                if (!strcicmp(name, proc))
                 {
                     ps.arch = getProcArch(procEntry.th32ProcessID);
                     if (ps.arch != ARCH::NONE)

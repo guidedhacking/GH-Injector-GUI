@@ -11,6 +11,8 @@ constexpr auto GH_INJECTOR_SM_X64 = "GH Injector SM - x64.exe";
 #define GH_INJ_EXE_NAME64A "GH Injector - x64.exe"
 #define GH_INJ_EXE_NAME86A "GH Injector - x86.exe"
 
+constexpr auto GH_INJECTOR_LOGA = "GH_Inj_Log.txt";
+constexpr auto GH_INJECTOR_LOGW = L"GH_Inj_Log.txt";
 
 constexpr auto GH_HELP_URL = "https://guidedhacking.com/resources/guided-hacking-dll-injector.4/";
 constexpr auto GH_LOG_URL = "https://pastebin.com/eN7KPX3x";

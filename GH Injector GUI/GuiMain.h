@@ -149,6 +149,7 @@ private slots:
 	// Info
 	void tooltip_change();
 	void open_help();
+	void generate_shortcut();
 	void open_log();
 
 	// Update

@@ -73,7 +73,8 @@ GuiMain::GuiMain(QWidget* parent)
 	// Info
 	connect(ui.btn_tooltip, SIGNAL(clicked()), this, SLOT(tooltip_change()));
 	connect(ui.btn_help,    SIGNAL(clicked()), this, SLOT(open_help()));
-	connect(ui.btn_log,     SIGNAL(clicked()), this, SLOT(open_log()));
+	connect(ui.btn_openlog,     SIGNAL(clicked()), this, SLOT(open_log()));
+	connect(ui.btn_shortcut,     SIGNAL(clicked()), this, SLOT(generate_shortcut()));
 	connect(ui.btn_version, SIGNAL(clicked()), this, SLOT(check_online_version()));
 
 	ui.btn_version->setText("V" GH_INJ_VERSIONA);
@@ -104,6 +105,8 @@ GuiMain::GuiMain(QWidget* parent)
 		framelessScanner.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	}
 	
+	ui.btn_openlog->setIcon(QIcon(":/GuiMain/gh_resource/log.ico"));
+
 	onReset = false;
 
 	t_Delay_Inj->setSingleShot(true);
@@ -544,9 +547,10 @@ bool GuiMain::update_injector(std::string version)
 	new_path += szPID;
 
 	printf("Launching updated version...\n");
-	CreateProcessA(nullptr, (char*)new_path.c_str(), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
 
 	Sleep(1000);
+
+	CreateProcessA(nullptr, (char*)new_path.c_str(), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
 
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
@@ -1452,8 +1456,9 @@ void GuiMain::tooltip_change()
 	// Info
 	ui.btn_tooltip->setToolTipDuration(duration);
 	ui.btn_help->setToolTipDuration(duration);
-	ui.btn_log->setToolTipDuration(duration);
+	ui.btn_shortcut->setToolTipDuration(duration);
 	ui.btn_version->setToolTipDuration(duration);
+	ui.btn_openlog->setToolTipDuration(duration);
 }
 
 void GuiMain::open_help()
@@ -1461,7 +1466,7 @@ void GuiMain::open_help()
 	bool ok = QDesktopServices::openUrl(QUrl(GH_HELP_URL, QUrl::TolerantMode));
 }
 
-void GuiMain::open_log()
+void GuiMain::generate_shortcut()
 {
 	//bool ok = QDesktopServices::openUrl(QUrl(GH_LOG_URL, QUrl::TolerantMode));
 
@@ -1636,9 +1641,17 @@ void GuiMain::open_log()
 	}
 }
 
+void GuiMain::open_log()
+{
+	if (FileExistsW(GH_INJECTOR_LOGW))
+	{
+		ShellExecuteW(NULL, L"edit", GH_INJECTOR_LOGW, nullptr, nullptr, SW_SHOW);
+	}
+}
+
 void GuiMain::check_online_version()
 {
-	std::string online_version = "3.4";// getVersionFromIE();
+	std::string online_version = "3.4";getVersionFromIE();
 	std::string current_version = GH_INJ_VERSIONA;
 
 	if (online_version.compare(current_version) > 0 || true)

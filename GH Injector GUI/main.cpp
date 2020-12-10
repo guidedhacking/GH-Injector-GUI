@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
 
 		QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 		QApplication::setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
-
+		
 		FramelessWindow framelessWindow;
 		if (!res)
 		{
