@@ -416,3 +416,8 @@ bool FileExistsW(const wchar_t * szFile)
 {
     return (GetFileAttributesW(szFile) != INVALID_FILE_ATTRIBUTES);
 }
+
+bool FileExistsA(const char * szFile)
+{
+    return (GetFileAttributesA(szFile) != INVALID_FILE_ATTRIBUTES);
+}

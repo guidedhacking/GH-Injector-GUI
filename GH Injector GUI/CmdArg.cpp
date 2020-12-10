@@ -8,289 +8,358 @@
 
 #include "Injection.h"
 #include "Process.h"
-#include "cxxopts.hpp"
 #include "InjectionLib.hpp"
 
 #define INJ_KEEP_HEADER 0x0000
 
-
+int FindArg(int argc, const char * arg, char * argv[], bool Parameter = false);
+void help();
 
 int CmdArg(int argc, char* argv[])
 {
-	int orig_argc = argc;
-	
-	if (orig_argc < 2)
-		return  err::none;
-	
-	cxxopts::Options options("injector.exe -p csgo.exe -f mogeln.dll", "A brief description");
+	AllocConsole();
+	FILE * pFile = nullptr;
+	freopen_s(&pFile, "CONOUT$", "w", stdout);
 
-	options.add_options()
-		("p,pid", "Process name or PID", cxxopts::value<std::string>())
-		("f,file", "File path", cxxopts::value<std::string>())
-		("d,delay", "Delay [ms]", cxxopts::value<int >()->default_value("0"))
-		("w,wait", "Wait for process", cxxopts::value<bool>()->default_value("false"))
-
-		("l,load", "Load method [ loadlib | ldr | ldrp | manual]", cxxopts::value<std::string>()->default_value("load"))
-		("s,start", "Launch method [ create | hijack | hook | apc ]", cxxopts::value<std::string>()->default_value("create"))
-		("j,hijack", "Hijack handle", cxxopts::value<bool>()->default_value("false"))
-		("o,cloak", "Cloak thread", cxxopts::value<bool>()->default_value("false"))
-
-		("e,peh", "PEH [ keep | erase | fake ]", cxxopts::value<std::string>()->default_value("keep"))
-		("r,randomize", "Randomize file name", cxxopts::value<bool>()->default_value("false"))
-		("u,unlink", "Unlink from PEB", cxxopts::value<bool>()->default_value("false"))
-		("c,copy", "Load DLL copy", cxxopts::value<bool>()->default_value("false"))
-		("m,mapping", "Manual mapping flags (MM_DEFAULT)", cxxopts::value<int>()->default_value("0x01fc0000"))
-	
-		("v,version", "Print version", cxxopts::value<bool>()->default_value("false"))
-		("y,style", "Performance style", cxxopts::value<bool>()->default_value("false"))
-		("h,help", "Print usage")
-		;
-
-	auto result = options.parse(argc, argv);
-
-	if (result.count("style"))
-		return none_performance;
-
-	
-//#ifdef _DEBUG
-	int iAttach = AttachConsole(ATTACH_PARENT_PROCESS);
-	int iAttachErr = GetLastError();
-	if(iAttachErr == ERROR_INVALID_HANDLE)
+	if (argc < 2)
 	{
-		int iAlloc = AllocConsole();
-		int iAllocErr = GetLastError();
-		if(!iAlloc)
+		printf("Invalid argument count.\n");
+		help();
+
+		return -1;
+	}
+
+	InjectionLib lib;
+	if (!lib.Init())
+	{
+		printf("Failed to initialze injection library.\n");
+
+		return -1;
+	}
+	else
+	{
+		printf("Injection library intialized\n");
+	}
+
+	const char * szProcessName = nullptr;
+	int process_index = FindArg(argc, "-p", argv, true);
+	if (!process_index)
+	{
+		printf("No target process specified.\n");
+
+		return -1;
+	}
+	else
+	{
+		szProcessName = argv[process_index + 1];
+
+		printf("target process = %s\n", szProcessName);
+	}
+
+	const char * szDllName = nullptr;
+	int dll_index = FindArg(argc, "-f", argv, true);
+	if (!dll_index)
+	{
+		printf("No dll to inject specified.\n");
+		return -1;
+	}
+	else
+	{
+		szDllName = argv[dll_index + 1];
+
+		if (!FileExistsA(szDllName))
 		{
-			return no_console_attach;
+			printf("Specified dll file doesn't exist.\n");
+
+			return -1;
+		}
+
+		printf("dll = %s\n", szDllName);
+	}
+
+	auto proc_struct = getProcessByName(szProcessName);
+	if (!proc_struct.pid)
+	{
+		if (!FindArg(argc, "-wait", argv))
+		{
+			printf("Target process doesn't exist.\n");
+
+			return -1;
+		}
+
+		printf("Waiting for target process.\n");
+
+		while (!proc_struct.pid)
+		{
+			Sleep(50);
+			proc_struct = getProcessByName(szProcessName);
 		}
 	}
-	freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
-	//std::cout << iAttach << iAttachErr << std::endl;
-//#endif
-	
-	
-	if (result.count("version"))
-	{
-		std::cout << GH_INJ_VERSIONA << std::endl;
-		return err::version;
-	}
-	
-	if(result.count("help") || orig_argc == 2)
-	{
-		std::cout << options.help() << std::endl;
-		return err::help;
-	}
 
-	InjectionLib injectionLib;
-	bool bLib = injectionLib.Init();
-	if(bLib == false)
-
-	//HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
-	//if (hInjectionMod == nullptr)
-	{
-		std::cout <<  "dll not found" << std::endl;
-		return err::no_lib;
-	}
-
-	
-	//auto InjectA = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
-	//if (InjectA == nullptr)
-	//{
-	//	std::cout << "InjectA " << " not found" << std::endl;
-	//	return err::no_func;
-	//}
+	printf("Target process found (pid = %d)\n", proc_struct.pid);
 
 	INJECTIONDATAA data{ 0 };
+	data.ProcessID = proc_struct.pid;
+	strcpy_s(data.szDllPath, szDllName);
 
-	
-	bool bDebug = SetDebugPrivilege(true);
-	
-	bool bPlatform = is_native_process(GetCurrentProcessId());
-
-	
-	// Dll
-	if (!result.count("file"))
+	int injection_mode = 0;
+	int inj_mode_index = FindArg(argc, "-l", argv, true);
+	if (inj_mode_index)
 	{
-		std::cout << "File arg missing" << std::endl;
-		return no_lib_arg;
+		injection_mode = atoi(argv[inj_mode_index + 1]);
+		if (injection_mode < 0 || injection_mode > 3)
+		{
+			injection_mode = 0;
+		}
 	}
-	
-	std::string dll = result["file"].as<std::string>();	
-	const ARCH fileArch = getFileArchA(dll.c_str());
-	if(fileArch == ARCH::NONE)
+	data.Mode = (INJECTION_MODE)injection_mode;
+	printf("Injection mode = %d\n", injection_mode);
+
+
+	int launch_method = 0;
+	int inj_method_index = FindArg(argc, "-s", argv, true);
+	if (inj_method_index)
 	{
-		std::cout << "File not found" << std::endl;
-		return no_file;
+		launch_method = atoi(argv[inj_method_index + 1]);
+		if (launch_method < 0 || launch_method > 3)
+		{
+			launch_method = 0;
+		}
 	}
+	data.Method = (LAUNCH_METHOD)launch_method;
+	printf("Launch method = %d\n", launch_method);
 
-	const int fileLength = GetFullPathNameA(dll.c_str(), MAX_PATH * 2, data.szDllPath, nullptr);
-	if (fileLength == 0)
+	DWORD Flags = 0;
+
+	int peh_index = FindArg(argc, "-peh", argv, true);
+	if (peh_index)
 	{
-		std::cout << "Full path not found" << std::endl;
-		return err::file_path;
-	}
+		int peh_option = atoi(argv[peh_index + 1]);
 
-	
-	// process
-	if (!result.count("pid"))
-	{
-		std::cout << "Process arg missing" << std::endl;
-		return no_process_arg;
-	}
-
-	std::string proc = result["pid"].as<std::string>();
-	Process_Struct procStruct{ 0 };
-
-
-	do
-	{
-		if (is_number(proc))
-			procStruct = getProcessByPID(std::atoi(proc.c_str()));
-		else
-			procStruct = getProcessByName(proc.c_str());
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		
-	} while (procStruct.pid == 0 && result.count("wait"));
-	
-
-	
-	if (procStruct.arch == NONE)
-	{
-		std::cout << "Process not found" << std::endl;
-		return err::no_process;
+		switch (peh_option)
+		{
+			case 1: Flags |= INJ_ERASE_HEADER; break;
+			case 2: Flags |= INJ_FAKE_HEADER; break;
+			default: break;
+		}
 	}
 
-	// delay
-	if (result.count("delay"))
-		std::this_thread::sleep_for(std::chrono::milliseconds(result["delay"].as<int>()));
-		
-
-	if (procStruct.arch != fileArch)
+	if (FindArg(argc, "-unlink", argv))
 	{
-		std::cout << "File and process have different architecture" << std::endl;
-		return err::different_arch;
-	}
-	
-	data.ProcessID = procStruct.pid;
-
-	
-	// inject
-	if (result.count("load"))
-		data.Mode = getInjMode(result["load"].as<std::string>());
-
-	
-	// launch
-	if (result.count("start"))
-		data.Method = getLaunchMethod(result["start"].as<std::string>());
-
-
-	if (result.count("hijack")) data.Flags |= INJ_HIJACK_HANDLE;
-	if (result.count("cloak"))  data.Flags |= INJ_THREAD_CREATE_CLOAKED;
-
-	
-	if (result.count("peh"))
-	{
-		
-		std::string peh = result["peh"].as<std::string>();
-		
-		if (peh == "erase")
-			data.Flags |= INJ_ERASE_HEADER;
-		else if (peh == "fake")
-			data.Flags |= INJ_FAKE_HEADER;
-		else
-			data.Flags |= INJ_KEEP_HEADER;
+		Flags |= INJ_UNLINK_FROM_PEB;
 	}
 
-	
-	if (result.count("randomize")) data.Flags |= INJ_SCRAMBLE_DLL_NAME;
-	if (result.count("unlink"))    data.Flags |= INJ_UNLINK_FROM_PEB;
-	if (result.count("copy"))      data.Flags |= INJ_LOAD_DLL_COPY;
+	if (FindArg(argc, "-cloak", argv))
+	{
+		Flags |= INJ_THREAD_CREATE_CLOAKED;
+	}
 
+	if (FindArg(argc, "-random", argv))
+	{
+		Flags |= INJ_SCRAMBLE_DLL_NAME;
+	}
+
+	if (FindArg(argc, "-copy", argv))
+	{
+		Flags |= INJ_LOAD_DLL_COPY;
+	}
+
+	if (FindArg(argc, "-hijack", argv))
+	{
+		Flags |= INJ_HIJACK_HANDLE;
+	}
+
+	if (data.Mode == INJECTION_MODE::IM_ManualMap)
+	{
+		DWORD mmflags = MM_DEFAULT;
+
+		int mmflags_index = FindArg(argc, "-mmflags", argv, true);
+		if (mmflags_index)
+		{
+			char * szMMflags = argv[mmflags_index + 1];
+			char * pEnd = nullptr;
+			mmflags = std::strtoul(szMMflags, &pEnd, 0x10);
+
+			DWORD mmflags_mask = MM_DEFAULT | INJ_MM_CLEAN_DATA_DIR;
+			mmflags &= mmflags_mask;
+		}
+
+		Flags |= mmflags;
+	}
+
+	data.Flags = Flags;
+
+	printf("Flags = %08X\n", Flags);
+
+	if (FindArg(argc, "-log", argv))
+	{
+		data.GenerateErrorLog = true;
+	}
 	
-	// flags
-	if (result.count("manual"))
-		data.Flags |= result["manual"].as<int>();
+	int timeout_index = FindArg(argc, "-timeout", argv, true);
+	if (timeout_index)
+	{
+		data.Timeout = std::atoi(argv[timeout_index + 1]);
+	}
 	else
-		if (data.Mode == INJECTION_MODE::IM_ManualMap)
-			data.Flags |= MM_DEFAULT;
-
-	
-	data.GenerateErrorLog = true;
-
-	data.Timeout = 2000;
-
-	
-	int iInject = injectionLib.InjectFuncA(&data);
-	//int iInject = InjectA(&data);
-	if (iInject != 0)
 	{
-		std::cout << "InjectA failed with " << iInject << std::endl;
-		return err::inject_fail;
+		data.Timeout = 2000;
 	}
-		
-	int i = 42;
-	std::cout << "Success" << std::endl;
-	return  ok;
+
+	printf("Timeout = %d\n", data.Timeout);
+
+	while (!lib.SymbolStatus())
+	{
+		Sleep(10);
+	}
+
+	printf("Injection library ready\n");
+
+	int delay = 0;
+	int delay_index = FindArg(argc, "-delay", argv, true);
+	if (delay_index)
+	{
+		delay = std::atoi(argv[delay_index + 1]);
+		printf("Delay = %d\n", delay);
+	}
+
+	if (delay)
+	{
+		printf("Executing delay\n");
+		std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+	}
+
+	printf("Injecting\n");
+	
+	DWORD inj_status = lib.InjectFuncA(&data);
+	
+	if (FindArg(argc, "-help", argv))
+	{
+		help();
+	}
+
+	if (FindArg(argc, "-version", argv))
+	{
+		printf("Version = %s\n", GH_INJ_VERSIONA);
+	}
+
+	if (inj_status != ERROR_SUCCESS)
+	{
+		printf("Injection failed with code %08X\n", inj_status);
+
+		return -1;
+	}
+	else
+	{
+		printf("Injection succeeded. Dll laoded at %p\n", data.hDllOut);
+	}
+
+
+	return 0;
 }
 
-
-bool is_number(const std::string& s)
+int FindArg(int argc, const char * arg, char * argv[], bool HasParameter)
 {
-	std::string::const_iterator it = s.begin();
-	while (it != s.end() && std::isdigit(*it)) ++it;
-	return !s.empty() && it == s.end();
+	for (int i = 0; i < argc; ++i)
+	{
+		if (!strcmp(arg, argv[i]))
+		{
+			if (HasParameter)
+			{
+				if (i + i == argc)
+				{
+					return 0;
+				}
+			}
+
+			return i;
+		}
+	}
+
+	return 0;
 }
 
-INJECTION_MODE getInjMode(std::string str)
+void help()
 {
-	for (auto c : str)
-		std::transform(str.begin(), str.end(), str.begin(), 
-			[](unsigned char c) {return std::tolower(c); });
+	//required
+	printf("The following arguments are required:\n\n");
 
+	printf("\t-p [\"TargetProcess.exe\"]\n");
+	printf("\t\tThis argument specifies the target process by name.\n\n");
+
+	printf("\t-f [\"path_to_dll\\dll_name.dll\"]\n");
+	printf("\t\tThis argument specifies the path to dll to inject.\n\n");
+
+	//optional
+	printf("The following arguments are optional:\n\n");
+
+	printf("\t-l [0,1,2,3]\n");
+	printf("\t\tThis argument specifies the injection method:\n");
+	printf("\t\t\t 0 = LoadLibraryExW (default)\n");
+	printf("\t\t\t 1 = LdrLoadDll\n");
+	printf("\t\t\t 2 = LdrpLoadDll\n");
+	printf("\t\t\t 3 = Manual Mapping\n\n");
+
+	printf("\t-s [0,1,2,3]\n");
+	printf("\t\tThis argument specifies the launch method:\n");
+	printf("\t\t\t 0 = NtCreateThreadEx (default)\n");
+	printf("\t\t\t 1 = Thread hijacking\n");
+	printf("\t\t\t 2 = SetWindowsHookEx\n");
+	printf("\t\t\t 3 = QueueUserAPC\n\n");
 	
-	if (str == "loadlib")
-		return  INJECTION_MODE::IM_LoadLibraryExW;
+	printf("\t-peh [0,1,2]\n");
+	printf("\t\tThis argument specifies the header option:\n");
+	printf("\t\t\t 0 = Keep PE header (default)\n");
+	printf("\t\t\t 1 = Erase PE header\n");
+	printf("\t\t\t 2 = Fake PE header\n\n");
 
-	
-	if (str == "ldr")
-		return INJECTION_MODE::IM_LdrLoadDll;
+	printf("\t-wait\n");
+	printf("\t\tIf specified the injector waits for the target process to start.\n\n");
 
-	
-	if (str == "ldrp")
-		return INJECTION_MODE::IM_LdrpLoadDll;
+	printf("\t-log\n");
+	printf("\t\tIf specified the injector generates an error log if the injection fails.\n\n");
 
-	
-	if (str == "manual")
-		return  INJECTION_MODE::IM_LdrLoadDll;
+	printf("\t-delay [value in ms]\n");
+	printf("\t\tIf specified the injector waits for specified amount in milliseconds before the injection.\n");
+	printf("\t\tThe default value is 0ms.\n\n");
 
-	
-	return INJECTION_MODE::IM_LoadLibraryExW;	
-}
+	printf("\t-timeout [value in ms]\n");
+	printf("\t\tThis argument specifies how long the injector waits for the shellcode and DllMain to execute.\n");
+	printf("\t\tThe default value is 2000ms.\n\n");
 
+	printf("\t-unlink\n");
+	printf("\t\tIf set the injected module will be unlinked from the PEB.\n\n");
 
-LAUNCH_METHOD getLaunchMethod(std::string str)
-{
-	for (auto c : str)
-		std::transform(str.begin(), str.end(), str.begin(),
-			[](unsigned char c) {return std::tolower(c); });
+	printf("\t-cloak\n");
+	printf("\t\tCreates the thread cloaked.\n\n");
 
+	printf("\t-random\n");
+	printf("\t\tIf set the dll name will be scrambled before the injection.\n\n");
 
-	if (str == "create")
-		return  LAUNCH_METHOD::LM_NtCreateThreadEx;
+	printf("\t-copy\n");
+	printf("\t\tIf set a copy of the dll will be loaded.\n\n");
 
+	printf("\t-hijack\n");
+	printf("\t\tIf set the injector will try to hijack a handle to the target process instead of opening a new one.\n\n");
 
-	if (str == "hijack")
-		return LAUNCH_METHOD::LM_HijackThread;
+	printf("\t-mmflags [value (hex)]\n");
+	printf("\t\tFlags that specify the manual mapping options in hexadecimal and a bitwise combination of these flags:\n");
+	printf("\t\t\t0x00010000 = INJ_MM_CLEAN_DATA_DIR\n");
+	printf("\t\t\t0x00020000 = INJ_MM_RESOLVE_IMPORTS\n");
+	printf("\t\t\t0x00040000 = INJ_MM_RESOLVE_DELAY_IMPORTS\n");
+	printf("\t\t\t0x00080000 = INJ_MM_EXECUTE_TLS\n");
+	printf("\t\t\t0x00100000 = INJ_MM_ENABLE_EXCEPTIONS\n");
+	printf("\t\t\t0x00200000 = INJ_MM_SET_PAGE_PROTECTIONS\n");
+	printf("\t\t\t0x00400000 = INJ_MM_INIT_SECURITY_COOKIE\n");
+	printf("\t\t\t0x00800000 = INJ_MM_RUN_DLL_MAIN\n");
+	printf("\t\tThe default is MM_DEFAULT (0x0FE00000)\n\n");
 
+	//additional
+	printf("Additional commands:\n\n");
 
-	if (str == "hook")
-		return LAUNCH_METHOD::LM_SetWindowsHookEx;
+	printf("\t-help\n");
+	printf("\t\tThis command lists all the commands and arguments (this).\n\n");
 
-
-	if (str == "apc")
-		return  LAUNCH_METHOD::LM_QueueUserAPC;
-
-
-	return LAUNCH_METHOD::LM_NtCreateThreadEx;
+	printf("\t-version\n");
+	printf("\t\tThis command prints the current version of the injector.\n\n");
 }

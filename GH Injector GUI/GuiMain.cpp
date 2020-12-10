@@ -71,11 +71,11 @@ GuiMain::GuiMain(QWidget* parent)
 	connect(ui.tree_files, SIGNAL(itemDoubleClicked(QTreeWidgetItem*, int)), this, SLOT(select_file()));
 
 	// Info
-	connect(ui.btn_tooltip, SIGNAL(clicked()), this, SLOT(tooltip_change()));
-	connect(ui.btn_help,    SIGNAL(clicked()), this, SLOT(open_help()));
+	connect(ui.btn_tooltip,		SIGNAL(clicked()), this, SLOT(tooltip_change()));
+	connect(ui.btn_help,		SIGNAL(clicked()), this, SLOT(open_help()));
 	connect(ui.btn_openlog,     SIGNAL(clicked()), this, SLOT(open_log()));
-	connect(ui.btn_shortcut,     SIGNAL(clicked()), this, SLOT(generate_shortcut()));
-	connect(ui.btn_version, SIGNAL(clicked()), this, SLOT(check_online_version()));
+	connect(ui.btn_shortcut,	SIGNAL(clicked()), this, SLOT(generate_shortcut()));
+	connect(ui.btn_version,		SIGNAL(clicked()), this, SLOT(check_online_version()));
 
 	ui.btn_version->setText("V" GH_INJ_VERSIONA);
 
@@ -1466,15 +1466,25 @@ void GuiMain::open_help()
 	bool ok = QDesktopServices::openUrl(QUrl(GH_HELP_URL, QUrl::TolerantMode));
 }
 
+// -p "ProcessName"
+// -f "FileName"
+// -d delay (default = 0)
+// -t timeout (default = 2000)
+// -l 0-3 (launchmethod, default = 0)
+// -s 0-3 (startmethod, default = 0)
+// -peh 0-2 (default = 0)
+// -log
+// -unlink
+// -cloak
+// -randomize
+// -copy
+// -hijack
+// -mmflags hex_value (manual mapping flags)
+
 void GuiMain::generate_shortcut()
 {
-	//bool ok = QDesktopServices::openUrl(QUrl(GH_LOG_URL, QUrl::TolerantMode));
-
 	std::string shortCut;
 	QString fileName = "Injector_";
-
-	int fileType = NONE;
-	int processType = NONE;
 
 	// Process ID
 	if (ui.rb_pid->isChecked())
@@ -1482,10 +1492,9 @@ void GuiMain::generate_shortcut()
 		int id = ui.txt_pid->text().toInt();
 		if (id)
 		{
-			Process_Struct ps_local =  getProcessByPID(id);
-			shortCut += " -p " + std::string(ps_local.name);
+			Process_Struct ps_local = getProcessByPID(id);
+			shortCut += "-p \"" + std::string(ps_local.name) + "\"";
 			fileName += ps_local.name;
-			processType = ps_local.arch;
 		}
 		else
 		{
@@ -1495,23 +1504,12 @@ void GuiMain::generate_shortcut()
 	}
 	else // Process Name
 	{
-
 		int index = ui.cmb_proc->currentIndex();
-		Process_Struct p = getProcessByName(ui.cmb_proc->itemText(index).toStdString().c_str());
-		if (p.pid)
-		{
-			shortCut += " -p " + std::string(p.name);
-			fileName += p.name;
-			processType = p.arch;
-		}
-		else
-		{
-			emit injec_status(false, "Invalid Process Name");
-			return;
-		}
+		shortCut += "-p \"" + ui.cmb_proc->itemText(index).toStdString() + "\"";
+		fileName += ui.cmb_proc->itemText(index);
 	}
 
-	int fileFound = 0;
+	bool fileFound = false;
 	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
 	{
 		if (fileFound)
@@ -1526,7 +1524,6 @@ void GuiMain::generate_shortcut()
 
 		fileName += QString("_") + (*it)->text(1);
 
-
 		// Check Existens
 		QFile qf(fileStr);
 		if (!qf.exists())
@@ -1535,32 +1532,11 @@ void GuiMain::generate_shortcut()
 			return;
 		}
 
-		// Check Architecture
-		fileType = str_to_arch((*it)->text(3));
-		if (fileType == NONE)
-		{
-			emit injec_status(false, "File Architecture invalid");
-			return;
-		}
-
-		// Check File Selected
-		if (processType == NONE)
-		{
-			emit injec_status(false, "File not selected");
-			return;
-		}
-
-		if (processType != fileType || processType == NULL || fileType == NULL)
-		{
-			emit injec_status(false, "File and Process are incompatible");
-			return;
-		}
-
-		shortCut += " -f " + fileStr.toStdString();
-		fileFound++;
+		shortCut += " -f \"" + fileStr.toStdString() + "\"";
+		fileFound = true;
 	}
 
-	if(fileFound == 0)
+	if (!fileFound)
 	{
 		emit injec_status(false, "No file selected");
 		return;
@@ -1569,40 +1545,43 @@ void GuiMain::generate_shortcut()
 	int delay = ui.txt_delay->text().toInt();
 	if (delay > 0)
 	{
-		shortCut += " -delay " + delay;
+		shortCut += " -delay ";
+		std::stringstream stream;
+		stream << delay;
+		shortCut += stream.str();
 	}
 
-	// We need a own checkbox for this
-
-	//int wait = ui.cb_auto->isChecked();
-	//if (wait)
-	//{
-	//	shortCut += " -wait";
-	//}
+	int timeout = ui.txt_timeout->text().toInt();
+	if (timeout > 0)
+	{
+		shortCut += " -timeout ";
+		std::stringstream stream;
+		stream << timeout;
+		shortCut += stream.str();
+	}
 
 
 	switch (ui.cmb_load->currentIndex())
 	{
-	case 1:  shortCut += " -load ldr";			break;
-	case 2:  shortCut += " -load ldrp";			break;
-	case 3:  shortCut += " -load manual";		break;
-	default: /*shortCut += " -load loadlib"*/;	break;
+		case 1:		shortCut += " -l 1";	break;
+		case 2:		shortCut += " -l 2";	break;
+		case 3:		shortCut += " -l 3";	break;
+		default: break;
 	}
 
 	switch (ui.cmb_create->currentIndex())
 	{
-	case 1:  shortCut += " -start hijack";		break;
-	case 2:  shortCut += " -start hook";		break;
-	case 3:  shortCut += " -start apc";			break;
-	default: /*shortCut += " -start create";*/	break;
+		case 1:		shortCut += " -s 1"; break;
+		case 2:		shortCut += " -s 2"; break;
+		case 3:		shortCut += " -s 3"; break;
+		default: break;
 	}
 
-
-	if (ui.cmb_peh->currentIndex() == 1)	shortCut += " -peh erase";
-	if (ui.cmb_peh->currentIndex() == 2)	shortCut += " -peh fake";
+	if (ui.cmb_peh->currentIndex() == 1)	shortCut += " -peh 1";
+	if (ui.cmb_peh->currentIndex() == 2)	shortCut += " -peh 2";
 	if (ui.cb_unlink->isChecked())			shortCut += " -unlink";
 	if (ui.cb_clock->isChecked())			shortCut += " -cloak";
-	if (ui.cb_random->isChecked())			shortCut += " -randomize";
+	if (ui.cb_random->isChecked())			shortCut += " -random";
 	if (ui.cb_copy->isChecked())			shortCut += " -copy";
 	if (ui.cb_hijack->isChecked())			shortCut += " -hijack";
 
@@ -1618,14 +1597,17 @@ void GuiMain::generate_shortcut()
 		if (ui.cb_protection->isChecked())	Flags |= INJ_MM_SET_PAGE_PROTECTIONS;
 		if (ui.cb_main->isChecked())		Flags |= INJ_MM_RUN_DLL_MAIN;
 
-		// ToDo:: Set Security Cookie ???
-
 		std::stringstream stream;
-		stream << "0x" << std::hex << Flags;
-		shortCut += " -mapping " + stream.str();
+		stream << std::hex << Flags;
+		shortCut += " -mmflags " + stream.str();
 	}
 
+	shortCut += " -wait ";
+
 	fileName.replace(".", "_");
+	fileName.replace(" ", "_");
+
+	printf("Link = \n%s\n", shortCut.c_str());
 
 	bool bLink = CreateLinkWrapper(fileName, QString::fromStdString(shortCut));
 	if (bLink)

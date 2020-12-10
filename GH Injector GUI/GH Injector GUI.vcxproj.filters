@@ -87,9 +87,6 @@
     <ClInclude Include="ShortCut.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="cxxopts.hpp">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="Zip.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>

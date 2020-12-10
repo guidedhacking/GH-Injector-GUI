@@ -25,15 +25,18 @@ int main(int argc, char* argv[]) {
 	FILE * pFile = nullptr;
 	freopen_s(&pFile, "CONOUT$", "w", stdout);*/
 
-#ifdef DEBUG_CMD_ARG
-	int res = CmdArg(ARRAYSIZE(argument_value1), argument_value1);
-#else	
-	int res = CmdArg(argc, argv);
-#endif //DEBUG CMD
-
-	if (res > 1)
+	if (argc > 1)
 	{
-		return res;
+		auto ret = CmdArg(argc, argv);
+
+		if (ret != 0)
+		{
+			std::cin.get();
+		}
+
+		Sleep(1000);
+
+		return 0;
 	}
 	
 	// Restart Application loop
@@ -45,37 +48,28 @@ int main(int argc, char* argv[]) {
 		QApplication::setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 		
 		FramelessWindow framelessWindow;
-		if (!res)
-		{
-			DarkStyle* dark = new DarkStyle;
-			QApplication::setStyle(dark);
-			QApplication::setPalette(QApplication::style()->standardPalette());
+		
+		DarkStyle* dark = new DarkStyle;
+		QApplication::setStyle(dark);
+		QApplication::setPalette(QApplication::style()->standardPalette());
 
-			framelessWindow.setWindowTitle("GH Injector");
-			framelessWindow.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
-
-			GuiMain* MainWindow = new GuiMain(&framelessWindow);
-			MainWindow->statusBar()->setSizeGripEnabled(false);
+		framelessWindow.setWindowTitle("GH Injector");
+		framelessWindow.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
+		
+		GuiMain* MainWindow = new GuiMain(&framelessWindow);
+		MainWindow->statusBar()->setSizeGripEnabled(false);
 			
-			HWND hDragnDrop = CreateDragDropWindow((HWND)framelessWindow.winId(), MainWindow);
+		HWND hDragnDrop = CreateDragDropWindow((HWND)framelessWindow.winId(), MainWindow);
 
-			framelessWindow.setContent(MainWindow);
-			framelessWindow.show();
+		framelessWindow.setContent(MainWindow);
+		framelessWindow.show();
 
-			ShowWindow(hDragnDrop, SW_SHOW);
-		}
-		// Old performance style
-		else
-		{
-			GuiMain* mainWindow = new GuiMain;
-			mainWindow->show();
-		}
-
+		ShowWindow(hDragnDrop, SW_SHOW);
+		
 		currentExitCode = a.exec();
 
 		CloseDragDropWindow();
 
-		int i = 42;
 	} while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
 		
 	return currentExitCode;

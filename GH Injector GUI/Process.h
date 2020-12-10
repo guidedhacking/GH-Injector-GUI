@@ -64,3 +64,4 @@ bool SetDebugPrivilege(bool Enable);
 bool is_native_process(DWORD pid);
 
 bool FileExistsW(const wchar_t * szFile);
+bool FileExistsA(const char * szFile);

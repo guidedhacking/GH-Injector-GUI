@@ -365,7 +365,6 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     <ClInclude Include="Banner.h" />
     <ClInclude Include="CmdArg.hpp" />
     <ClInclude Include="Compress.h" />
-    <ClInclude Include="cxxopts.hpp" />
     <ClInclude Include="DownloadProgress.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="ShortCut.h" />
