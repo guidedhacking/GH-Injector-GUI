@@ -1,4 +1,5 @@
 #pragma once
-#include "qstring.h"
+
+#include "pch.h"
 
 bool CreateLinkWrapper(QString linkName, QString linkArgument);

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <qfilesystemmodel.h>
-#include <QWidget>
+#include "pch.h"
+
 #include "ui_GuiProcess.h"
 #include "Process.h"
 #include "framelesswindow.h"
@@ -18,37 +18,39 @@ class GuiProcess : public QWidget
 	Q_OBJECT
 
 public:
-	GuiProcess(QWidget* parent = Q_NULLPTR);
+	GuiProcess(QWidget * parent = Q_NULLPTR);
 	~GuiProcess();
 
 private:
+
 	Ui::frm_proc ui;
-	Process_State_Struct*	pss;
-	Process_Struct*			ps;
-	QFileSystemModel		model;
-	SORT_PS					sort_prev;
-	bool					native;
-	FramelessWindow*		parent;
+
+	Process_State_Struct	*	pss;
+	Process_Struct			*	ps;
+	QFileSystemModel			model;
+	SORT_PS						sort_prev;
+	bool						native;
+	FramelessWindow			*	parent;
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
 
 signals:
-	void send_to_inj(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
+	void send_to_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
 
 public slots:
-	void get_from_inj(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
+	void get_from_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
 
 	void set_frameless_parent(FramelessWindow * p);
 
 private slots:
-	
+
 	void refresh_gui();
 	void refresh_process();
 	void filter_change(int i);
 	void session_change();
-	void name_change(const QString&);
+	void name_change(const QString &);
 	void proc_select(bool ignore = false);
-	void customSort(int);
-	void on_treeView_doubleClicked(const QModelIndex & index);
+	void custom_sort(int);
+	void double_click_process(const QModelIndex & index);
 };

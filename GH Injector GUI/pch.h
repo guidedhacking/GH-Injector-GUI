@@ -1,0 +1,43 @@
+#pragma once
+
+#include <QApplication>
+#include <QtWidgets>
+
+#include <algorithm>
+#include <codecvt>
+#include <cstdio>
+#include <fstream>
+#include <filesystem>
+#include <functional>
+#include <guiddef.h>
+#include <iostream>
+#include <shlguid.h>
+#include <shobjidl.h>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <TlHelp32.h>
+#include <Urlmon.h>
+#include <vector>
+#include <Windows.h>
+#include <WinInet.h>
+
+//#include <QEvent.h>
+//#include <QDesktopWidget>
+//#include <QAlgorithms.h>
+//#include <QProxyStyle>
+//#include <QScreen>
+//#include <QTableWidget>
+//#include <QGraphicsDropShadowEffect>
+//#include <QtWidgets/QMainWindow>
+//#include <QFile>
+//#include <QFilesystemmodel.h>
+//#include <QFont>
+//#include <QGlobal.h>
+//#include <QMessagebox.h>
+//#include <QMouseEvent>
+//#include <QString.h>
+//#include <QStyleFactory>
+//#include <QTimer.h>
+//#include <QTreewidget.h>
+//#include <QWidget>

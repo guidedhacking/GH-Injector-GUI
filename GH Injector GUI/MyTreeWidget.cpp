@@ -1,10 +1,10 @@
+#include "pch.h"
+
 #include "MyTreeWidget.h"
-#include  <qalgorithms.h>
-#include <algorithm>
 
 // https://www.qtcentre.org/threads/6884-Sorting-in-QTreeWidget
 
-MyTreeWidget::MyTreeWidget(QWidget* parent)
+MyTreeWidget::MyTreeWidget(QWidget * parent)
 	: QTreeWidget(parent)
 {
 
@@ -12,14 +12,14 @@ MyTreeWidget::MyTreeWidget(QWidget* parent)
 	new QTreeWidgetItem(this);
 	setObjectName(QString::fromUtf8("tree_process"));
 	header()->setMinimumSectionSize(40);
-	header()->setDefaultSectionSize(40);	
+	header()->setDefaultSectionSize(40);
 	setSortingEnabled(false);				// disable built-in sorting	
 	header()->setSortIndicatorShown(true);	// use our own sorting method instead
 	header()->setSectionsClickable(true);		// use our own sorting method instead
 	header()->setStretchLastSection(true);
 
-	connect(header(), SIGNAL(sectionClicked(int)), this,   SLOT(customSortByColumn(int)));
-	customSortByColumn(header()->sortIndicatorSection());	
+	connect(header(), SIGNAL(sectionClicked(int)), this, SLOT(customSortByColumn(int)));
+	customSortByColumn(header()->sortIndicatorSection());
 }
 
 
@@ -41,7 +41,7 @@ MyTreeWidget::MyTreeWidget(QWidget* parent)
 //	}
 //}
 
-bool compare(QTreeWidgetItem* a, QTreeWidgetItem* b)
+bool compare(QTreeWidgetItem * a, QTreeWidgetItem * b)
 {
 	if ((*a).text(1).toInt() > (*b).text(1).toInt())
 		return  true;
@@ -64,7 +64,7 @@ void MyTreeWidget::customSortByColumn(int column)
 		return;
 	}
 
-	
+
 	// bubble, replace this 
 	int n = topLevelItemCount();
 	for (int i = 0; i < n - 1; i++)
@@ -73,13 +73,13 @@ void MyTreeWidget::customSortByColumn(int column)
 		{
 			if (order == 0 && compare(topLevelItem(j), topLevelItem(j + 1)))
 			{
-				QTreeWidgetItem* swap = takeTopLevelItem(j);
+				QTreeWidgetItem * swap = takeTopLevelItem(j);
 				insertTopLevelItem(j + 1, swap);
 			}
 
-			if(order == 1 && !compare(topLevelItem(j), topLevelItem(j + 1)))
+			if (order == 1 && !compare(topLevelItem(j), topLevelItem(j + 1)))
 			{
-				QTreeWidgetItem* swap = takeTopLevelItem(j);
+				QTreeWidgetItem * swap = takeTopLevelItem(j);
 				insertTopLevelItem(j + 1, swap);
 			}
 		}

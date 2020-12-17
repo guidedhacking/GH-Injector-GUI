@@ -1,7 +1,18 @@
+#include "pch.h"
+
 #include "DownloadProgress.h"
+
+DownloadProgress::DownloadProgress()
+{
+	m_fProgress = 0.0f;
+	m_szStatus  = "";
+}
 
 HRESULT __stdcall DownloadProgress::QueryInterface(const IID & riid, void ** ppvObject)
 {
+    UNREFERENCED_PARAMETER(riid);
+    UNREFERENCED_PARAMETER(ppvObject);
+
     return E_NOINTERFACE;
 }
 
@@ -17,95 +28,99 @@ ULONG __stdcall DownloadProgress::Release(void)
 
 HRESULT __stdcall DownloadProgress::OnStartBinding(DWORD dwReserved, IBinding * pib)
 {
+    UNREFERENCED_PARAMETER(dwReserved);
+    UNREFERENCED_PARAMETER(pib);
+
     return S_OK;
 }
 
-HRESULT __stdcall DownloadProgress::GetPriority(LONG *pnPriority)
+HRESULT __stdcall DownloadProgress::GetPriority(LONG * pnPriority)
 {
+    UNREFERENCED_PARAMETER(pnPriority);
+
     return S_OK;
 }
 
 HRESULT __stdcall DownloadProgress::OnLowResource(DWORD reserved)
 {
+    UNREFERENCED_PARAMETER(reserved);
+
     return S_OK;
 }
 
 HRESULT __stdcall DownloadProgress::OnStopBinding(HRESULT hresult, LPCWSTR szError)
 {
+    UNREFERENCED_PARAMETER(hresult);
+    UNREFERENCED_PARAMETER(szError);
+
     return S_OK;
 }
 
-HRESULT __stdcall DownloadProgress::GetBindInfo(DWORD *grfBINDF, BINDINFO *pbindinfo)
+HRESULT __stdcall DownloadProgress::GetBindInfo(DWORD * grfBINDF, BINDINFO * pbindinfo)
 {
+    UNREFERENCED_PARAMETER(grfBINDF);
+    UNREFERENCED_PARAMETER(pbindinfo);
+
     return S_OK;
 }
 
-HRESULT __stdcall DownloadProgress::OnDataAvailable(DWORD grfBSCF, DWORD dwSize, FORMATETC *pformatetc, STGMEDIUM * pstgmed)
+HRESULT __stdcall DownloadProgress::OnDataAvailable(DWORD grfBSCF, DWORD dwSize, FORMATETC * pformatetc, STGMEDIUM * pstgmed)
 {
+    UNREFERENCED_PARAMETER(grfBSCF);
+    UNREFERENCED_PARAMETER(dwSize);
+    UNREFERENCED_PARAMETER(pformatetc);
+    UNREFERENCED_PARAMETER(pstgmed);
+
     return S_OK;
 }
 
 HRESULT __stdcall DownloadProgress::OnObjectAvailable(const IID & riid, IUnknown * punk)
 {
+    UNREFERENCED_PARAMETER(riid);
+    UNREFERENCED_PARAMETER(punk);
+
     return S_OK;
 }
 
 HRESULT __stdcall DownloadProgress::OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText)
 {
-    BINDSTATUS status = (BINDSTATUS)ulStatusCode;
+    UNREFERENCED_PARAMETER(szStatusText);
 
-    switch (status)
-    {
-        case BINDSTATUS::BINDSTATUS_CONNECTING:
-            printf("Connecting to server\n");
-            break;
+	BINDSTATUS status = (BINDSTATUS)ulStatusCode;
 
-        case BINDSTATUS::BINDSTATUS_BEGINDOWNLOADDATA:
-        case BINDSTATUS::BINDSTATUS_DOWNLOADINGDATA:
-        case BINDSTATUS::BINDSTATUS_ENDDOWNLOADDATA:
-        {
-            if (status == BINDSTATUS::BINDSTATUS_BEGINDOWNLOADDATA)
-            {
-                printf("Beginning download\n");
-            }
+	if (ulProgressMax)
+	{
+		m_fProgress = (float)ulProgress / ulProgressMax;
+	}
 
-            float percentage        = (float)ulProgress / ulProgressMax;
-            float mibs_downloaded   = (float)ulProgress / 1024 / 1024;
-            float mibs_max          = (float)ulProgressMax / 1024 / 1024;
+	switch (status)
+	{
+		case BINDSTATUS::BINDSTATUS_CONNECTING:
+			m_szStatus = "Connecting to server...";
+			break;
 
-            if (status == BINDSTATUS_ENDDOWNLOADDATA)
-            {
-                percentage = 1;
-                mibs_downloaded = mibs_max;
-            }
+		case BINDSTATUS::BINDSTATUS_BEGINDOWNLOADDATA:
+			m_szStatus = "Beginning download...";
+			break;
 
-            int char_count = 50;
+		case BINDSTATUS::BINDSTATUS_DOWNLOADINGDATA:
+			m_szStatus = "Downloading...";
+			break;
 
-            printf("[");
+		case BINDSTATUS::BINDSTATUS_ENDDOWNLOADDATA:
+			m_szStatus = "Download finished";
+			break;
+	}
 
-            for (int i = 0; i < char_count; ++i)
-            {
-                if (i > char_count * percentage)
-                {
-                    printf(".");
-                }
-                else
-                {
-                    printf("#");
-                }
-            }
+	return S_OK;
+}
 
-            printf("] %.2f%% (%.2f/%.2f MiB) %\r", (double)percentage * 100, mibs_downloaded, mibs_max);
+float DownloadProgress::GetDownloadProgress()
+{
+	return m_fProgress;
+}
 
-            std::cout.flush();
-
-            if (status == BINDSTATUS_ENDDOWNLOADDATA)
-            {
-                printf("\nDownload finished\n");
-            }
-        }
-        break;
-    }
-
-    return S_OK;
+std::string DownloadProgress::GetStatusText()
+{
+	return m_szStatus;
 }

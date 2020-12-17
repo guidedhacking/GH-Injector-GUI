@@ -1,33 +1,28 @@
 #pragma once
 
-#include <qfilesystemmodel.h>
-#include <qstringlistmodel.h>
-#include <QWidget>
 #include "ui_GuiScanHook.h"
-#include "InjectionLib.hpp"
-
-
+#include "InjectionLib.h"
 
 class GuiScanHook : public QWidget
 {
 	Q_OBJECT
 
 public:
-	GuiScanHook(QWidget* parent = Q_NULLPTR);
+	GuiScanHook(QWidget * parent = Q_NULLPTR);
 	~GuiScanHook();
 
 	InjectionLib InjLib;
 
 private:
 	Ui::Form ui;
-	QStringListModel* model;
+	QStringListModel * model;
 	QStringList List;
 
 	int m_pid = 0;
 	int m_err = 0;
 
 
-	void setItem(const std::vector<std::string>& item);
+	void setItem(const std::vector<std::string> & item);
 	std::vector<std::string> getSelectedItem();
 
 signals:

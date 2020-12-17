@@ -1,8 +1,9 @@
 #pragma once
-#include <qglobal.h>
 
-const uchar*	getBanner();
+#include "pch.h"
+
+const uchar * getBanner();
 uint			getBannerLen();
 
-const uchar*	getBannerWhite();
+const uchar * getBannerWhite();
 uint			getBannerWhiteLen();

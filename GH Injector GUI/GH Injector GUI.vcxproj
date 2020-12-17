@@ -245,6 +245,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link />
     <PostBuildEvent>
@@ -258,11 +260,14 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpegd.dll "$(OutDir)imageformats\"</Comm
     </PostBuildEvent>
     <Link>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link />
     <PostBuildEvent>
@@ -276,15 +281,19 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpegd.dll "$(OutDir)imageformats\"</Comm
     </PostBuildEvent>
     <Link>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
-      <AdditionalDependencies>Urlmon.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <PostBuildEvent />
     <PostBuildEvent>
@@ -299,11 +308,14 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Link>
-      <AdditionalDependencies>Urlmon.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <PostBuildEvent />
     <PostBuildEvent>
@@ -318,27 +330,56 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static|x64'">
     <Link>
-      <AdditionalDependencies>Urlmon.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static|Win32'">
     <Link>
-      <AdditionalDependencies>Urlmon.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DownloadProgress.cpp" />
-    <ClCompile Include="framelesswindow\framelesswindow.cpp" />
-    <ClCompile Include="framelesswindow\windowdragger.cpp" />
+    <ClCompile Include="DownloadProgressWindow.cpp" />
+    <ClCompile Include="framelesswindow\framelesswindow.cpp">
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Static|Win32'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Static|x64'">..\pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="framelesswindow\windowdragger.cpp">
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Static|Win32'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Static|x64'">..\pch.h</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="MyTreeWidget.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Static|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Static|x64'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="Process.cpp" />
     <ClCompile Include="ShortCut.cpp" />
     <ClCompile Include="DragDropWindow.cpp" />
@@ -352,7 +393,6 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     <QtMoc Include="mainwindow.h" />
     <ClCompile Include="Banner.cpp" />
     <ClCompile Include="CmdArg.cpp" />
-    <ClCompile Include="Compress.cpp" />
     <ClCompile Include="DarkStyle.cpp" />
     <ClCompile Include="GuiMain.cpp" />
     <ClCompile Include="GuiProcess.cpp" />
@@ -363,16 +403,17 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Banner.h" />
-    <ClInclude Include="CmdArg.hpp" />
-    <ClInclude Include="Compress.h" />
+    <ClInclude Include="CmdArg.h" />
     <ClInclude Include="DownloadProgress.h" />
+    <QtMoc Include="DownloadProgressWindow.h" />
+    <ClInclude Include="pch.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="ShortCut.h" />
     <QtMoc Include="framelesswindow\windowdragger.h" />
     <QtMoc Include="framelesswindow\framelesswindow.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Injection.h" />
-    <ClInclude Include="InjectionLib.hpp" />
+    <ClInclude Include="InjectionLib.h" />
     <ClInclude Include="Process.h" />
     <ClInclude Include="DragDropWindow.h" />
     <ClInclude Include="Zip.h" />

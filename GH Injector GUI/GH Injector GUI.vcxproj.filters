@@ -7,9 +7,6 @@
     <ClCompile Include="CmdArg.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="Compress.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="DarkStyle.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -55,15 +52,15 @@
     <ClCompile Include="ShortCut.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="DownloadProgressWindow.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Banner.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="Compress.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="CmdArg.hpp">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="DownloadProgress.h">
@@ -90,7 +87,13 @@
     <ClInclude Include="Zip.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="InjectionLib.hpp">
+    <ClInclude Include="pch.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="InjectionLib.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="CmdArg.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
@@ -130,6 +133,9 @@
     <QtMoc Include="framelesswindow\windowdragger.h">
       <Filter>Headerdateien</Filter>
     </QtMoc>
+    <QtMoc Include="DownloadProgressWindow.h">
+      <Filter>Headerdateien</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="framelesswindow\framelesswindow.ui">
@@ -166,6 +172,11 @@
     </Filter>
     <Filter Include="UI">
       <UniqueIdentifier>{e3066775-22c2-4b7c-9267-3baa441d1851}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+      <ParseFiles>true</ParseFiles>
     </Filter>
   </ItemGroup>
   <ItemGroup>

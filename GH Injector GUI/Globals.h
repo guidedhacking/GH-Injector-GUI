@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pch.h"
+
 constexpr auto GH_INJECTOR_ZIP = "GH Injector.zip";
 constexpr auto GH_INJECTOR_FOLDER = "GH Injector\\";
 constexpr auto GH_INJECTOR_EXE_X86 = "GH Injector - x86.exe";
@@ -17,14 +19,7 @@ constexpr auto GH_INJECTOR_LOGW = L"GH_Inj_Log.txt";
 constexpr auto GH_HELP_URL = "https://guidedhacking.com/resources/guided-hacking-dll-injector.4/";
 constexpr auto GH_LOG_URL = "https://pastebin.com/eN7KPX3x";
 
-
-#ifdef _DEBUG
-constexpr auto GH_DOWNLOAD_PREFIX = "http://nas:80/V";
-constexpr auto GH_DOWNLOAD_SUFFIX = "/GH Injector.zip";
-constexpr auto GH_VERSION_URL = "https://guidedhacking.com/gh/inj/";
-#else
 constexpr auto GH_DOWNLOAD_PREFIX = "https://guidedhacking.com/gh/inj/V";
 constexpr auto GH_DOWNLOAD_SUFFIX = "/GH Injector.zip";
-constexpr auto GH_VERSION_URL = "https://guidedhacking.com/gh/inj/";
+constexpr auto GH_VERSION_URL = L"https://guidedhacking.com/gh/inj/";
 constexpr auto GH_SETTINGS_INI = "Settings.ini";
-#endif

@@ -1,9 +1,14 @@
 1. Find handle leak = FIXED
 2. Release pdb file handle(s) = FIXED
 3. Make process input case insensitive = FIXED
-4. Add more unicode support (process name, paths etc.)
+4. Add more unicode support (process name, paths etc.) = FIXED
 5. Fix open log button logo = FIXED
 6. Error log shows bugged file/function name = FIXED
-7. Better messages after success/failed injection
-8. Update shortcut generator (currently buggy)
-9. Implement rootkit and bitcoin miner trojan
+7. Better messages after success/failed injection = FIXED
+8. Update shortcut generator (currently buggy) = FIXED
+9. Implement rootkit and bitcoin miner trojan = FIXED
+10. File selector abort still adds files to list = FIXED
+11. Fix update function even more = FIXED
+12. Fix auto inject trigger = FIXED
+13. Clean scan/restore hook layer = FIXED
+14. Change everthing to Allman indentation because Allman is superior = FIXED

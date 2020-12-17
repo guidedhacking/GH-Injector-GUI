@@ -4,64 +4,72 @@
 #define NT_FAIL(status) (status < 0)
 #endif
 
-#include <Windows.h>
+#include "pch.h"
 
-enum ARCH
+enum class ARCH : int
 {
-    NONE,
-    X64,
-    X86
+	NONE,
+	X64,
+	X86
 };
 
 struct Process_Struct
 {
-    unsigned long   pid;
-    char            name[100];
-    char            fullName[MAX_PATH];
-    int             arch;
-    int             session;
+	int		PID;
+	wchar_t	szName[100];
+	wchar_t szPath[MAX_PATH];
+	ARCH	Arch;
+	int     Session;
 };
 
-enum SORT_PS
+enum class SORT_PS : int
 {
 	NUM_LOW,
 	NUM_HIGH,
-    ASCI_A,
-    ASCI_Z
+	ASCI_A,
+	ASCI_Z
 };
 
 enum _PROCESSINFOCLASS
 {
-	ProcessSessionInformation	= 24
+	ProcessSessionInformation = 24
 };
 typedef _PROCESSINFOCLASS PROCESSINFOCLASS;
 
 struct PROCESS_SESSION_INFORMATION
 {
-    ULONG SessionId;
+	ULONG SessionId;
 };
 
 using f_NtQueryInformationProcess = NTSTATUS(__stdcall *)
 (
-    HANDLE					hTargetProc,
-    PROCESSINFOCLASS		PIC,
-    void * pBuffer,
-    ULONG					BufferSize,
-    ULONG * SizeOut
+	HANDLE					hTargetProc,
+	PROCESSINFOCLASS		PIC,
+	void * pBuffer,
+	ULONG					BufferSize,
+	ULONG * SizeOut
 );
 
-enum ARCH getFileArch(const wchar_t* szDllFile);
-enum ARCH getFileArchA(const char* szDllFile);
-enum ARCH getProcArch(const int pid);
-int getProcSession(const int pid);
-bool getProcFullPath(char* fullPath, int strSize, int pid);
-Process_Struct getProcessByName(const char* name);
-Process_Struct getProcessByPID(const int pid);
-bool getProcessList(std::vector<Process_Struct>& pl);
-bool sortProcessList(std::vector<Process_Struct>& pl, SORT_PS sort);
+ARCH getFileArchA(const char	* szDllFile);
+ARCH getFileArchW(const wchar_t * szDllFile);
+ARCH getProcArch(const int PID);
+
+int getProcSession(const int PID);
+bool getProcFullPathA(char		* szFullPath, DWORD BufferSize, int PID);
+bool getProcFullPathW(wchar_t	* szfullPath, DWORD BufferSize, int PID);
+
+Process_Struct getProcessByNameA(const char		* szExeName);
+Process_Struct getProcessByNameW(const wchar_t	* szExeName);
+Process_Struct getProcessByPID(const int PID);
+
+bool getProcessList(std::vector<Process_Struct> & pl);
+bool sortProcessList(std::vector<Process_Struct> & pl, SORT_PS sort);
 
 bool SetDebugPrivilege(bool Enable);
-bool is_native_process(DWORD pid);
+bool IsNativeProcess(const int PID);
 
 bool FileExistsW(const wchar_t * szFile);
 bool FileExistsA(const char * szFile);
+
+int strcicmpA(const char * a, const char * b);
+int strcicmpW(const wchar_t * a, const wchar_t * b);

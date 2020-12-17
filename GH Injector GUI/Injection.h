@@ -137,10 +137,12 @@ struct HookInfo
 using f_InjectA = DWORD(__stdcall*)(INJECTIONDATAA * pData);
 using f_InjectW = DWORD(__stdcall*)(INJECTIONDATAW * pData);
 
-using f_ValidateInjectionFunctions	= bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut);
-using f_RestoreInjectionFunctions	= bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn, UINT Count, UINT * CountOut);
+using f_ValidateInjectionFunctions = bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut);
+using f_RestoreInjectionFunctions = bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn, UINT Count, UINT * CountOut);
 
 using f_GetVersionA = HRESULT(__stdcall *)(char		* out, size_t cb_size);
 using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);
 
 using f_GetSymbolState = DWORD(__stdcall *)();
+
+using f_GetDownloadProgress = float(__stdcall *)(bool bWoW64);

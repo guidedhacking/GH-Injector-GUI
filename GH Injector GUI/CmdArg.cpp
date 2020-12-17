@@ -1,25 +1,27 @@
-#include <algorithm>
-#include <string>
-#include <vector>
+﻿#include "pch.h"
 
-#include "CmdArg.hpp"
-
-#include <thread>
-
+#include "CmdArg.h"
 #include "Injection.h"
 #include "Process.h"
-#include "InjectionLib.hpp"
+#include "InjectionLib.h"
 
 #define INJ_KEEP_HEADER 0x0000
 
-int FindArg(int argc, const char * arg, char * argv[], bool Parameter = false);
+int FindArg(int argc, const wchar_t * arg, wchar_t * argv[], bool Parameter = false);
 void help();
 
-int CmdArg(int argc, char* argv[])
+int CmdArg(int argc, wchar_t * argv[])
 {
+	//Console output is buggy for non ASCII characters, works fine internally
+	
 	AllocConsole();
 	FILE * pFile = nullptr;
 	freopen_s(&pFile, "CONOUT$", "w", stdout);
+
+	if (!SetDebugPrivilege(true))
+	{
+		printf("Failed to enable debug privileges. This might affect the functionality of the injector.\n");
+	}
 
 	if (argc < 2)
 	{
@@ -41,8 +43,8 @@ int CmdArg(int argc, char* argv[])
 		printf("Injection library intialized\n");
 	}
 
-	const char * szProcessName = nullptr;
-	int process_index = FindArg(argc, "-p", argv, true);
+	const wchar_t * szProcessName = nullptr;
+	int process_index = FindArg(argc, L"-p", argv, true);
 	if (!process_index)
 	{
 		printf("No target process specified.\n");
@@ -53,11 +55,13 @@ int CmdArg(int argc, char* argv[])
 	{
 		szProcessName = argv[process_index + 1];
 
-		printf("target process = %s\n", szProcessName);
+		printf("target process = %ls\n", szProcessName);
 	}
 
-	const char * szDllName = nullptr;
-	int dll_index = FindArg(argc, "-f", argv, true);
+	std::wcout << szProcessName << std::endl;
+
+	const wchar_t * szDllName = nullptr;
+	int dll_index = FindArg(argc, L"-f", argv, true);
 	if (!dll_index)
 	{
 		printf("No dll to inject specified.\n");
@@ -67,20 +71,20 @@ int CmdArg(int argc, char* argv[])
 	{
 		szDllName = argv[dll_index + 1];
 
-		if (!FileExistsA(szDllName))
+		if (!FileExistsW(szDllName))
 		{
 			printf("Specified dll file doesn't exist.\n");
 
 			return -1;
 		}
 
-		printf("dll = %s\n", szDllName);
+		printf("dll = %ls\n", szDllName);
 	}
 
-	auto proc_struct = getProcessByName(szProcessName);
-	if (!proc_struct.pid)
+	auto proc_struct = getProcessByNameW(szProcessName);
+	if (!proc_struct.PID)
 	{
-		if (!FindArg(argc, "-wait", argv))
+		if (!FindArg(argc, L"-wait", argv))
 		{
 			printf("Target process doesn't exist.\n");
 
@@ -89,24 +93,24 @@ int CmdArg(int argc, char* argv[])
 
 		printf("Waiting for target process.\n");
 
-		while (!proc_struct.pid)
+		while (!proc_struct.PID)
 		{
 			Sleep(50);
-			proc_struct = getProcessByName(szProcessName);
+			proc_struct = getProcessByNameW(szProcessName);
 		}
 	}
 
-	printf("Target process found (pid = %d)\n", proc_struct.pid);
+	printf("Target process found (pid = %d)\n", proc_struct.PID);
 
-	INJECTIONDATAA data{ 0 };
-	data.ProcessID = proc_struct.pid;
-	strcpy_s(data.szDllPath, szDllName);
+	INJECTIONDATAW data{ 0 };
+	data.ProcessID = proc_struct.PID;
+	lstrcpyW(data.szDllPath, szDllName);
 
 	int injection_mode = 0;
-	int inj_mode_index = FindArg(argc, "-l", argv, true);
+	int inj_mode_index = FindArg(argc, L"-l", argv, true);
 	if (inj_mode_index)
 	{
-		injection_mode = atoi(argv[inj_mode_index + 1]);
+		injection_mode = std::stoi(argv[inj_mode_index + 1]);
 		if (injection_mode < 0 || injection_mode > 3)
 		{
 			injection_mode = 0;
@@ -115,12 +119,11 @@ int CmdArg(int argc, char* argv[])
 	data.Mode = (INJECTION_MODE)injection_mode;
 	printf("Injection mode = %d\n", injection_mode);
 
-
 	int launch_method = 0;
-	int inj_method_index = FindArg(argc, "-s", argv, true);
+	int inj_method_index = FindArg(argc, L"-s", argv, true);
 	if (inj_method_index)
 	{
-		launch_method = atoi(argv[inj_method_index + 1]);
+		launch_method = std::stoi(argv[inj_method_index + 1]);
 		if (launch_method < 0 || launch_method > 3)
 		{
 			launch_method = 0;
@@ -131,40 +134,40 @@ int CmdArg(int argc, char* argv[])
 
 	DWORD Flags = 0;
 
-	int peh_index = FindArg(argc, "-peh", argv, true);
+	int peh_index = FindArg(argc, L"-peh", argv, true);
 	if (peh_index)
 	{
-		int peh_option = atoi(argv[peh_index + 1]);
+		int peh_option = std::stoi(argv[peh_index + 1]);
 
 		switch (peh_option)
 		{
-			case 1: Flags |= INJ_ERASE_HEADER; break;
-			case 2: Flags |= INJ_FAKE_HEADER; break;
-			default: break;
+		case 1: Flags |= INJ_ERASE_HEADER; break;
+		case 2: Flags |= INJ_FAKE_HEADER; break;
+		default: break;
 		}
 	}
 
-	if (FindArg(argc, "-unlink", argv))
+	if (FindArg(argc, L"-unlink", argv))
 	{
 		Flags |= INJ_UNLINK_FROM_PEB;
 	}
 
-	if (FindArg(argc, "-cloak", argv))
+	if (FindArg(argc, L"-cloak", argv))
 	{
 		Flags |= INJ_THREAD_CREATE_CLOAKED;
 	}
 
-	if (FindArg(argc, "-random", argv))
+	if (FindArg(argc, L"-random", argv))
 	{
 		Flags |= INJ_SCRAMBLE_DLL_NAME;
 	}
 
-	if (FindArg(argc, "-copy", argv))
+	if (FindArg(argc, L"-copy", argv))
 	{
 		Flags |= INJ_LOAD_DLL_COPY;
 	}
 
-	if (FindArg(argc, "-hijack", argv))
+	if (FindArg(argc, L"-hijack", argv))
 	{
 		Flags |= INJ_HIJACK_HANDLE;
 	}
@@ -173,12 +176,12 @@ int CmdArg(int argc, char* argv[])
 	{
 		DWORD mmflags = MM_DEFAULT;
 
-		int mmflags_index = FindArg(argc, "-mmflags", argv, true);
+		int mmflags_index = FindArg(argc, L"-mmflags", argv, true);
 		if (mmflags_index)
 		{
-			char * szMMflags = argv[mmflags_index + 1];
-			char * pEnd = nullptr;
-			mmflags = std::strtoul(szMMflags, &pEnd, 0x10);
+			wchar_t * szMMflags = argv[mmflags_index + 1];
+			wchar_t * pEnd = nullptr;
+			mmflags = std::stol(szMMflags, nullptr, 0x10);
 
 			DWORD mmflags_mask = MM_DEFAULT | INJ_MM_CLEAN_DATA_DIR;
 			mmflags &= mmflags_mask;
@@ -191,15 +194,15 @@ int CmdArg(int argc, char* argv[])
 
 	printf("Flags = %08X\n", Flags);
 
-	if (FindArg(argc, "-log", argv))
+	if (FindArg(argc, L"-log", argv))
 	{
 		data.GenerateErrorLog = true;
 	}
-	
-	int timeout_index = FindArg(argc, "-timeout", argv, true);
+
+	int timeout_index = FindArg(argc, L"-timeout", argv, true);
 	if (timeout_index)
 	{
-		data.Timeout = std::atoi(argv[timeout_index + 1]);
+		data.Timeout = std::stoi(argv[timeout_index + 1]);
 	}
 	else
 	{
@@ -216,10 +219,10 @@ int CmdArg(int argc, char* argv[])
 	printf("Injection library ready\n");
 
 	int delay = 0;
-	int delay_index = FindArg(argc, "-delay", argv, true);
+	int delay_index = FindArg(argc, L"-delay", argv, true);
 	if (delay_index)
 	{
-		delay = std::atoi(argv[delay_index + 1]);
+		delay = std::stoi(argv[delay_index + 1]);
 		printf("Delay = %d\n", delay);
 	}
 
@@ -230,15 +233,15 @@ int CmdArg(int argc, char* argv[])
 	}
 
 	printf("Injecting\n");
-	
-	DWORD inj_status = lib.InjectFuncA(&data);
-	
-	if (FindArg(argc, "-help", argv))
+
+	DWORD inj_status = lib.InjectFuncW(&data);
+
+	if (FindArg(argc, L"-help", argv))
 	{
 		help();
 	}
 
-	if (FindArg(argc, "-version", argv))
+	if (FindArg(argc, L"-version", argv))
 	{
 		printf("Version = %s\n", GH_INJ_VERSIONA);
 	}
@@ -258,11 +261,11 @@ int CmdArg(int argc, char* argv[])
 	return 0;
 }
 
-int FindArg(int argc, const char * arg, char * argv[], bool HasParameter)
+int FindArg(int argc, const wchar_t * arg, wchar_t * argv[], bool HasParameter)
 {
 	for (int i = 0; i < argc; ++i)
 	{
-		if (!strcmp(arg, argv[i]))
+		if (!lstrcmpiW(arg, argv[i]))
 		{
 			if (HasParameter)
 			{
@@ -306,7 +309,7 @@ void help()
 	printf("\t\t\t 1 = Thread hijacking\n");
 	printf("\t\t\t 2 = SetWindowsHookEx\n");
 	printf("\t\t\t 3 = QueueUserAPC\n\n");
-	
+
 	printf("\t-peh [0,1,2]\n");
 	printf("\t\tThis argument specifies the header option:\n");
 	printf("\t\t\t 0 = Keep PE header (default)\n");

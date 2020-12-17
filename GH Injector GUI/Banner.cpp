@@ -1,3 +1,5 @@
+#include "pch.h"
+
 /* .\GH Banner.jpg (12.02.2020 20:07:22)
    StartOffset(h): 00000000, EndeOffset(h): 000049B6, Länge(h): 000049B7 */
 #include "Banner.h"
@@ -2417,7 +2419,7 @@ const uchar white[9968] = {
 };
 
 
-const uchar* getBanner()
+const uchar * getBanner()
 {
 	return data;
 }
@@ -2427,7 +2429,7 @@ uint getBannerLen()
 	return uint(sizeof(data));
 }
 
-const uchar* getBannerWhite()
+const uchar * getBannerWhite()
 {
 	return white;
 }

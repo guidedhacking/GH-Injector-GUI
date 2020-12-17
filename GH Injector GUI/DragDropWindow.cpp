@@ -1,26 +1,26 @@
+#include "pch.h"
+
 #include "DragDropWindow.h"
 #include "resource.h"
 
-#include <iostream>
-
-HWND g_hMainWnd		= NULL;
-HWND g_hDropWnd		= NULL;
+HWND g_hMainWnd = NULL;
+HWND g_hDropWnd = NULL;
 GuiMain * g_GuiMain = NULL;
 
 WNDPROC g_MainWndProc = nullptr;
 
-bool g_Active	= false;
-bool g_Hide		= false;
+bool g_Active = false;
+bool g_Hide = false;
 
 WINDOWPOS g_WinPosOld{ 0 };
 WINDOWPOS g_WinPosNew{ 0 };
 
-HANDLE g_hMsgThread		= nullptr;
-HANDLE g_hUpdateThread	= nullptr;
-HANDLE g_hUpdateNow		= nullptr;
+HANDLE g_hMsgThread = nullptr;
+HANDLE g_hUpdateThread = nullptr;
+HANDLE g_hUpdateNow = nullptr;
 
-HICON	g_hIcon		= NULL;
-HDC		g_hWndDC	= NULL;
+HICON	g_hIcon = NULL;
+HDC		g_hWndDC = NULL;
 
 const wchar_t g_szClassName[] = L"DragnDropWindow";
 
@@ -37,7 +37,7 @@ void HandleDrops(HDROP hDrop)
 		return;
 	}
 
-	wchar_t ** Drops = new wchar_t*[DropCount]();
+	wchar_t ** Drops = new wchar_t * [DropCount]();
 	for (UINT i = 0; i < DropCount; ++i)
 	{
 		auto BufferSize = DragQueryFile(hDrop, i, nullptr, 0);
@@ -54,7 +54,8 @@ void HandleDrops(HDROP hDrop)
 		DragQueryFile(hDrop, i, Drops[i], BufferSize);
 
 		QString qDrop = QString::fromWCharArray(Drops[i]);
-		g_GuiMain->add_file_to_list(qDrop, false);
+		qDrop.replace("\\", "/");
+		g_GuiMain->add_file_to_list(qDrop, true);
 
 		delete[] Drops[i];
 	}
@@ -85,6 +86,8 @@ LRESULT CALLBACK LocalWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
+//if god ever existed this code killed him
+
 DWORD __stdcall UpdateDragDropWnd_Thread(void * pParam)
 {
 	UNREFERENCED_PARAMETER(pParam);
@@ -92,7 +95,7 @@ DWORD __stdcall UpdateDragDropWnd_Thread(void * pParam)
 	while (true)
 	{
 		WaitForSingleObject(g_hUpdateNow, INFINITE);
-		
+
 		if (g_Hide)
 		{
 			SetWindowPos(g_hDropWnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_HIDEWINDOW);
@@ -110,7 +113,7 @@ DWORD __stdcall UpdateDragDropWnd_Thread(void * pParam)
 				g_WinPosOld = g_WinPosNew;
 			}
 			else
-			{					
+			{
 				SetWindowPos(g_hDropWnd, g_hMainWnd, g_WinPosNew.x + g_WinPosNew.cx - x_offset, g_WinPosNew.y + g_WinPosNew.cy - y_offset, 30, 30, SWP_SHOWWINDOW | SWP_NOACTIVATE);
 				SetWindowPos(g_hMainWnd, g_hDropWnd, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
 
@@ -123,7 +126,7 @@ DWORD __stdcall UpdateDragDropWnd_Thread(void * pParam)
 }
 
 LRESULT CALLBACK Proxy_WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{	
+{
 	if (uMsg == WM_SIZE)
 	{
 		if (wParam == SIZE_MINIMIZED)
@@ -132,19 +135,19 @@ LRESULT CALLBACK Proxy_WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		else if (wParam == SIZE_RESTORED)
 		{
-			g_Active	= true;
-			g_Hide		= false;
+			g_Active = true;
+			g_Hide = false;
 		}
 
 		SetEvent(g_hUpdateNow);
 	}
 	else if (uMsg == WM_WINDOWPOSCHANGED)
 	{
-		auto * pos = reinterpret_cast<WINDOWPOS*>(lParam);
+		auto * pos = reinterpret_cast<WINDOWPOS *>(lParam);
 		if (g_WinPosOld.cx != pos->cx || g_WinPosOld.cy != pos->cy || g_WinPosOld.x != pos->x || g_WinPosOld.y != pos->y)
 		{
-			g_Active	= true;
-			g_Hide		= false;
+			g_Active = true;
+			g_Hide = false;
 
 			g_WinPosNew = *pos;
 
@@ -155,14 +158,14 @@ LRESULT CALLBACK Proxy_WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	{
 		if (wParam == WA_ACTIVE || wParam == WA_CLICKACTIVE)
 		{
-			g_Active	= true;
-			g_Hide		= false;
+			g_Active = true;
+			g_Hide = false;
 			SetEvent(g_hUpdateNow);
 		}
 		else if (wParam == WA_INACTIVE && (HWND)lParam != g_hDropWnd)
 		{
-			g_Active	= false;
-			g_Hide		= false;
+			g_Active = false;
+			g_Hide = false;
 			SetEvent(g_hUpdateNow);
 		}
 	}
@@ -192,7 +195,7 @@ HWND CreateDragDropWindow(HWND hMainWnd, GuiMain * pGui)
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
 
 	WNDCLASSEX wc{ 0 };
-	wc.cbSize = sizeof(WNDCLASSEX); 
+	wc.cbSize = sizeof(WNDCLASSEX);
 
 	wc.style			= 0;
 	wc.lpfnWndProc		= LocalWndProc;
@@ -212,9 +215,9 @@ HWND CreateDragDropWindow(HWND hMainWnd, GuiMain * pGui)
 
 		return 0;
 	}
-	
-	g_hMainWnd	= hMainWnd;
-	g_GuiMain	= pGui;
+
+	g_hMainWnd = hMainWnd;
+	g_GuiMain = pGui;
 
 	g_MainWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr(hMainWnd, GWLP_WNDPROC));
 	if (!g_MainWndProc)
@@ -274,8 +277,8 @@ HWND CreateDragDropWindow(HWND hMainWnd, GuiMain * pGui)
 	ChangeWindowMessageFilterEx(hWnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
 	ChangeWindowMessageFilterEx(hWnd, 0x0049, MSGFLT_ALLOW, nullptr);
 
-	g_hMsgThread	= CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)MsgLoop, (void*)hWnd, NULL, nullptr);
-	g_hUpdateThread	= CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)UpdateDragDropWnd_Thread, nullptr, NULL, nullptr);
+	g_hMsgThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)MsgLoop, (void *)hWnd, NULL, nullptr);
+	g_hUpdateThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)UpdateDragDropWnd_Thread, nullptr, NULL, nullptr);
 
 	return hWnd;
 }
@@ -286,7 +289,7 @@ void CloseDragDropWindow()
 	DestroyIcon(g_hIcon);
 
 	DestroyWindow(g_hDropWnd);
-	
+
 	TerminateThread(g_hMsgThread, 0);
 	TerminateThread(g_hUpdateThread, 0);
 

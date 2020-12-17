@@ -1,43 +1,27 @@
 #pragma once
 
-#include <QtWidgets/QMainWindow>
-#include <qtimer.h>
-#include <qtreewidget.h>
-#include <qevent.h>
-
-#include <thread>
-
-
 #include "framelesswindow/framelesswindow.h"
 #include "ui_GuiMain.h"
 #include "GuiProcess.h"
 #include "GuiScanHook.h"
 #include "Process.h"
-#include "InjectionLib.hpp"
+#include "InjectionLib.h"
 #include "Globals.h"
 #include "DownloadProgress.h"
-
-
-enum class UPDATE
-{
-	NOTHING,
-	UPDATE1,
-	DOWNLOAD,
-};
-
+#include "DownloadProgressWindow.h"
 
 class GuiMain : public QMainWindow
 {
 	Q_OBJECT
 
 public:
-	GuiMain(QWidget* parent = Q_NULLPTR);
+	GuiMain(QWidget * parent = Q_NULLPTR);
 	~GuiMain();
 
 	static int const EXIT_CODE_REBOOT;
 
-	static int str_to_arch(const QString str);
-	static QString arch_to_str(const int arch);
+	static ARCH str_to_arch(const QString str);
+	static QString arch_to_str(const ARCH arch);
 	Ui::GuiMainClass ui;
 
 	void add_file_to_list(QString str, bool active);
@@ -47,8 +31,10 @@ private:
 
 	FramelessWindow framelessPicker;
 	FramelessWindow framelessScanner;
-	GuiProcess* gui_Picker = NULL;
-	GuiScanHook* gui_Scanner = NULL;
+	FramelessWindow framelessUpdate;
+
+	GuiProcess	* gui_Picker	= Q_NULLPTR;
+	GuiScanHook * gui_Scanner	= Q_NULLPTR;
 
 	// Design
 	QPalette normalPalette;
@@ -57,55 +43,44 @@ private:
 	QString	 darkSheet;
 
 	// Settings
-	Process_State_Struct*	pss;
-	Process_Struct*			ps_picker;
-	//Process_Struct*		ps_main;
+	Process_State_Struct	* pss;
+	Process_Struct			* ps_picker;
 
 	QString		lastPathStr;
 	bool		ignoreUpdate;
 	bool		lightMode;
 	bool		lbl_hide_banner;
-	UPDATE		update;
 	bool		onReset;
 	bool		onUserInput;
 	bool		native;
+	bool		interrupt_download;
+	bool		pre_main_exec_update;
 
 	std::thread process_update_thread;
 	bool OnExit;
-	
-	QTimer* t_Auto_Inj;
-	QTimer* t_Delay_Inj;
 
-	//HINSTANCE hInjectionMod;
-	//f_InjectA injectFunc;
+	QTimer * t_Auto_Inj;
+	QTimer * t_Delay_Inj;
+
 	InjectionLib InjLib;
 
-	std::string getVersionFromIE();
-
-	void keyPressEvent(QKeyEvent * k);
 	void UpdateProcess(int Interval = 100);
-	
-protected:
-	void dragEnterEvent(QDragEnterEvent* e);
-	void dragMoveEvent(QDragMoveEvent* e);
-	void dragLeaveEvent(QDragLeaveEvent* e);
-	//void dropEvent(QDropEvent* e); 
-	
-	bool eventFilter(QObject *obj, QEvent *event) override;
-	
 	void toggleSelected();
 
+protected:
+	bool eventFilter(QObject * obj, QEvent * event) override;
+
 public slots:
-	void get_from_picker(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
+	void get_from_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
 	void get_from_scan_hook(int pid, int error);
 
 signals:
-	void send_to_picker(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
+	void send_to_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
 	void send_to_scan_hook(int pid, int error);
 
 private slots:
 	// Titelbar
-	void closeEvent(QCloseEvent* event) override;
+	void closeEvent(QCloseEvent * event) override;
 	bool platformCheck();
 
 	// Settings
@@ -121,19 +96,20 @@ private slots:
 	void auto_loop_inject();
 	void reset_settings();
 	void hook_Scan();
-	void btn_hook_scan_change();
+	void btn_change();
 
 	// Settings, Color
 	void save_settings();
 	void load_settings();
+	void settings_get_update();
 	void color_setup();
 	void color_change();
 	void load_banner();
 	void hide_banner();
 
 	// Method, Cloaking, Advanced
-	void load_change(int i);
-	void create_change(int i);
+	void load_change(int index);
+	void create_change(int index);
 	void cb_main_clicked();
 	void cb_page_protection_clicked();
 
@@ -153,6 +129,13 @@ private slots:
 	void open_log();
 
 	// Update
-	bool update_injector(std::string version);
-	void check_online_version();
+	void update_download_progress(DownloadProgressWindow * wnd, DownloadProgress * progress);
+	void update_update_thread(DownloadProgressWindow * wnd, std::string version);
+	void update_injector(std::string version);
+	void update_init();
+	std::string get_newest_version();
+
+	// PDB Download
+	void pdb_download();
+	void pdb_download_update_thread(DownloadProgressWindow * wnd);
 };

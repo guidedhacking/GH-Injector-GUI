@@ -4,13 +4,16 @@
 
 #pragma once
 
-#include <windows.h>
-#include <iostream>
+#include "pch.h"
 
 class DownloadProgress : public IBindStatusCallback 
 {
+    float m_fProgress;
+    std::string m_szStatus;
 
 public:
+
+    DownloadProgress();
 
     HRESULT __stdcall QueryInterface(const IID & riid, void ** ppvObject);
 
@@ -33,4 +36,7 @@ public:
     virtual HRESULT STDMETHODCALLTYPE OnObjectAvailable(const IID & riid, IUnknown * punk);
 
     HRESULT __stdcall OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText);
+
+    float GetDownloadProgress();
+    std::string GetStatusText();
 };
