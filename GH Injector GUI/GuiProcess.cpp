@@ -4,10 +4,16 @@
 #include "GuiMain.h"
 #include "MyTreeWidget.h"
 
-GuiProcess::GuiProcess(QWidget * parent)
+GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	: QWidget(parent)
 {
 	ui.setupUi(this);
+
+	frameless_parent = FramelessParent;
+
+	ps	= nullptr;
+	pss = nullptr;
+	sort_prev = SORT_PS::NUM_LOW;
 
 	// Maybe sometime we need this
 	delete ui.tree_process;
@@ -34,9 +40,6 @@ GuiProcess::GuiProcess(QWidget * parent)
 
 	connect(ui.tree_process->header(), SIGNAL(sectionClicked(int)), this, SLOT(custom_sort(int)));
 	connect(ui.tree_process, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(double_click_process(const QModelIndex &)));
-
-	//dummy in case nothing was selected
-	ps = new Process_Struct();
 
 	native = IsNativeProcess(GetCurrentProcessId());
 
@@ -130,19 +133,14 @@ void GuiProcess::refresh_gui()
 		++proc_count;
 	}
 
-	if (parent)
+	if (frameless_parent)
 	{
-		parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
+		frameless_parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
 	}
 	else
 	{
 		this->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
 	}
-}
-
-void GuiProcess::set_frameless_parent(FramelessWindow * p)
-{
-	parent = p;
 }
 
 void GuiProcess::refresh_process()
@@ -203,9 +201,9 @@ void GuiProcess::name_change(const QString & str)
 
 void GuiProcess::proc_select(bool ignore)
 {
-	pss->txtFilter = ui.txt_filter->text();
-	pss->cmbArch = ui.cmb_arch->currentIndex();
-	pss->cbSession = ui.cb_session->isChecked();
+	pss->txtFilter	= ui.txt_filter->text();
+	pss->cmbArch	= ui.cmb_arch->currentIndex();
+	pss->cbSession	= ui.cb_session->isChecked();
 
 	QTreeWidgetItem * item = ui.tree_process->currentItem();
 	if (item)
@@ -256,11 +254,12 @@ void GuiProcess::double_click_process(const QModelIndex & index)
 void GuiProcess::get_from_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct)
 {
 	pss = procStateStruct;
-	ps = procStruct;
+	ps	= procStruct;
 
 	ui.txt_filter->setText(pss->txtFilter);
 	ui.cmb_arch->setCurrentIndex(pss->cmbArch);
 	ui.cb_session->setChecked(pss->cbSession);
+
 	memset(ps, 0, sizeof(Process_Struct));
 
 	ui.tree_process->setFocus();

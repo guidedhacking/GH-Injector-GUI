@@ -16,7 +16,7 @@ public:
 	DWORD InjectFuncA(INJECTIONDATAA * pData);
 	DWORD InjectFuncW(INJECTIONDATAW * pData);
 	int ScanHook(int pid, std::vector<std::string> & hList);
-	int RestoreHook(std::vector<std::string> & hList);
+	int RestoreHook(std::vector<int> & hList);
 	bool SymbolStatus();
 	float DownloadProgress(bool bWow64);
 

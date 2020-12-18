@@ -3,10 +3,17 @@
 #include "GuiScanHook.h"
 #include "GuiMain.h"
 
-GuiScanHook::GuiScanHook(QWidget * parent)
+GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, InjectionLib * lib)
 	: QWidget(parent)
 {
 	ui.setupUi(this);
+
+	InjLib = lib;
+
+	m_pid = 0;
+	m_err = 0;
+
+	frameless_parent = FramelessParent;
 
 	connect(ui.btn_scan, SIGNAL(clicked()), this, SLOT(scan_clicked()));
 	connect(ui.btn_unhook, SIGNAL(clicked()), this, SLOT(unhook_clicked()));
@@ -18,9 +25,10 @@ GuiScanHook::GuiScanHook(QWidget * parent)
 	model->setStringList(List);
 	ui.lv_scanhook->setModel(model);
 
-	if (!InjLib.Init())
+	if (!InjLib->LoadingStatus())
 	{
-		emit injec_status(false, "Library or Function not found!");
+		emit injec_status(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
+
 		return;
 	}
 }
@@ -34,7 +42,7 @@ void GuiScanHook::setItem(const std::vector<std::string> & item)
 {
 	List.clear();
 
-	for (auto i : item)
+	for (const auto & i : item)
 	{
 		List << QString::fromStdString(i);
 	}
@@ -42,13 +50,13 @@ void GuiScanHook::setItem(const std::vector<std::string> & item)
 	model->setStringList(List);
 }
 
-std::vector<std::string> GuiScanHook::getSelectedItem()
+std::vector<int> GuiScanHook::get_selected_indices()
 {
-	std::vector<std::string> res;
+	std::vector<int> res;	
 
 	foreach(const QModelIndex & index, ui.lv_scanhook->selectionModel()->selectedIndexes())
 	{
-		res.push_back(index.data(Qt::DisplayRole).toString().toStdString());
+		res.push_back(index.row());
 	}
 
 	return res;
@@ -64,13 +72,10 @@ void GuiScanHook::get_from_inj_to_sh(int pid, int error)
 	emit scan_clicked();
 }
 
-void GuiScanHook::refresh_gui()
-{
-
-}
-
 void GuiScanHook::scan_clicked()
 {
+	update_title("Scan for hooks");
+
 	if (m_pid == 0)
 	{
 		setItem({ "Please select a process" });
@@ -105,18 +110,32 @@ void GuiScanHook::scan_clicked()
 
 	std::vector<std::string> tempHookList;
 
-	int fail = InjLib.ScanHook(m_pid, tempHookList);
+	int fail = InjLib->ScanHook(m_pid, tempHookList);
 	if (fail)
 	{
+		ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
 		setItem({ "Failed to scan for hooks" });
 	}
 	else if (tempHookList.empty())
 	{
+		ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
 		setItem({ "No hooks found" });
 	}
 	else
 	{
+		ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::ExtendedSelection);
 		setItem(tempHookList);
+
+		auto hook_count = tempHookList.size();
+
+		if (hook_count == 1)
+		{
+			update_title("1 hook found");
+		}
+		else
+		{
+			update_title(QString::number(hook_count) + " hooks found");
+		}
 	}
 }
 
@@ -127,20 +146,21 @@ void GuiScanHook::unhook_clicked()
 		return;
 	}
 
-	std::vector<std::string> selected = getSelectedItem();
-	int fail = InjLib.RestoreHook(selected);
+	std::vector<int> selected = get_selected_indices();
+	if (!selected.size())
+	{
+		return;
+	}
+
+	int fail = InjLib->RestoreHook(selected);
 	if (fail)
 	{
-		List.clear();
-		model->setStringList(List);
-		setItem({ "Failed" });
+		injec_status(false, "Failed to restore hook(s)");
 	}
-	else
-	{
-		List.clear();
-		model->setStringList(List);
-		scan_clicked();
-	}
+
+	List.clear();
+	model->setStringList(List);
+	scan_clicked();
 }
 
 void GuiScanHook::injec_status(bool ok, const QString msg)
@@ -150,12 +170,23 @@ void GuiScanHook::injec_status(bool ok, const QString msg)
 		QMessageBox messageBox;
 		messageBox.information(0, "Success", msg);
 		messageBox.setFixedSize(500, 200);
-
 	}
 	else
 	{
 		QMessageBox messageBox;
 		messageBox.critical(0, "Error", msg);
 		messageBox.setFixedSize(500, 200);
+	}
+}
+
+void GuiScanHook::update_title(const QString title)
+{
+	if (frameless_parent)
+	{
+		frameless_parent->setWindowTitle(title);
+	}
+	else
+	{
+		this->setWindowTitle(title);
 	}
 }

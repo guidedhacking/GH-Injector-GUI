@@ -1,7 +1,5 @@
 #pragma once
 
-#include "pch.h"
-
 #include "ui_GuiProcess.h"
 #include "Process.h"
 #include "framelesswindow.h"
@@ -18,19 +16,19 @@ class GuiProcess : public QWidget
 	Q_OBJECT
 
 public:
-	GuiProcess(QWidget * parent = Q_NULLPTR);
+	GuiProcess(QWidget * parent = Q_NULLPTR, FramelessWindow * FramelessParent = Q_NULLPTR);
 	~GuiProcess();
 
 private:
 
 	Ui::frm_proc ui;
+	FramelessWindow * frameless_parent;
 
 	Process_State_Struct	*	pss;
 	Process_Struct			*	ps;
 	QFileSystemModel			model;
 	SORT_PS						sort_prev;
 	bool						native;
-	FramelessWindow			*	parent;
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
@@ -40,8 +38,6 @@ signals:
 
 public slots:
 	void get_from_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
-
-	void set_frameless_parent(FramelessWindow * p);
 
 private slots:
 

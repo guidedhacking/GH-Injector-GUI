@@ -108,40 +108,32 @@ int InjectionLib::ScanHook(int pid, std::vector<std::string> & hList)
 	return 0;
 }
 
-int InjectionLib::RestoreHook(std::vector<std::string> & hList)
+int InjectionLib::RestoreHook(std::vector<int> & IndexList)
 {
 	if (!LoadingStatus())
 	{
 		(DWORD)-1;
 	}
 
-	HookInfo infoRestore[30];
-	memset(infoRestore, 0, sizeof(infoRestore));
-	int counter = 0;
-
-	for (UINT i = 0; i != CountOut; ++i)
+	if (!IndexList.size())
 	{
-		if (info[i].ChangeCount && !info[i].ErrorCode)
-		{
-			std::string guiString = std::string(info[i].ModuleName) + "->" + std::string(info[i].FunctionName);
-
-			if (std::find(hList.begin(), hList.end(), guiString) != hList.end())
-			{
-				memcpy(&infoRestore[counter], &info[i], sizeof(HookInfo));
-
-				counter++;
-			}
-		}
+		(DWORD)-2;
 	}
 
-	if (counter)
-	{
-		auto res_ret = RestoreFunc(targetPid, err1, err2, infoRestore, CountOut, &CountOut);
+	HookInfo infoRestore[30]{ 0 };
+	int counter = 0;
 
-		if (!res_ret)
-		{
-			(DWORD)-2;
-		}
+	for (auto i : IndexList)
+	{
+		infoRestore[counter++] = info[i];
+		printf("Restoring (%d) %s\n", i, info[i].FunctionName);
+	}
+
+	auto res_ret = RestoreFunc(targetPid, err1, err2, infoRestore, CountOut, &CountOut);
+
+	if (!res_ret)
+	{
+		(DWORD)-3;
 	}
 
 	return 0;

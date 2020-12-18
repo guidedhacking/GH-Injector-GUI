@@ -33,38 +33,29 @@ private:
 	FramelessWindow framelessScanner;
 	FramelessWindow framelessUpdate;
 
-	GuiProcess	* gui_Picker	= Q_NULLPTR;
-	GuiScanHook * gui_Scanner	= Q_NULLPTR;
-
-	// Design
-	QPalette normalPalette;
-	QString  normalSheet;
-	QPalette darkPalette;
-	QString	 darkSheet;
+	GuiProcess	* gui_Picker;
+	GuiScanHook * gui_Scanner;
 
 	// Settings
 	Process_State_Struct	* pss;
 	Process_Struct			* ps_picker;
 
-	QString		lastPathStr;
-	bool		ignoreUpdate;
-	bool		lightMode;
-	bool		lbl_hide_banner;
-	bool		onReset;
-	bool		onUserInput;
-	bool		native;
-	bool		interrupt_download;
-	bool		pre_main_exec_update;
-
-	std::thread process_update_thread;
-	bool OnExit;
+	bool ignoreUpdate;
+	bool lbl_hide_banner;
+	bool onReset;
+	bool native;
+	bool interrupt_download;
+	bool pre_main_exec_update;
 
 	QTimer * t_Auto_Inj;
 	QTimer * t_Delay_Inj;
+	QTimer * t_Update_Proc;
+	QTimer * t_OnUserInput;
+
+	QString lastPathStr;
 
 	InjectionLib InjLib;
 
-	void UpdateProcess(int Interval = 100);
 	void toggleSelected();
 
 protected:
@@ -90,6 +81,7 @@ private slots:
 	void cmb_proc_name_change();
 	void txt_pid_change();
 	void btn_pick_process_click();
+	void update_process();
 
 	// Auto, Reset
 	void auto_inject();
@@ -102,8 +94,6 @@ private slots:
 	void save_settings();
 	void load_settings();
 	void settings_get_update();
-	void color_setup();
-	void color_change();
 	void load_banner();
 	void hide_banner();
 
@@ -120,7 +110,6 @@ private slots:
 	void delay_inject();
 	void inject_file();
 	void injec_status(bool ok, const QString msg);
-	void load_Dll();
 
 	// Info
 	void tooltip_change();
