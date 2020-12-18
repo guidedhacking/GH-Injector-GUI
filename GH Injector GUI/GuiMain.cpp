@@ -1807,7 +1807,7 @@ void GuiMain::update_init()
 	std::string online_version = get_newest_version();
 	std::string current_version = GH_INJ_VERSIONA;
 
-	if (online_version.compare(current_version) > 0 || true)
+	if (online_version.compare(current_version) > 0)
 	{
 		std::string update_msg = "This version of the GH Injector is outdated.\nThe newest version is V";
 		update_msg += online_version;
