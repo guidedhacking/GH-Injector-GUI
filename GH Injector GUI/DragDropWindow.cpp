@@ -3,59 +3,251 @@
 #include "DragDropWindow.h"
 #include "resource.h"
 
-HWND g_hMainWnd = NULL;
-HWND g_hDropWnd = NULL;
-GuiMain * g_GuiMain = NULL;
+const wchar_t DragDropWindow::m_szClassName[] = L"DragnDropWindow";
+int DragDropWindow::m_ClassRefCount = 0;
 
-WNDPROC g_MainWndProc = nullptr;
+DragDropWindow::~DragDropWindow()
+{
+	Close();
+}
 
-bool g_Active = false;
-bool g_Hide = false;
+HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
+{
+	m_hMainWnd = hParent;
+	m_size = Size;
 
-WINDOWPOS g_WinPosOld{ 0 };
-WINDOWPOS g_WinPosNew{ 0 };
+	HINSTANCE hInstance = GetModuleHandle(nullptr);
 
-HANDLE g_hMsgThread = nullptr;
-HANDLE g_hUpdateThread = nullptr;
-HANDLE g_hUpdateNow = nullptr;
+	WNDCLASSEX wc{ 0 };
+	wc.cbSize = sizeof(WNDCLASSEX);
 
-HICON	g_hIcon = NULL;
-HDC		g_hWndDC = NULL;
+	if (!GetClassInfoEx(hInstance, m_szClassName, &wc))
+	{
+		wc.cbSize			= sizeof(WNDCLASSEX);
+		wc.style			= 0;
+		wc.lpfnWndProc		= DragDropWindow::WndProc;
+		wc.cbClsExtra		= 0;
+		wc.cbWndExtra		= 0;
+		wc.hInstance		= hInstance;
+		wc.hIcon			= LoadIcon(NULL, IDI_APPLICATION);
+		wc.hCursor			= LoadCursor(NULL, IDC_ARROW);
+		wc.hbrBackground	= (HBRUSH)(COLOR_WINDOW + 1);
+		wc.lpszMenuName		= nullptr;
+		wc.lpszClassName	= m_szClassName;
+		wc.hIconSm			= LoadIcon(NULL, IDI_APPLICATION);
 
-const wchar_t g_szClassName[] = L"DragnDropWindow";
+		if (!RegisterClassEx(&wc))
+		{
+			printf("RegisterClassEx failed: %08X\n", GetLastError());
 
-void HandleDrops(HDROP hDrop)
+			return NULL;
+		}
+	}
+
+	++m_ClassRefCount;
+	
+	m_hDropWnd = CreateWindowExW(WS_EX_ACCEPTFILES | WS_EX_TOOLWINDOW, m_szClassName, nullptr, WS_BORDER | WS_POPUP, -1000000, -1000000, m_size, m_size, NULL, NULL, hInstance, this);
+	if (m_hDropWnd == NULL)
+	{
+		printf("CreateWindowExW failed: %08X\n", GetLastError());
+
+		if (m_ClassRefCount == 1)
+		{
+			UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
+
+			--m_ClassRefCount;
+		}
+
+		return NULL;
+	}
+
+	SetWindowLongPtr(m_hDropWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+
+	m_hDropIcon = reinterpret_cast<HICON>(LoadImage(GetModuleHandle(0), MAKEINTRESOURCE(IDI_ICON2), IMAGE_ICON, m_size, m_size, NULL));
+	if (!m_hDropIcon)
+	{
+		printf("LoadImage failed: %08X\n", GetLastError());
+	
+		DestroyWindow(m_hDropWnd);
+
+		if (m_ClassRefCount == 1)
+		{
+			UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
+
+			--m_ClassRefCount;
+		}
+
+		return NULL;
+	}
+
+	m_hDeviceContext = GetDC(m_hDropWnd);
+	if (!m_hDeviceContext)
+	{
+		printf("GetDC failed: %08X\n", GetLastError());
+
+		DestroyIcon(m_hDropIcon);
+		DestroyWindow(m_hDropWnd);
+
+		if (m_ClassRefCount == 1)
+		{
+			UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
+
+			--m_ClassRefCount;
+		}
+
+		return NULL;
+	}
+
+	ChangeWindowMessageFilterEx(m_hDropWnd, WM_DROPFILES, MSGFLT_ALLOW, nullptr);
+	ChangeWindowMessageFilterEx(m_hDropWnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
+	ChangeWindowMessageFilterEx(m_hDropWnd, 0x0049, MSGFLT_ALLOW, nullptr);
+
+	return m_hDropWnd;
+}
+
+void DragDropWindow::Close()
+{
+	if (!m_hDropWnd)
+	{
+		return;
+	}
+
+	ReleaseDC(m_hDropWnd, m_hDeviceContext);
+
+	DestroyWindow(m_hDropWnd);
+
+	DestroyIcon(m_hDropIcon);
+
+	--m_ClassRefCount;
+
+	if (!m_ClassRefCount)
+	{
+		UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
+	}
+
+	m_hDropWnd = NULL;
+}
+
+void DragDropWindow::DrawIcon()
+{
+	auto ret = DrawIconEx(m_hDeviceContext, 0, 0, m_hDropIcon, m_size, m_size, 0, NULL, DI_NORMAL);
+	if (!ret)
+	{
+		DWORD err = GetLastError();
+
+		printf("Draw Icon failed: %08X\n", err);
+	}
+}
+
+HWND DragDropWindow::GetHWND()
+{
+	return m_hDropWnd;
+}
+
+HWND DragDropWindow::GetParent()
+{
+	return m_hMainWnd;
+}
+
+void DragDropWindow::GetPosition(int & x, int & y)
+{
+	x = m_x;
+	y = m_y;
+}
+
+void DragDropWindow::SetPosition(int x, int y, bool hide, bool active)
+{
+	if (hide)
+	{
+		SetWindowPos(m_hDropWnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_HIDEWINDOW);
+
+		return;
+	}
+
+	DWORD flag = SWP_SHOWWINDOW | SWP_NOACTIVATE;
+	if (x == -1 || y == -1)
+	{
+		flag |= SWP_NOMOVE;
+	}
+
+	if (active)
+	{
+		SetWindowPos(m_hDropWnd, HWND_TOPMOST, x, y, m_size, m_size, flag);
+	}
+	else
+	{
+		SetWindowPos(m_hDropWnd, m_hMainWnd, x, y, m_size, m_size, flag);
+		SetWindowPos(m_hMainWnd, m_hDropWnd, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+	}
+
+	if (x != -1 && y != -1)
+	{
+		m_x = x;
+		m_y = y;
+	}
+}
+
+
+void DragDropWindow::HandleDrop(HDROP hDrop)
 {
 	if (!hDrop)
 	{
+		printf("hDrop = 0\n");
+
 		return;
 	}
 
 	auto DropCount = DragQueryFile(hDrop, 0xFFFFFFFF, nullptr, 0);
 	if (!DropCount)
 	{
+		printf("DropCount = 0\n");
+		
 		return;
 	}
 
 	wchar_t ** Drops = new wchar_t * [DropCount]();
+	if (!Drops)
+	{
+		printf("Can't allocate memory for drops\n");
+
+		return;
+	}
+
 	for (UINT i = 0; i < DropCount; ++i)
 	{
 		auto BufferSize = DragQueryFile(hDrop, i, nullptr, 0);
 
 		if (!BufferSize)
 		{
+			printf("DragQueryFile returned invalid size for drop %d\n", i);
+
 			continue;
 		}
 
 		BufferSize++;
 
-		Drops[i] = new wchar_t[(UINT_PTR)BufferSize]();
+		Drops[i] = new wchar_t[static_cast<size_t>(BufferSize)]();
 
-		DragQueryFile(hDrop, i, Drops[i], BufferSize);
+		if (!Drops[i])
+		{
+			printf("Can't allocate memory for drop %d\n", i);
+
+			continue;
+		}
+
+		if (!DragQueryFile(hDrop, i, Drops[i], BufferSize))
+		{
+			printf("DragQueryFile failed for drop %d\n", i);
+
+			delete[] Drops[i];
+
+			continue;
+		}
 
 		QString qDrop = QString::fromWCharArray(Drops[i]);
 		qDrop.replace("\\", "/");
-		g_GuiMain->add_file_to_list(qDrop, true);
+
+		m_Callback(qDrop);
 
 		delete[] Drops[i];
 	}
@@ -63,239 +255,38 @@ void HandleDrops(HDROP hDrop)
 	delete[] Drops;
 }
 
-LRESULT CALLBACK LocalWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+void DragDropWindow::SetCallback(std::function<void(const QString &)> Callback)
 {
-	switch (uMsg)
-	{
-		case WM_DROPFILES:
-			HandleDrops(reinterpret_cast<HDROP>(wParam));
-			break;
-
-		case WM_PAINT:
-			DrawIcon(g_hWndDC, 0, 0, g_hIcon);
-			break;
-
-		case WM_ACTIVATE:
-			if (wParam == WA_ACTIVE || wParam == WA_CLICKACTIVE)
-			{
-				SetWindowPos(g_hMainWnd, g_hDropWnd, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
-			}
-			break;
-	}
-
-	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+	m_Callback = Callback;
 }
 
-//if god ever existed this code killed him
-
-DWORD __stdcall UpdateDragDropWnd_Thread(void * pParam)
+LRESULT CALLBACK DragDropWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	UNREFERENCED_PARAMETER(pParam);
-
-	while (true)
+	if (uMsg == WM_DROPFILES || uMsg == WM_PAINT || uMsg == WM_ACTIVATE)
 	{
-		WaitForSingleObject(g_hUpdateNow, INFINITE);
+		DragDropWindow * pThis = reinterpret_cast<DragDropWindow *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
-		if (g_Hide)
+		if (pThis && pThis->GetHWND() == hWnd)
 		{
-			SetWindowPos(g_hDropWnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_HIDEWINDOW);
-		}
-		else
-		{
-			float scaling = g_WinPosNew.cx / 1250.0f;
-			int y_offset = 200 * scaling;
-			int x_offset = 85 * scaling;
-
-			if (g_Active)
+			switch (uMsg)
 			{
-				SetWindowPos(g_hDropWnd, HWND_TOPMOST, g_WinPosNew.x + g_WinPosNew.cx - x_offset, g_WinPosNew.y + g_WinPosNew.cy - y_offset, 30, 30, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+				case WM_DROPFILES:
+					pThis->HandleDrop(reinterpret_cast<HDROP>(wParam));
+					break;
 
-				g_WinPosOld = g_WinPosNew;
-			}
-			else
-			{
-				SetWindowPos(g_hDropWnd, g_hMainWnd, g_WinPosNew.x + g_WinPosNew.cx - x_offset, g_WinPosNew.y + g_WinPosNew.cy - y_offset, 30, 30, SWP_SHOWWINDOW | SWP_NOACTIVATE);
-				SetWindowPos(g_hMainWnd, g_hDropWnd, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+				case WM_PAINT:
+					pThis->DrawIcon();
+					break;
 
-				g_WinPosOld = g_WinPosNew;
+				case WM_ACTIVATE:
+					if (wParam == WA_ACTIVE || wParam == WA_CLICKACTIVE)
+					{
+						SetWindowPos(pThis->GetParent(), pThis->GetHWND(), 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+					}
+					break;
 			}
 		}
-
-		ResetEvent(g_hUpdateNow);
-	}
-}
-
-LRESULT CALLBACK Proxy_WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	if (uMsg == WM_SIZE)
-	{
-		if (wParam == SIZE_MINIMIZED)
-		{
-			g_Hide = true;
-		}
-		else if (wParam == SIZE_RESTORED)
-		{
-			g_Active = true;
-			g_Hide = false;
-		}
-
-		SetEvent(g_hUpdateNow);
-	}
-	else if (uMsg == WM_WINDOWPOSCHANGED)
-	{
-		auto * pos = reinterpret_cast<WINDOWPOS *>(lParam);
-		if (g_WinPosOld.cx != pos->cx || g_WinPosOld.cy != pos->cy || g_WinPosOld.x != pos->x || g_WinPosOld.y != pos->y)
-		{
-			g_Active = true;
-			g_Hide = false;
-
-			g_WinPosNew = *pos;
-
-			SetEvent(g_hUpdateNow);
-		}
-	}
-	else if (uMsg == WM_ACTIVATE)
-	{
-		if (wParam == WA_ACTIVE || wParam == WA_CLICKACTIVE)
-		{
-			g_Active = true;
-			g_Hide = false;
-			SetEvent(g_hUpdateNow);
-		}
-		else if (wParam == WA_INACTIVE && (HWND)lParam != g_hDropWnd)
-		{
-			g_Active = false;
-			g_Hide = false;
-			SetEvent(g_hUpdateNow);
-		}
-	}
-	else if (uMsg == WM_DISPLAYCHANGE)
-	{
-		g_GuiMain->slotReboot();
 	}
 
-	return g_MainWndProc(hWnd, uMsg, wParam, lParam);
-}
-
-DWORD __stdcall MsgLoop(HWND hWnd)
-{
-	MSG Msg{ 0 };
-
-	while (GetMessage(&Msg, hWnd, 0, 0))
-	{
-		TranslateMessage(&Msg);
-		DispatchMessage(&Msg);
-	}
-
-	return Msg.wParam;
-}
-
-HWND CreateDragDropWindow(HWND hMainWnd, GuiMain * pGui)
-{
-	HINSTANCE hInstance = GetModuleHandle(nullptr);
-
-	WNDCLASSEX wc{ 0 };
-	wc.cbSize = sizeof(WNDCLASSEX);
-
-	wc.style			= 0;
-	wc.lpfnWndProc		= LocalWndProc;
-	wc.cbClsExtra		= 0;
-	wc.cbWndExtra		= 0;
-	wc.hInstance		= hInstance;
-	wc.hIcon			= LoadIcon(NULL, IDI_APPLICATION);
-	wc.hCursor			= LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground	= (HBRUSH)(COLOR_WINDOW + 1);
-	wc.lpszMenuName		= nullptr;
-	wc.lpszClassName	= g_szClassName;
-	wc.hIconSm			= LoadIcon(NULL, IDI_APPLICATION);
-
-	if (!RegisterClassEx(&wc))
-	{
-		printf("RegisterClassEx failed: %08X\n", GetLastError());
-
-		return 0;
-	}
-
-	g_hMainWnd = hMainWnd;
-	g_GuiMain = pGui;
-
-	g_MainWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr(hMainWnd, GWLP_WNDPROC));
-	if (!g_MainWndProc)
-	{
-		printf("GetWindowLongPtr failed: %08X\n", GetLastError());
-
-		return 0;
-	}
-
-	if (!SetWindowLongPtr(hMainWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(Proxy_WndProc)))
-	{
-		printf("SetWindowLongPtr failed: %08X\n", GetLastError());
-
-		return 0;
-	}
-
-	g_hUpdateNow = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-	if (!g_hUpdateNow)
-	{
-		printf("CreateEvent failed: %08X\n", GetLastError());
-
-		return 0;
-	}
-
-	HWND hWnd = CreateWindowExW(WS_EX_ACCEPTFILES | WS_EX_TOOLWINDOW, g_szClassName, nullptr, WS_BORDER | WS_POPUP, -1000000, -1000000, 30, 30, NULL, NULL, hInstance, nullptr);
-	if (hWnd == NULL)
-	{
-		printf("CreateWindowExW failed: %08X\n", GetLastError());
-
-		return 0;
-	}
-
-	g_hDropWnd = hWnd;
-
-	g_hIcon = (HICON)LoadImage(GetModuleHandle(0), MAKEINTRESOURCE(IDI_ICON2), IMAGE_ICON, 40, 40, LR_LOADTRANSPARENT);
-	if (!g_hIcon)
-	{
-		printf("LoadImage failed: %08X\n", GetLastError());
-
-		return 0;
-	}
-
-	g_hWndDC = GetDC(hWnd);
-	if (!g_hWndDC)
-	{
-		printf("GetDC failed: %08X\n", GetLastError());
-
-		return 0;
-	}
-
-	if (!DrawIcon(g_hWndDC, 0, 0, g_hIcon))
-	{
-		printf("DrawIcon failed: %08X\n", GetLastError());
-	}
-
-	ChangeWindowMessageFilterEx(hWnd, WM_DROPFILES, MSGFLT_ALLOW, nullptr);
-	ChangeWindowMessageFilterEx(hWnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
-	ChangeWindowMessageFilterEx(hWnd, 0x0049, MSGFLT_ALLOW, nullptr);
-
-	g_hMsgThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)MsgLoop, (void *)hWnd, NULL, nullptr);
-	g_hUpdateThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)UpdateDragDropWnd_Thread, nullptr, NULL, nullptr);
-
-	return hWnd;
-}
-
-void CloseDragDropWindow()
-{
-	ReleaseDC(g_hDropWnd, g_hWndDC);
-	DestroyIcon(g_hIcon);
-
-	DestroyWindow(g_hDropWnd);
-
-	TerminateThread(g_hMsgThread, 0);
-	TerminateThread(g_hUpdateThread, 0);
-
-	CloseHandle(g_hMsgThread);
-	CloseHandle(g_hUpdateThread);
-	CloseHandle(g_hUpdateNow);
-
-	UnregisterClass(g_szClassName, GetModuleHandle(nullptr));
+	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }

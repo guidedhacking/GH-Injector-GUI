@@ -31,9 +31,6 @@
     <ClCompile Include="InjectionLib.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="mainwindow.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -56,6 +53,9 @@
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="DownloadProgressWindow.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -101,12 +101,13 @@
     <Image Include="gh_resource\GH Icon.ico">
       <Filter>Ressourcendateien</Filter>
     </Image>
-    <Image Include="gh_resource\icon2.ico">
+    <Image Include="gh_resource\DragDrop Icon.ico">
       <Filter>Ressourcendateien</Filter>
     </Image>
-    <Image Include="gh_resource\log.ico">
+    <Image Include="gh_resource\Log Icon.ico">
       <Filter>Ressourcendateien</Filter>
     </Image>
+    <Image Include="gh_resource\LUL Icon.ico" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="DarkStyle.h">

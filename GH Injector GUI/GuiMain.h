@@ -1,5 +1,8 @@
 #pragma once
 
+//forward declaration because project structure is just fucked lmao
+class GuiMain;
+
 #include "framelesswindow/framelesswindow.h"
 #include "ui_GuiMain.h"
 #include "GuiProcess.h"
@@ -9,13 +12,14 @@
 #include "Globals.h"
 #include "DownloadProgress.h"
 #include "DownloadProgressWindow.h"
+#include "DragDropWindow.h"
 
 class GuiMain : public QMainWindow
 {
 	Q_OBJECT
 
 public:
-	GuiMain(QWidget * parent = Q_NULLPTR);
+	GuiMain(QWidget * parent = Q_NULLPTR, FramelessWindow * FramelessParent = Q_NULLPTR);
 	~GuiMain();
 
 	static int const EXIT_CODE_REBOOT;
@@ -29,12 +33,18 @@ public:
 
 private:
 
+	FramelessWindow * framelessParent;
+
 	FramelessWindow framelessPicker;
 	FramelessWindow framelessScanner;
 	FramelessWindow framelessUpdate;
 
 	GuiProcess	* gui_Picker;
 	GuiScanHook * gui_Scanner;
+
+	DragDropWindow * drag_drop;
+
+	QFileSystemModel model;
 
 	// Settings
 	Process_State_Struct	* pss;
@@ -47,10 +57,25 @@ private:
 	bool interrupt_download;
 	bool pre_main_exec_update;
 
+	std::string newest_version;
+	std::string current_version;
+
+	int current_dpi;
+	int dragdrop_size;
+	int dragdrop_offset;
+
+	int old_raw_pid;
+	int old_byname_pid;
+	int old_bypid_pid;
+
 	QTimer * t_Auto_Inj;
 	QTimer * t_Delay_Inj;
 	QTimer * t_Update_Proc;
 	QTimer * t_OnUserInput;
+
+	QPixmap pxm_lul;
+	QPixmap pxm_error;
+	QPixmap pxm_generic;
 
 	QString lastPathStr;
 
@@ -82,6 +107,7 @@ private slots:
 	void txt_pid_change();
 	void btn_pick_process_click();
 	void update_process();
+	void update_proc_icon();
 
 	// Auto, Reset
 	void auto_inject();
@@ -100,6 +126,7 @@ private slots:
 	// Method, Cloaking, Advanced
 	void load_change(int index);
 	void create_change(int index);
+	void peh_change(int index);
 	void cb_main_clicked();
 	void cb_page_protection_clicked();
 

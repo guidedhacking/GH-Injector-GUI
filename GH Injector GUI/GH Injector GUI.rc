@@ -54,9 +54,9 @@ END
 // remains consistent on all systems.
 IDI_ICON1               ICON                    "gh_resource\\GH Icon.ico"
 
-IDI_ICON2               ICON                    "gh_resource\\icon2.ico"
+IDI_ICON2               ICON                    "gh_resource\\DragDrop Icon.ico"
 
-IDI_ICON3               ICON                    "gh_resource\\log.ico"
+IDI_ICON3               ICON                    "gh_resource\\Log Icon.ico"
 
 #endif    // Deutsch (Deutschland) resources
 /////////////////////////////////////////////////////////////////////////////

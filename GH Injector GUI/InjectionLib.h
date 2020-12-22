@@ -19,6 +19,8 @@ public:
 	int RestoreHook(std::vector<int> & hList);
 	bool SymbolStatus();
 	float DownloadProgress(bool bWow64);
+	std::string VersionA();
+	std::wstring VersionW();
 
 private:
 	HookInfo info[30];

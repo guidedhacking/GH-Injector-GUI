@@ -405,6 +405,8 @@ bool FramelessWindow::rightBorderHit(const QPoint & pos)
 
 bool FramelessWindow::topBorderHit(const QPoint & pos)
 {
+	return false;
+
 	const QRect & rect = this->geometry();
 	if (pos.y() >= rect.y() && pos.y() <= rect.y() + CONST_DRAG_BORDER_SIZE)
 	{
@@ -415,6 +417,8 @@ bool FramelessWindow::topBorderHit(const QPoint & pos)
 
 bool FramelessWindow::bottomBorderHit(const QPoint & pos)
 {
+	return false;
+
 	const QRect & rect = this->geometry();
 	int tmp = rect.y() + rect.height();
 	if (pos.y() <= tmp && pos.y() >= (tmp - CONST_DRAG_BORDER_SIZE))

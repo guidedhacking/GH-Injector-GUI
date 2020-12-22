@@ -50,6 +50,8 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	{
 		ui.tree_process->resizeColumnToContents(i);
 	}
+
+	setFixedHeight(520);
 }
 
 GuiProcess::~GuiProcess()

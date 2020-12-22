@@ -15,6 +15,8 @@ GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, In
 
 	frameless_parent = FramelessParent;
 
+	ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
+
 	connect(ui.btn_scan, SIGNAL(clicked()), this, SLOT(scan_clicked()));
 	connect(ui.btn_unhook, SIGNAL(clicked()), this, SLOT(unhook_clicked()));
 
@@ -75,6 +77,13 @@ void GuiScanHook::get_from_inj_to_sh(int pid, int error)
 void GuiScanHook::scan_clicked()
 {
 	update_title("Scan for hooks");
+
+	if (!InjLib->LoadingStatus())
+	{
+		setItem({ "Injection library not loaded" });
+
+		return;
+	}
 
 	if (m_pid == 0)
 	{
@@ -141,6 +150,11 @@ void GuiScanHook::scan_clicked()
 
 void GuiScanHook::unhook_clicked()
 {
+	if (!InjLib->LoadingStatus())
+	{
+		return;
+	}
+
 	if (m_pid == 0)
 	{
 		return;

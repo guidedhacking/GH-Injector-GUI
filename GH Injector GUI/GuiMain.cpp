@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include "GuiMain.h"
 
@@ -12,13 +12,18 @@
 
 int const GuiMain::EXIT_CODE_REBOOT = -123456789;
 
-GuiMain::GuiMain(QWidget * parent)
+GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	: QMainWindow(parent)
 {
+	framelessParent = FramelessParent;
+
 	settings_get_update();
 
 	interrupt_download = false;
 	pre_main_exec_update = true;
+
+	current_version = GH_INJ_VERSIONA;
+	newest_version = get_newest_version();
 
 	if (!ignoreUpdate)
 	{
@@ -57,10 +62,7 @@ GuiMain::GuiMain(QWidget * parent)
 	{
 		this->statusBar()->hide();
 	}
-
-	parent->layout()->setSizeConstraint(QLayout::SetFixedSize);
-	ui.grp_settings->layout()->setSizeConstraint(QLayout::SetFixedSize);
-	ui.tree_files->setFixedWidth(800);
+		
 	ui.tree_files->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
 
 	// Settings
@@ -78,6 +80,7 @@ GuiMain::GuiMain(QWidget * parent)
 	connect(ui.cmb_create,		SIGNAL(currentIndexChanged(int)),	this, SLOT(create_change(int)));
 	connect(ui.cb_main,			SIGNAL(clicked()),					this, SLOT(cb_main_clicked()));
 	connect(ui.cb_protection,	SIGNAL(clicked()),					this, SLOT(cb_page_protection_clicked()));
+	connect(ui.cmb_peh,			SIGNAL(currentIndexChanged(int)),	this, SLOT(peh_change(int)));
 
 	// Files
 	connect(ui.btn_add,		SIGNAL(clicked()),									this, SLOT(add_file_dialog()));
@@ -102,6 +105,7 @@ GuiMain::GuiMain(QWidget * parent)
 	t_OnUserInput	= new QTimer(this);
 	pss				= new Process_State_Struct;
 	ps_picker		= new Process_Struct;
+	drag_drop		= new DragDropWindow();
 
 	framelessPicker.setWindowTitle("Select a process");
 	framelessPicker.setContent(gui_Picker);
@@ -115,7 +119,7 @@ GuiMain::GuiMain(QWidget * parent)
 	framelessScanner.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	framelessScanner.setWindowModality(Qt::WindowModality::ApplicationModal);
 	
-	ui.btn_openlog->setIcon(QIcon(":/GuiMain/gh_resource/log.ico"));
+	ui.btn_openlog->setIcon(QIcon(":/GuiMain/gh_resource/Log Icon.ico"));
 
 	t_Delay_Inj->setSingleShot(true);
 	t_OnUserInput->setSingleShot(true);
@@ -123,9 +127,18 @@ GuiMain::GuiMain(QWidget * parent)
 	pss->cbSession	= true;
 	pss->cmbArch	= 0;
 	pss->txtFilter	= "";
-
+	
 	onReset			= false;
 	lbl_hide_banner = false;
+
+	ui.cmb_proc->setEditText("Broihon.exe");
+
+	ui.txt_arch->setText(QString::fromUtf8("\xF0\x9F\x98\x8E") + QString::fromUtf8("\xF0\x9F\x92\xA6"));
+	ui.txt_arch->setToolTip("Doin your mom doin doin your mom\nDoin your mom doin doin your mom\nDoin doin your mom doin doin your mom\nYou know we straight with doin your mom");
+
+	old_raw_pid		= 1337;
+	old_byname_pid	= 0;
+	old_bypid_pid	= 0;
 
 	memset(ps_picker, 0, sizeof(Process_Struct));
 
@@ -142,8 +155,8 @@ GuiMain::GuiMain(QWidget * parent)
 	connect(t_Update_Proc,	SIGNAL(timeout()), this, SLOT(update_process()));
 
 	ui.tree_files->setColumnWidth(0, 50);
-	ui.tree_files->setColumnWidth(1, 178);
-	ui.tree_files->setColumnWidth(2, 454);
+	ui.tree_files->setColumnWidth(1, 125);
+	ui.tree_files->setColumnWidth(2, 320);
 	ui.tree_files->setColumnWidth(3, 100);
 
 	ui.tree_files->clear();
@@ -152,6 +165,8 @@ GuiMain::GuiMain(QWidget * parent)
 	load_banner();
 	load_change(0);
 	create_change(0);
+	peh_change(0);
+	tooltip_change();
 	hide_banner();
 	auto_inject();
 
@@ -160,14 +175,13 @@ GuiMain::GuiMain(QWidget * parent)
 	winSize.setWidth(1000);
 	parentWidget()->resize(winSize);
 
-	this->installEventFilter(this);
+	ui.lbl_proc_icon->setStyleSheet("background: transparent");
+
+	QApplication::instance()->installEventFilter(this);
 	ui.tree_files->installEventFilter(this);
-	ui.txt_pid->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
 	ui.txt_pid->installEventFilter(this);
 
-	ui.txt_delay->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
-
-	ui.txt_timeout->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
+	ui.txt_pid->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
 
 	if (!native)
 	{
@@ -187,14 +201,50 @@ GuiMain::GuiMain(QWidget * parent)
 	{
 		cmb_proc_name_change();
 	}
-	
-	t_Update_Proc->start(100);
 
+	pxm_lul		= QPixmap(":/GuiMain/gh_resource/LUL Icon.png");
+	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
+	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
+
+	update_process();
+	update_proc_icon();
 	btn_change();
+
+	t_Update_Proc->start(100);
 
 	if (!InjLib.LoadingStatus() || !InjLib.SymbolStatus())
 	{
 		ui.btn_inject->setEnabled(false);
+	}
+
+	auto Drop_Handler = [this](const QString & path)
+	{
+		add_file_to_list(path, true);
+	};
+
+	current_dpi = framelessParent->logicalDpiX();
+	dragdrop_size = (int)(30.0f * current_dpi / 96.0f + 0.5f);
+	dragdrop_offset = (int)(10.0f * current_dpi / 96.0f + 0.5f);
+
+	drag_drop->CreateDragDropWindow(reinterpret_cast<HWND>(framelessParent->winId()), dragdrop_size);
+	drag_drop->SetCallback(Drop_Handler);
+
+	auto cmp = newest_version.compare(current_version);
+	if (cmp > 0)
+	{
+		std::string update_txt = "This version of the GH Injector is outdated and might contain life-threatening bugs. The newest version is V" + newest_version + ". Click to update.";
+		ui.btn_version->setToolTip(update_txt.c_str());
+		ui.btn_version->setStyleSheet("background-color: red");
+	}
+	else if (cmp < 0)
+	{
+		ui.btn_version->setToolTip("Holy shit, your version is from the future.");
+		ui.btn_version->setDisabled(true);
+	}
+	else
+	{
+		ui.btn_version->setToolTip("You are using the newest version of the GH Injector.");
+		ui.btn_version->setDisabled(true);
 	}
 }
 
@@ -202,6 +252,7 @@ GuiMain::~GuiMain()
 {
 	save_settings();
 
+	delete drag_drop;
 	delete gui_Picker;
 	delete gui_Scanner;
 	delete t_Auto_Inj;
@@ -229,6 +280,18 @@ void GuiMain::update_process()
 	int raw = ui.txt_pid->text().toInt();
 	Process_Struct byName	= getProcessByNameW(ui.cmb_proc->currentText().toStdWString().c_str());
 	Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toInt());
+
+	//avoid unnecessary updates
+	if (raw != old_raw_pid || byName.PID != old_byname_pid || byPID.PID != old_bypid_pid || (ui.cmb_proc->currentText().compare("Broihon.exe") == 0 && old_raw_pid != 1337))
+	{
+		old_raw_pid		= raw;
+		old_byname_pid	= byName.PID;
+		old_bypid_pid	= byPID.PID;
+	}
+	else
+	{
+		return;
+	}
 
 #ifndef _WIN64
 	if (!native)
@@ -259,22 +322,46 @@ void GuiMain::update_process()
 			{
 				txt_pid_change();
 				btn_change();
+				update_proc_icon();
 			}
 		}
-		else if (!t_OnUserInput->isActive())
+		else if (!t_OnUserInput->isActive() || raw == 1337)
 		{
-			if (byName.PID)
+			if (byName.PID && byName.PID != raw && raw != 1337)
 			{
 				cmb_proc_name_change();
 				btn_change();
+				update_proc_icon();
 			}
-			else if (raw)
+			else if (raw && raw != 1337)
 			{
 				ui.txt_pid->setText("0");
 				ui.txt_arch->setText("---");
+				ui.txt_arch->setToolTip("");
 				ui.txt_pid->setToolTip("");
 				ui.cmb_proc->setToolTip("");
+
+				old_raw_pid = 0;
+
 				btn_change();
+				update_proc_icon();
+			}
+			else if (raw == 1337)
+			{
+				ui.txt_arch->setText(QString::fromUtf8("\xF0\x9F\x98\x8E") + QString::fromUtf8("\xF0\x9F\x92\xA6"));
+				ui.txt_arch->setToolTip("Doin your mom doin doin your mom\nDoin your mom doin doin your mom\nDoin doin your mom doin doin your mom\nYou know we straight with doin your mom");
+				ui.txt_pid->setToolTip("");
+				ui.cmb_proc->setToolTip("");
+				ui.cmb_proc->setEditText("Broihon.exe");
+
+				old_raw_pid		= 1337;
+				old_byname_pid	= 0;
+				old_bypid_pid	= 0;
+
+				btn_change();
+				update_proc_icon();
+
+				ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(L"Praise Broihon \u2665\u2665\u2665"));
 			}
 		}
 	}
@@ -286,17 +373,94 @@ void GuiMain::update_process()
 			{
 				cmb_proc_name_change();
 				btn_change();
+				update_proc_icon();
 			}
 		}
-		else if (ui.txt_pid->text().toInt() != 0)
+		else if (raw != 0 && ui.cmb_proc->currentText().compare("Broihon.exe") != 0)
 		{
 			ui.txt_pid->setText("0");
 			ui.txt_arch->setText("---");
 			ui.txt_pid->setToolTip("");
 			ui.cmb_proc->setToolTip("");
+
+			old_raw_pid = 0;
+
 			btn_change();
+			update_proc_icon();
+		}
+		else if (ui.cmb_proc->currentText().compare("Broihon.exe") == 0)
+		{
+			ui.txt_arch->setText(QString::fromUtf8("\xF0\x9F\x98\x8E") + QString::fromUtf8("\xF0\x9F\x92\xA6"));
+			ui.txt_arch->setToolTip("Doin your mom doin doin your mom\nDoin your mom doin doin your mom\nDoin doin your mom doin doin your mom\nYou know we straight with doin your mom");
+			ui.txt_pid->setToolTip("");
+			ui.cmb_proc->setToolTip("");
+			ui.txt_pid->setText("1337");
+
+			old_raw_pid		= 1337;
+			old_byname_pid	= 0;
+			old_bypid_pid	= 0;
+
+			btn_change();
+			update_proc_icon();
+
+			ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(L"Praise Broihon \u2665\u2665\u2665"));
 		}
 	}	
+}
+
+void GuiMain::update_proc_icon()
+{
+	int size = ui.btn_proc->height();
+	ui.lbl_proc_icon->setFixedSize(QSize(size, size));
+
+	int pid = ui.txt_pid->text().toInt();
+	
+	Process_Struct ps = getProcessByPID(pid);
+
+	QPixmap new_icon;
+
+	if (pid == 1337)
+	{
+		new_icon = pxm_lul.scaled(size, size);
+	}
+	else if (!ps.PID)
+	{
+		new_icon = pxm_error.scaled(size, size);
+	}
+	else
+	{
+		auto path = QString::fromWCharArray(ps.szPath);
+		model.setRootPath(path);
+		QIcon icon = model.fileIcon(model.index(path));
+		
+		if (icon.isNull())
+		{
+			new_icon = pxm_generic.scaled(size, size);
+		}
+		else
+		{
+			//grab highest resolution
+			QSize max = QSize(0, 0);
+
+			for (const auto & i : icon.availableSizes())
+			{
+				if (i.width() >= max.width())
+				{
+					max = i;
+				}
+			}
+
+			new_icon = icon.pixmap(max.width(), max.height());
+			new_icon = new_icon.scaled(size, size, Qt::AspectRatioMode::KeepAspectRatio, Qt::TransformationMode::SmoothTransformation);
+		}
+
+		if (new_icon.isNull())
+		{
+			new_icon = pxm_generic.scaled(size, size);
+		}
+	}
+
+	ui.lbl_proc_icon->setPixmap(new_icon);
 }
 
 ARCH GuiMain::str_to_arch(const QString str)
@@ -366,7 +530,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 	{
 		if (obj == ui.tree_files)
 		{
-			QKeyEvent * keyEvent = static_cast<QKeyEvent *>(event);
+			auto * keyEvent = static_cast<QKeyEvent *>(event);
 			if (keyEvent->key() == Qt::Key_Delete)
 			{
 				remove_file();
@@ -378,12 +542,88 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 		}
 		else if (obj == ui.txt_pid)
 		{
-			QKeyEvent * keyEvent = static_cast<QKeyEvent *>(event);
+			auto * keyEvent = static_cast<QKeyEvent *>(event);
 			if (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_9 || keyEvent->key() == Qt::Key_Backspace || keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Space)
 			{
 				t_OnUserInput->start(10000);
 			}
 		}
+	}
+	else if (event->type() == QEvent::Resize)
+	{
+		if (obj == ui.tree_files)
+		{
+			auto pos = ui.tree_files->header()->pos();
+			pos = ui.tree_files->header()->mapToGlobal(pos);
+			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
+		}
+	}
+	else if (event->type() == QEvent::Move)
+	{
+		if (obj == framelessParent)
+		{
+			auto pos = ui.tree_files->header()->pos();
+			pos = ui.tree_files->header()->mapToGlobal(pos);
+			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
+		}
+	}
+	else if (event->type() == QEvent::ApplicationStateChange)
+	{
+		auto * ascEvent = static_cast<QApplicationStateChangeEvent *>(event);
+		if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive)
+		{
+			update_proc_icon();
+
+			auto pos = ui.tree_files->header()->pos();
+			pos = ui.tree_files->header()->mapToGlobal(pos);
+			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
+		}
+		else
+		{
+			if (framelessParent->isMinimized())
+			{
+				drag_drop->SetPosition(-1, -1, true, false);
+			}
+			else
+			{
+				auto pos = ui.tree_files->header()->pos();
+				pos = ui.tree_files->header()->mapToGlobal(pos);
+				drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
+			}
+		}
+	}
+	else if (event->type() == QEvent::WindowStateChange)
+	{
+		auto * wscEvent = static_cast<QWindowStateChangeEvent *>(event);
+		if (framelessParent->isMinimized())
+		{
+			drag_drop->SetPosition(-1, -1, true, false);
+		}
+
+		update_proc_icon();
+	}
+	else if (event->type() == QEvent::ScreenChangeInternal || event->type() == QEvent::WindowChangeInternal)
+	{
+		if (current_dpi != framelessParent->logicalDpiX())
+		{
+			drag_drop->Close();
+
+			current_dpi = framelessParent->logicalDpiX();
+			dragdrop_size = (int)(30.0f * current_dpi / 96.0f + 0.5f);
+			dragdrop_offset = (int)(10.0f * current_dpi / 96.0f + 0.5f);
+
+			drag_drop->CreateDragDropWindow(reinterpret_cast<HWND>(framelessParent->winId()), dragdrop_size);
+
+			auto pos = ui.tree_files->header()->pos();
+			pos = ui.tree_files->header()->mapToGlobal(pos);
+			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
+			
+			update_proc_icon();
+		}
+	}
+	else if (event->type() == QEvent::Close)
+	{
+		drag_drop->SetPosition(-1, -1, false, true);
 	}
 
 	return QObject::eventFilter(obj, event);
@@ -637,14 +877,9 @@ void GuiMain::rb_unset_all()
 
 void GuiMain::btn_pick_process_click()
 {
-	if (gui_Picker->parentWidget())
-	{
-		framelessPicker.show();
-	}
-	else
-	{
-		gui_Picker->show();
-	}
+	drag_drop->SetPosition(-1, -1, false, false);
+
+	framelessPicker.show();
 
 	emit send_to_picker(pss, ps_picker);
 }
@@ -659,13 +894,38 @@ void GuiMain::cmb_proc_name_change()
 		return;
 	}
 
+	old_raw_pid		= pl.PID;
+	old_byname_pid	= pl.PID;
+	old_bypid_pid	= pl.PID;
+
 	memcpy(ps_picker, &pl, sizeof(Process_Struct));
 
 	ui.txt_pid->setText(QString::number(pl.PID));
 	QString new_pid = QString::asprintf("0x%08X", pl.PID);
 	ui.txt_pid->setToolTip(new_pid);
 
+	if (pl.Arch == ARCH::X64)
+	{
+		ui.txt_arch->setToolTip("The target is a 64-bit process.");
+	}
+	else
+	{
+#ifdef _WIN64
+		ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
+#else
+		if (!native)
+		{
+			ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
+		}
+		else
+		{
+			ui.txt_arch->setToolTip("The target is a 32-bit process.");
+		}
+#endif
+	}
+
 	ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
+	ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
 
 	ui.txt_arch->setText(GuiMain::arch_to_str(pl.Arch));
 
@@ -685,13 +945,38 @@ void GuiMain::txt_pid_change()
 		return;
 	}
 
+	old_raw_pid		= pl.PID;
+	old_byname_pid	= pl.PID;
+	old_bypid_pid	= pl.PID;
+
 	memcpy(ps_picker, &pl, sizeof(Process_Struct));
 
 	QString new_pid = QString::asprintf("0x%08X", pl.PID);
 	ui.txt_pid->setToolTip(new_pid);
 
+	if (pl.Arch == ARCH::X64)
+	{
+		ui.txt_arch->setToolTip("The target is a 64-bit process.");
+	}
+	else
+	{
+#ifdef _WIN64
+		ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
+#else
+		if (!native)
+		{
+			ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
+		}
+		else
+		{
+			ui.txt_arch->setToolTip("The target is a 32-bit process.");
+		}
+#endif
+	}
+
 	ui.cmb_proc->setCurrentText(QString::fromWCharArray(pl.szName));
 	ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
+	ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
 
 	ui.txt_arch->setText(GuiMain::arch_to_str(pl.Arch));
 
@@ -716,6 +1001,11 @@ void GuiMain::btn_change()
 		ui.btn_hooks->setEnabled(true);
 		ui.btn_inject->setEnabled(true);
 	}
+
+	if (s_PID.toInt() == 1337)
+	{
+		ui.btn_inject->setEnabled(true);
+	}
 }
 
 void GuiMain::get_from_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct)
@@ -723,14 +1013,7 @@ void GuiMain::get_from_picker(Process_State_Struct * procStateStruct, Process_St
 	pss			= procStateStruct;
 	ps_picker	= procStruct;
 
-	if (gui_Picker->parentWidget())
-	{
-		framelessPicker.hide();
-	}
-	else
-	{
-		gui_Picker->hide();
-	}
+	framelessPicker.hide();
 
 	if (ps_picker->PID)
 	{
@@ -745,25 +1028,25 @@ void GuiMain::get_from_picker(Process_State_Struct * procStateStruct, Process_St
 		ui.txt_pid->setText(QString::number(ps_picker->PID));
 		ui.txt_arch->setText(GuiMain::arch_to_str(ps_picker->Arch));
 
+		update_proc_icon();
 		txt_pid_change();
 		rb_pid_set();
 	}
 
 	btn_change();
+	printf("return from picker\n");
+
+	drag_drop->SetPosition(-1, -1, false, true);
 }
 
 void GuiMain::get_from_scan_hook(int pid, int error)
 {
-	if (gui_Picker->parentWidget())
-	{
-		framelessPicker.hide();
-	}
-	else
-	{
-		gui_Picker->hide();
-	}
-}
+	framelessPicker.hide();
 
+	printf("return from scan hook\n");
+
+	drag_drop->SetPosition(-1, -1, false, true);
+}
 
 void GuiMain::auto_inject()
 {
@@ -877,14 +1160,9 @@ void GuiMain::slotReboot()
 
 void GuiMain::hook_Scan()
 {
-	if (gui_Scanner->parentWidget())
-	{
-		framelessScanner.show();
-	}
-	else
-	{
-		gui_Scanner->show();
-	}
+	drag_drop->SetPosition(-1, -1, false, false);
+
+	framelessScanner.show();
 
 	emit send_to_scan_hook(ps_picker->PID, 0);
 }
@@ -894,7 +1172,6 @@ void GuiMain::settings_get_update()
 	QFile iniFile(GH_SETTINGS_INI);
 	if (!iniFile.exists())
 	{
-		printf("file doesn't exist\n");
 		ignoreUpdate = false;
 	}
 
@@ -950,10 +1227,10 @@ void GuiMain::save_settings()
 	settings.setValue("PID", ui.txt_pid->text());
 	settings.setValue("PROCESSBYNAME", ui.rb_proc->isChecked());
 	settings.setValue("ARCH", ui.txt_arch->text());
-	settings.setValue("DELAY", ui.txt_delay->text());
+	settings.setValue("DELAY", ui.sp_delay->value());
 	settings.setValue("AUTOINJ", ui.cb_auto->isChecked());
 	settings.setValue("CLOSEONINJ", ui.cb_close->isChecked());
-	settings.setValue("TIMEOUT", ui.txt_timeout->text());
+	settings.setValue("TIMEOUT", ui.sp_timeout->value());
 	settings.setValue("ERRORLOG", ui.cb_error->isChecked());
 
 	// Method
@@ -991,8 +1268,7 @@ void GuiMain::save_settings()
 	settings.setValue("IGNOREUPDATES", ignoreUpdate);
 	settings.setValue("HIDEBANNER", lbl_hide_banner);
 	settings.setValue("STATE", saveState());
-	settings.setValue("GEOMETRY", saveGeometry());
-	// Broken on frameless window
+	settings.setValue("GEOMETRY", framelessParent->saveGeometry());
 
 	settings.endGroup();
 }
@@ -1003,7 +1279,10 @@ void GuiMain::load_settings()
 	if (!iniFile.exists())
 	{
 		lastPathStr = QApplication::applicationDirPath();
+		ui.cmb_proc->setEditText("Broihon.exe");
+		ui.txt_pid->setText("1337");
 		ignoreUpdate = false;
+
 		return;
 	}
 
@@ -1030,20 +1309,38 @@ void GuiMain::load_settings()
 		settings.setArrayIndex(i);
 		ui.cmb_proc->addItem(settings.value(QString::number(0)).toString());
 	}
+
+	if (!procSize)
+	{
+		ui.cmb_proc->setEditText("Broihon.exe");
+		ui.txt_pid->setText("1337");
+	}
+	else
+	{
+		ui.cmb_proc->setCurrentIndex(settings.value("PROCESS").toInt());
+	}
+
 	settings.endArray();
 
 	settings.beginGroup("CONFIG");
 
 	// Settings
-	ui.cmb_proc->setCurrentIndex(settings.value("PROCESS").toInt());
 	ui.txt_pid->setText(settings.value("PID").toString());
-	ui.rb_proc->setChecked(settings.value("PROCESSBYNAME").toBool());
 	ui.txt_arch->setText(settings.value("ARCH").toString());
-	ui.txt_delay->setText(settings.value("DELAY").toString());
+	ui.sp_delay->setValue(settings.value("DELAY").toInt());
 	ui.cb_auto->setChecked(settings.value("AUTOINJ").toBool());
 	ui.cb_close->setChecked(settings.value("CLOSEONINJ").toBool());
-	ui.txt_timeout->setText(settings.value("TIMEOUT").toString());
+	ui.sp_timeout->setValue(settings.value("TIMEOUT").toInt());
 	ui.cb_error->setChecked(settings.value("ERRORLOG").toBool());
+
+	if (settings.value("PROCESSBYNAME").toBool())
+	{
+		rb_process_set();
+	}
+	else
+	{
+		rb_pid_set();
+	}
 
 	// Method
 	ui.cmb_load->setCurrentIndex(settings.value("MODE").toInt());
@@ -1080,7 +1377,7 @@ void GuiMain::load_settings()
 	ignoreUpdate = settings.value("IGNOREUPDATES").toBool();
 	lbl_hide_banner = settings.value("HIDEBANNER", false).toBool();
 	restoreState(settings.value("STATE").toByteArray());
-	restoreGeometry(settings.value("GEOMETRY").toByteArray());
+	framelessParent->restoreGeometry(settings.value("GEOMETRY").toByteArray());
 
 	settings.endGroup();
 }
@@ -1097,16 +1394,25 @@ void GuiMain::load_change(int index)
 			ui.cmb_load->setToolTip("LoadLibraryExW is the default injection method which simply uses LoadLibraryExW.");
 			ui.grp_adv->setVisible(false);
 			ui.cb_unlink->setEnabled(true);
+
+			resize(sizeHint());
+			framelessParent->resize(framelessParent->sizeHint());
 			break;
 		case INJECTION_MODE::IM_LdrLoadDll:
 			ui.cmb_load->setToolTip("LdrLoadDll is an advanced injection method which uses LdrLoadDll and bypasses LoadLibrary(Ex) hooks.");
 			ui.grp_adv->setVisible(false);
 			ui.cb_unlink->setEnabled(true);
+
+			resize(sizeHint());
+			framelessParent->resize(framelessParent->sizeHint());
 			break;
 		case INJECTION_MODE::IM_LdrpLoadDll:
 			ui.cmb_load->setToolTip("LdrpLoadDll is an advanced injection method which uses LdrpLoadDll and bypasses LdrLoadDll hooks.");
 			ui.grp_adv->setVisible(false);
 			ui.cb_unlink->setEnabled(true);
+
+			resize(sizeHint());
+			framelessParent->resize(framelessParent->sizeHint());
 			break;
 		default:
 			ui.cmb_load->setToolTip("ManualMap is an advanced injection technique which bypasses most module detection methods.");
@@ -1115,6 +1421,9 @@ void GuiMain::load_change(int index)
 			ui.cb_unlink->setChecked(false);
 			cb_main_clicked();
 			cb_page_protection_clicked();
+
+			resize(sizeHint());
+			framelessParent->resize(framelessParent->sizeHint());
 			break;
 	}
 }
@@ -1145,6 +1454,25 @@ void GuiMain::create_change(int index)
 			ui.cmb_create->setToolTip("QueueUserAPC: Registers an asynchronous procedure call to the process' threads which then loads the dll(s).");
 			ui.cb_clock->setEnabled(false);
 			ui.cb_clock->setChecked(false);
+			break;
+	}
+}
+
+void GuiMain::peh_change(int index)
+{
+	index = ui.cmb_peh->currentIndex();
+	switch (index)
+	{
+		case 0:
+			ui.cmb_peh->setToolTip("Keep PEH: Doesn't modify the PE header of the dll(s).");
+			break;
+
+		case 1:
+			ui.cmb_peh->setToolTip("Erase PEH: Erases the PE header by wrting 0's to it to avoid detections.");
+			break;
+
+		default:
+			ui.cmb_peh->setToolTip("Fake PEH: Replaces the PE header with the PE header of the ntdll.dll.");
 			break;
 	}
 }
@@ -1260,6 +1588,11 @@ void GuiMain::select_file()
 {
 	QList<QTreeWidgetItem *> item = ui.tree_files->selectedItems();
 
+	if (item.size() == 0)
+	{
+		return;
+	}
+
 	auto path = item[0]->text(2).toStdWString();
 	auto pos = path.find_last_of('/');
 	path.resize(pos);
@@ -1269,7 +1602,14 @@ void GuiMain::select_file()
 
 void GuiMain::delay_inject()
 {
-	int delay = ui.txt_delay->text().toInt();
+	int id = ui.txt_pid->text().toInt();
+	if (id == 1337)
+	{
+		ShellExecuteW(0, 0, L"https://www.youtube.com/watch?v=5t53TcKIlMc", 0, 0, SW_SHOW);
+		return;
+	}
+
+	int delay = ui.sp_delay->value();
 	if (delay > 0)
 	{
 		t_Delay_Inj->start(delay);
@@ -1318,7 +1658,7 @@ void GuiMain::inject_file()
 		}
 		else
 		{
-			emit injec_status(false, "Invalid Process Name");
+			emit injec_status(false, "Invalid process name");
 
 			return;
 		}
@@ -1362,7 +1702,7 @@ void GuiMain::inject_file()
 
 	data.GenerateErrorLog = ui.cb_error->isChecked();
 
-	int Timeout = ui.txt_timeout->text().toInt();
+	int Timeout = ui.sp_timeout->value();
 	if (Timeout > 0)
 	{
 		data.Timeout = Timeout;
@@ -1477,6 +1817,11 @@ void GuiMain::inject_file()
 
 void GuiMain::injec_status(bool ok, const QString msg)
 {
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, false);
+	}
+
 	if (ok)
 	{
 		QMessageBox messageBox;
@@ -1486,6 +1831,11 @@ void GuiMain::injec_status(bool ok, const QString msg)
 	{
 		QMessageBox messageBox;
 		messageBox.critical(0, "Error", msg);
+	}
+
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, true);
 	}
 }
 
@@ -1515,13 +1865,14 @@ void GuiMain::tooltip_change()
 	ui.rb_pid->setToolTipDuration(duration);
 	ui.txt_pid->setToolTipDuration(duration);
 	ui.btn_proc->setToolTipDuration(duration);
+	ui.txt_arch->setToolTipDuration(duration);
+	ui.lbl_arch->setToolTipDuration(duration);
+	ui.lbl_proc_icon->setToolTipDuration(duration);
 
-	ui.lbl_delay->setToolTipDuration(duration);
-	ui.txt_delay->setToolTipDuration(duration);
+	ui.sp_delay->setToolTipDuration(duration);
 	ui.cb_close->setToolTipDuration(duration);
 	ui.cb_auto->setToolTipDuration(duration);
-	ui.lbl_timeout->setToolTipDuration(duration);
-	ui.txt_timeout->setToolTipDuration(duration);
+	ui.sp_timeout->setToolTipDuration(duration);
 	ui.cb_error->setToolTipDuration(duration);
 
 	// Method
@@ -1653,6 +2004,8 @@ void GuiMain::generate_shortcut()
 	std::wstring shortCut;
 	QString fileName = "Injector_";
 
+	ARCH target_arch = ARCH::NONE;
+
 	// Process ID
 	if (ui.rb_pid->isChecked())
 	{
@@ -1662,6 +2015,8 @@ void GuiMain::generate_shortcut()
 			Process_Struct ps_local = getProcessByPID(id);
 			shortCut += L"-p \"" + std::wstring(ps_local.szName) + L"\"";
 			fileName += QString::fromWCharArray(ps_local.szName);
+
+			target_arch = ps_local.Arch;
 		}
 		else
 		{
@@ -1672,44 +2027,67 @@ void GuiMain::generate_shortcut()
 	else // Process Name
 	{
 		int index = ui.cmb_proc->currentIndex();
-		shortCut += L"-p \"" + ui.cmb_proc->itemText(index).toStdWString() + L"\"";
+		auto exeName = ui.cmb_proc->itemText(index).toStdWString();
+
+		Process_Struct ps_local = getProcessByNameW(exeName.c_str());
+
+		if (!ps_local.PID)
+		{
+			emit injec_status(false, "The specified process doesn't exist.");
+			return;
+		}
+
+		shortCut += L"-p \"" + exeName + L"\"";
 		fileName += ui.cmb_proc->itemText(index);
+
+		target_arch = ps_local.Arch;
 	}
 
 	bool fileFound = false;
 	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
 	{
-		if (fileFound)
-			break;
-
-		// Find Item
+		// Find checked item
 		if ((*it)->checkState(0) != Qt::CheckState::Checked)
+		{
 			continue;
+		}
 
-		// Convert String
+		// Grab path
 		QString fileStr = (*it)->text(2);
 
-		fileName += QString("_") + (*it)->text(1);
-
-		// Check Existens
+		// Check existens
 		QFile qf(fileStr);
 		if (!qf.exists())
 		{
-			emit injec_status(false, "File not found");
-			return;
+			continue;
 		}
 
+		// Check architecture
+		ARCH file_arch = str_to_arch((*it)->text(3));
+		if (file_arch != target_arch)
+		{
+			continue;
+		}
+
+		// Append file to shortcut data
+		fileName += QString("_") + (*it)->text(1);
+
+		fileStr.replace("/", "\\");
 		shortCut += L" -f \"" + fileStr.toStdWString() + L"\"";
+
 		fileFound = true;
+
+		break;
 	}
 
 	if (!fileFound)
 	{
-		emit injec_status(false, "No file selected");
+		emit injec_status(false, "No valid file selected.");
+
 		return;
 	}
 
-	int delay = ui.txt_delay->text().toInt();
+	int delay = ui.sp_delay->value();
 	if (delay > 0)
 	{
 		shortCut += L" -delay ";
@@ -1718,7 +2096,7 @@ void GuiMain::generate_shortcut()
 		shortCut += stream.str();
 	}
 
-	int timeout = ui.txt_timeout->text().toInt();
+	int timeout = ui.sp_timeout->value();
 	if (timeout > 0)
 	{
 		shortCut += L" -timeout ";
@@ -1804,13 +2182,10 @@ void GuiMain::open_log()
 
 void GuiMain::update_init()
 {
-	std::string online_version = get_newest_version();
-	std::string current_version = GH_INJ_VERSIONA;
-
-	if (online_version.compare(current_version) > 0)
+	if (newest_version.compare(current_version) > 0)
 	{
 		std::string update_msg = "This version of the GH Injector is outdated.\nThe newest version is V";
-		update_msg += online_version;
+		update_msg += newest_version;
 		update_msg += ".\n";
 		update_msg += "Do you want to update?";
 
@@ -1823,20 +2198,27 @@ void GuiMain::update_init()
 		box.setDefaultButton(QMessageBox::Yes);
 		box.setIcon(QMessageBox::Icon::Information);
 
+		if (drag_drop)
+		{
+			drag_drop->SetPosition(-1, -1, false, false);
+		}
+
 		auto res = box.exec();
 
 		if (res == QMessageBox::Yes)
 		{
 			ignoreUpdate = false;
 
-			update_injector(online_version);
-
-			return;
+			update_injector(newest_version);
 		}
-
-		if (res == QMessageBox::Ignore)
+		else if (res == QMessageBox::Ignore)
 		{
 			ignoreUpdate = true;
+		}
+
+		if (drag_drop)
+		{
+			drag_drop->SetPosition(-1, -1, false, true);
 		}
 	}
 

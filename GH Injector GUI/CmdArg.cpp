@@ -31,6 +31,13 @@ int CmdArg(int argc, wchar_t * argv[])
 		return -1;
 	}
 
+	if (FindArg(argc, L"-help", argv))
+	{
+		help();
+
+		return -1;
+	}
+
 	InjectionLib lib;
 	if (!lib.Init())
 	{
@@ -41,6 +48,14 @@ int CmdArg(int argc, wchar_t * argv[])
 	else
 	{
 		printf("Injection library intialized\n");
+	}
+
+	if (FindArg(argc, L"-version", argv))
+	{
+		printf("GH Injector Version = V%s\n", lib.VersionA().c_str());
+		printf("GH Injector GUI Version = V%s\n", GH_INJ_VERSIONA);
+
+		return -1;
 	}
 
 	const wchar_t * szProcessName = nullptr;
@@ -65,6 +80,7 @@ int CmdArg(int argc, wchar_t * argv[])
 	if (!dll_index)
 	{
 		printf("No dll to inject specified.\n");
+
 		return -1;
 	}
 	else
@@ -235,17 +251,7 @@ int CmdArg(int argc, wchar_t * argv[])
 	printf("Injecting\n");
 
 	DWORD inj_status = lib.InjectFuncW(&data);
-
-	if (FindArg(argc, L"-help", argv))
-	{
-		help();
-	}
-
-	if (FindArg(argc, L"-version", argv))
-	{
-		printf("Version = %s\n", GH_INJ_VERSIONA);
-	}
-
+	
 	if (inj_status != ERROR_SUCCESS)
 	{
 		printf("Injection failed with code %08X\n", inj_status);
@@ -256,7 +262,6 @@ int CmdArg(int argc, wchar_t * argv[])
 	{
 		printf("Injection succeeded. Dll laoded at %p\n", data.hDllOut);
 	}
-
 
 	return 0;
 }

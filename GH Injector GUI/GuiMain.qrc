@@ -1,6 +1,7 @@
 <RCC>
   <qresource prefix="/GuiMain">
+    <file>gh_resource/LUL Icon.png</file>
     <file>gh_resource/GH Icon.ico</file>
-    <file>gh_resource/log.ico</file>
+    <file>gh_resource/Log Icon.ico</file>
   </qresource>
 </RCC>

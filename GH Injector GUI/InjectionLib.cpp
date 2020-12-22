@@ -148,3 +148,25 @@ float InjectionLib::DownloadProgress(bool bWow64)
 {
 	return GetDownloadProgress(bWow64);
 }
+
+std::string InjectionLib::VersionA()
+{
+	char szVersion[32]{ 0 };
+	if (FAILED(GetVersionA(szVersion, sizeof(szVersion))))
+	{
+		return std::string("0.0");
+	}
+
+	return std::string(szVersion);
+}
+
+std::wstring InjectionLib::VersionW()
+{
+	wchar_t szVersion[32]{ 0 };
+	if (FAILED(GetVersionW(szVersion, sizeof(szVersion))))
+	{
+		return std::wstring(L"0.0");
+	}
+
+	return std::wstring(szVersion);
+}

@@ -28,7 +28,7 @@ int wmain(int argc, wchar_t * argv[])
 		Sleep(1500);
 
 		return 0;
-	}	
+	}
 
 	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 	std::string s_argv = converter.to_bytes(argv[0]);
@@ -38,7 +38,7 @@ int wmain(int argc, wchar_t * argv[])
 	int currentExitCode = 0;
 	do
 	{
-		QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+		QApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
 		QApplication a(argc, &sz_argv);
 
 		QApplication::setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
@@ -52,20 +52,13 @@ int wmain(int argc, wchar_t * argv[])
 		framelessWindow.setWindowTitle("GH Injector");
 		framelessWindow.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 
-		GuiMain * MainWindow = new GuiMain(&framelessWindow);
+		GuiMain * MainWindow = new GuiMain(&framelessWindow, &framelessWindow);
 		MainWindow->statusBar()->setSizeGripEnabled(false);
-
-		HWND hDragnDrop = CreateDragDropWindow((HWND)framelessWindow.winId(), MainWindow);
 
 		framelessWindow.setContent(MainWindow);
 		framelessWindow.show();
 
-		ShowWindow(hDragnDrop, SW_SHOW);
-
 		currentExitCode = a.exec();
-
-		CloseDragDropWindow();
-
 	} while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
 
 	return currentExitCode;
