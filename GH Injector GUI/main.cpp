@@ -12,9 +12,9 @@
 
 int wmain(int argc, wchar_t * argv[])
 {
-	/*AllocConsole();
+	AllocConsole();
 	FILE * pFile = nullptr;
-	freopen_s(&pFile, "CONOUT$", "w", stdout);*/
+	freopen_s(&pFile, "CONOUT$", "w", stdout);
 
 	if (argc > 1)
 	{

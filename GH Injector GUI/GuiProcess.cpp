@@ -2,7 +2,6 @@
 
 #include "GuiProcess.h"
 #include "GuiMain.h"
-#include "MyTreeWidget.h"
 
 GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	: QWidget(parent)
@@ -13,45 +12,33 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 
 	ps	= nullptr;
 	pss = nullptr;
-	sort_prev = SORT_PS::NUM_LOW;
+	sort_sense = SORT_SENSE::SS_PID_LO;
 
-	// Maybe sometime we need this
-	delete ui.tree_process;
-	ui.tree_process = new MyTreeWidget(this);
+	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
+	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
 
-	//why is this necessary??
-	ui.grid_proc->addWidget(ui.tree_process, 0, 0, 1, 3);
+	connect(ui.btn_refresh, SIGNAL(clicked()),						this, SLOT(refresh_process()));
+	connect(ui.cmb_arch,	SIGNAL(currentIndexChanged(int)),		this, SLOT(filter_change(int)));
+	connect(ui.txt_filter,	SIGNAL(textChanged(const QString &)),	this, SLOT(name_change(const QString &)));
+	connect(ui.btn_select,	SIGNAL(clicked()),						this, SLOT(proc_select()));
+	connect(ui.cb_session,	SIGNAL(stateChanged(int)),				this, SLOT(session_change()));
 
-	QTreeWidgetItem * ___qtreewidgetitem = ui.tree_process->headerItem();
-	___qtreewidgetitem->setText(3, QCoreApplication::translate("frm_proc", "Type", nullptr));
-	___qtreewidgetitem->setText(2, QCoreApplication::translate("frm_proc", "Name", nullptr));
-	___qtreewidgetitem->setText(1, QCoreApplication::translate("frm_proc", "PID", nullptr));
+	connect(ui.tree_process,			SIGNAL(doubleClicked(const QModelIndex &)),	this, SLOT(double_click_process(const QModelIndex &)));
+	connect(ui.tree_process->header(),	SIGNAL(sectionClicked(int)),				this, SLOT(custom_sort(int)));
 
-	QTreeWidgetItem * ___qtreewidgetitem1 = ui.tree_process->topLevelItem(0);
-	___qtreewidgetitem1->setText(3, QCoreApplication::translate("frm_proc", "NONE", nullptr));
-	___qtreewidgetitem1->setText(2, QCoreApplication::translate("frm_proc", "xxxxxxxxxxxxxxxxxxxxxxx", nullptr));
-	___qtreewidgetitem1->setText(1, QCoreApplication::translate("frm_proc", "123456", nullptr));
-
-	connect(ui.btn_refresh, SIGNAL(clicked()), this, SLOT(refresh_process()));
-	connect(ui.cmb_arch,	SIGNAL(currentIndexChanged(int)), this, SLOT(filter_change(int)));
-	connect(ui.txt_filter,	SIGNAL(textChanged(const QString &)), this, SLOT(name_change(const QString &)));
-	connect(ui.btn_select,	SIGNAL(clicked()), this, SLOT(proc_select()));
-	connect(ui.cb_session,	SIGNAL(stateChanged(int)), this, SLOT(session_change()));
-
-	connect(ui.tree_process->header(), SIGNAL(sectionClicked(int)), this, SLOT(custom_sort(int)));
-	connect(ui.tree_process, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(double_click_process(const QModelIndex &)));
+	ui.tree_process->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
+	ui.tree_process->setColumnWidth(0, 50);
+	ui.tree_process->setColumnWidth(1, 50);
+	ui.tree_process->setColumnWidth(2, 200);
+	ui.tree_process->setColumnWidth(3, 50);
 
 	native = IsNativeProcess(GetCurrentProcessId());
 
 	installEventFilter(this);
 	ui.tree_process->installEventFilter(this);
 
-	for (int i = 0; i <= 3; i++)
-	{
-		ui.tree_process->resizeColumnToContents(i);
-	}
-
 	setFixedHeight(520);
+	m_OwnSession = getProcSession(GetCurrentProcessId());
 }
 
 GuiProcess::~GuiProcess()
@@ -86,24 +73,16 @@ bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
 
 void GuiProcess::refresh_gui()
 {
-	ARCH target_arch = (ARCH)ui.cmb_arch->currentIndex();
-	int own_session = getProcSession(GetCurrentProcessId());
-	QString filter = ui.txt_filter->text();
-	int proc_count = 0;
+	ARCH target_arch	= (ARCH)ui.cmb_arch->currentIndex();
+	QString filter		= ui.txt_filter->text();
+	int proc_count		= 0;
 
 	QTreeWidgetItemIterator it(ui.tree_process);
 	for (; *it; ++it)
 	{
-		QString strArch = (*it)->text(3);
-		ARCH arch = GuiMain::str_to_arch(strArch);
-		int pid = (*it)->text(1).toInt();
+		ARCH arch = StrToArchW((*it)->text(3).toStdWString().c_str());
 
-		if (pid == GetCurrentProcessId())
-		{
-			continue;
-		}
-
-		if (target_arch != ARCH::NONE && arch != target_arch)  // x86 or x64
+		if (target_arch != ARCH::NONE && arch != target_arch)
 		{
 			(*it)->setHidden(true);
 
@@ -112,8 +91,8 @@ void GuiProcess::refresh_gui()
 
 		if (ui.cb_session->isChecked())
 		{
-			int target_session = getProcSession(pid);
-			if (target_session != own_session && own_session != -1)
+			int target_session = getProcSession((*it)->text(1).toInt());
+			if (target_session != m_OwnSession && m_OwnSession != -1)
 			{
 				(*it)->setHidden(true);
 
@@ -132,73 +111,96 @@ void GuiProcess::refresh_gui()
 		}
 
 		(*it)->setHidden(false);
+
 		++proc_count;
 	}
 
-	if (frameless_parent)
-	{
-		frameless_parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
-	}
-	else
-	{
-		this->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
-	}
+	frameless_parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
 }
 
 void GuiProcess::refresh_process()
 {
-	std::vector<Process_Struct> all_proc;
-	getProcessList(all_proc);
-	sortProcessList(all_proc, sort_prev);
+	getProcessList(m_ProcList, true);
 
-	ui.tree_process->clear();
-
-	for (const auto & proc : all_proc)
+	if (sort_sense != SORT_SENSE::SS_PID_LO)
 	{
-		if (proc.PID == GetCurrentProcessId())
+		sortProcessList(m_ProcList, sort_sense);
+	}
+
+	int index = 0;
+
+	for (QTreeWidgetItemIterator item(ui.tree_process); *item; ++item)
+	{
+		int PID = (*item)->text(1).toInt();
+
+		static auto search_list = [&pid = PID](const Process_Struct * entry) -> bool
 		{
-			continue;
-		}
+			return (pid == entry->PID);
+		};
 
-		QTreeWidgetItem * item = new QTreeWidgetItem(ui.tree_process);
-
-		item->setText(1, QString::number(proc.PID));
-		item->setText(2, QString::fromWCharArray(proc.szName));
-		item->setText(3, GuiMain::arch_to_str(proc.Arch));
-
-		// https://forum.qt.io/topic/62866/getting-icon-from-external-applications/4
-		if (this->parentWidget())
+		auto ret = std::find_if(m_ProcList.begin(), m_ProcList.end(), search_list);
+		if (ret == m_ProcList.end() && m_ProcList.back()->PID != PID)
 		{
-			QString path = QString::fromWCharArray(proc.szPath);
-
-#ifndef _WIN64
-			if (!native)
-			{
-				path.replace(":\\Windows\\System32\\", ":\\Windows\\Sysnative\\", Qt::CaseSensitivity::CaseInsensitive);
-			}
-#endif
-			model.setRootPath(path);
-			QIcon ic = model.fileIcon(model.index(path));
-			item->setIcon(0, ic);
+			delete (*item);
 		}
 	}
 
+	for (int i = 0; i < m_ProcList.size(); ++i)
+	{
+		QTreeWidgetItem * current_item = ui.tree_process->topLevelItem(i);
+		
+		if (current_item && current_item->text(1).toInt() == m_ProcList[i]->PID)
+		{
+			continue;
+		}		
+
+		TreeWidgetItem * new_item = new TreeWidgetItem(0);
+
+		new_item->setText(1, QString::number(m_ProcList[i]->PID));
+		new_item->setText(2, QString::fromWCharArray(m_ProcList[i]->szName));
+		new_item->setText(3, QString::fromStdWString(ArchToStrW(m_ProcList[i]->Arch)));
+
+		QIcon new_icon;
+
+		if (m_ProcList[i]->hIcon)
+		{
+			new_icon = qt_pixmapFromWinHICON(m_ProcList[i]->hIcon);
+		}
+		else if (lstrlenW(m_ProcList[i]->szPath))
+		{
+			new_icon = pxm_generic;
+		}
+		else
+		{
+			new_icon = pxm_error;
+		}
+
+		new_item->setIcon(0, new_icon);
+
+		ui.tree_process->insertTopLevelItem(i, new_item);
+	}
+
 	emit refresh_gui();
+
+	if (sort_sense != SORT_SENSE::SS_PID_LO)
+	{
+		sortProcessList(m_ProcList, SORT_SENSE::SS_PID_LO);
+	}
 }
 
 void GuiProcess::filter_change(int i)
 {
-	emit refresh_process();
+	emit refresh_gui();
 }
 
 void GuiProcess::session_change()
 {
-	emit refresh_process();
+	emit refresh_gui();
 }
 
 void GuiProcess::name_change(const QString & str)
 {
-	emit refresh_process();
+	emit refresh_gui();
 }
 
 void GuiProcess::proc_select(bool ignore)
@@ -211,7 +213,7 @@ void GuiProcess::proc_select(bool ignore)
 	if (item)
 	{
 		ps->PID = item->text(1).toInt();
-		ps->Arch = GuiMain::str_to_arch(item->text(3));
+		ps->Arch = StrToArchW(item->text(3).toStdWString().c_str());
 		lstrcpyW(ps->szName, item->text(2).toStdWString().c_str());
 	}
 
@@ -225,27 +227,45 @@ void GuiProcess::proc_select(bool ignore)
 
 void GuiProcess::custom_sort(int column)
 {
-	// here you can get the order
-	Qt::SortOrder order = ui.tree_process->header()->sortIndicatorOrder();
+	column = column;
+	auto order = ui.tree_process->header()->sortIndicatorOrder();
 
-	if (column == 2 && order == Qt::AscendingOrder)
+	switch (order)
 	{
-		sort_prev = SORT_PS::ASCI_A;
-	}
-	else if (column == 2 && order == Qt::DescendingOrder)
-	{
-		sort_prev = SORT_PS::ASCI_Z;
-	}
-	else if (column == 1 && order == Qt::DescendingOrder)
-	{
-		sort_prev = SORT_PS::NUM_HIGH;
-	}
-	else
-	{
-		sort_prev = SORT_PS::NUM_LOW;
-	}
+		case Qt::AscendingOrder:
+			switch (column)
+			{
+				case 1:
+					sort_sense = SORT_SENSE::SS_PID_LO;
+					break;
 
-	emit refresh_process();
+				case 2:
+					sort_sense = SORT_SENSE::SS_NAME_LO;
+					break;
+
+				case 3:
+					sort_sense = SORT_SENSE::SS_ARCH_LO;
+					break;
+			}
+			break;
+		
+		case Qt::DescendingOrder:
+			switch (column)
+			{
+				case 1:
+					sort_sense = SORT_SENSE::SS_PID_HI;
+					break;
+
+				case 2:
+					sort_sense = SORT_SENSE::SS_NAME_HI;
+					break;
+
+				case 3:
+					sort_sense = SORT_SENSE::SS_ARCH_HI;
+					break;
+			}
+			break;
+	}
 }
 
 void GuiProcess::double_click_process(const QModelIndex & index)
@@ -272,4 +292,84 @@ void GuiProcess::get_from_inj(Process_State_Struct * procStateStruct, Process_St
 #endif // WIN64
 
 	refresh_process();
+}
+
+TreeWidgetItem::TreeWidgetItem(int type)
+	: QTreeWidgetItem(type)
+{
+}
+
+bool TreeWidgetItem::operator<(const QTreeWidgetItem & rhs) const
+{
+	int column = treeWidget()->sortColumn();
+	auto order = treeWidget()->header()->sortIndicatorOrder();
+
+	switch (order)
+	{
+		case Qt::AscendingOrder:
+			switch (column)
+			{
+				case 1: //SORT_SENSE::SS_PID_LO
+					return (text(1).toInt() < rhs.text(1).toInt());
+
+				case 2: //SORT_SENSE::SS_NAME_LO
+				{
+					int cmp = text(2).compare(rhs.text(2), Qt::CaseSensitivity::CaseInsensitive);
+
+					if (cmp == 0)
+					{
+						return (text(1).toInt() < rhs.text(1).toInt());
+					}
+
+					return (cmp < 0);
+				}
+
+				case 3: //SORT_SENSE::SS_ARCH_LO
+				{
+					int cmp = text(3).compare(rhs.text(3), Qt::CaseSensitivity::CaseInsensitive);
+
+					if (cmp == 0)
+					{
+						return (text(1).toInt() < rhs.text(1).toInt());
+					}
+
+					return (cmp > 0);
+				}
+			}
+			break;
+
+		case Qt::DescendingOrder:
+			switch (column)
+			{
+				case 1: //SORT_SENSE::SS_PID_HI
+					return (text(1).toInt() > rhs.text(1).toInt());
+
+				case 2: //SORT_SENSE::SS_NAME_HI
+				{
+					int cmp = text(2).compare(rhs.text(2), Qt::CaseSensitivity::CaseInsensitive);
+
+					if (cmp == 0)
+					{
+						return (text(1).toInt() > rhs.text(1).toInt());
+					}
+
+					return (cmp > 0);
+				}				
+
+				case 3: //SORT_SENSE::SS_ARCH_HI
+				{
+					int cmp = text(3).compare(rhs.text(3), Qt::CaseSensitivity::CaseInsensitive);
+
+					if (cmp == 0)
+					{
+						return (text(1).toInt() < rhs.text(1).toInt());
+					}
+
+					return (cmp < 0);
+				}
+			}
+			break;
+	}
+
+	return false;
 }

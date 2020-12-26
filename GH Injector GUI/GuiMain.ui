@@ -190,20 +190,6 @@
            <string>Architecture</string>
           </property>
          </column>
-         <item>
-          <property name="text">
-           <string>YES</string>
-          </property>
-          <property name="text">
-           <string>HelloWorld_x64.dll</string>
-          </property>
-          <property name="text">
-           <string>C:\dev\_aoe\Debug\AoE_IMGUI - Kopie.dllxxxxx</string>
-          </property>
-          <property name="text">
-           <string>x86</string>
-          </property>
-         </item>
         </widget>
        </item>
        <item row="2" column="0">

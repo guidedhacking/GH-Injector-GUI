@@ -245,14 +245,14 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link />
     <PostBuildEvent>
       <Command>xcopy /y $(QTDIR)\bin\Qt5Cored.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Guid.dll "$(OutDir)"
-xcopy /y $(QTDIR)\bin\Qt5Networkd.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Widgetsd.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Cored.dll "$(OutDir)"
 xcopy /y $(QTDIR)\plugins\platforms\qwindowsd.dll "$(OutDir)platforms\"
@@ -266,14 +266,14 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpegd.dll "$(OutDir)imageformats\"</Comm
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link />
     <PostBuildEvent>
       <Command>xcopy /y $(QTDIR)\bin\Qt5Cored.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Guid.dll "$(OutDir)"
-xcopy /y $(QTDIR)\bin\Qt5Networkd.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Widgetsd.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Cored.dll "$(OutDir)"
 xcopy /y $(QTDIR)\plugins\platforms\qwindowsd.dll "$(OutDir)platforms\"
@@ -292,14 +292,14 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpegd.dll "$(OutDir)imageformats\"</Comm
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <PostBuildEvent />
     <PostBuildEvent>
       <Command>xcopy /y $(QTDIR)\bin\Qt5Core.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Gui.dll "$(OutDir)"
-xcopy /y $(QTDIR)\bin\Qt5Network.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Widgets.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Core.dll "$(OutDir)"
 xcopy /y $(QTDIR)\plugins\platforms\qwindows.dll "$(OutDir)platforms\"
@@ -314,14 +314,14 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <PostBuildEvent />
     <PostBuildEvent>
       <Command>xcopy /y $(QTDIR)\bin\Qt5Core.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Gui.dll "$(OutDir)"
-xcopy /y $(QTDIR)\bin\Qt5Network.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Widgets.dll "$(OutDir)"
 xcopy /y $(QTDIR)\bin\Qt5Core.dll "$(OutDir)"
 xcopy /y $(QTDIR)\plugins\platforms\qwindows.dll "$(OutDir)platforms\"
@@ -336,8 +336,9 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static|Win32'">
@@ -348,8 +349,9 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -371,7 +373,6 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Static|x64'">..\pch.h</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="MyTreeWidget.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -380,9 +381,12 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Static|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="PDB Download.cpp" />
     <ClCompile Include="Process.cpp" />
     <ClCompile Include="ShortCut.cpp" />
     <ClCompile Include="DragDropWindow.cpp" />
+    <ClCompile Include="StatusBox.cpp" />
+    <ClCompile Include="Update.cpp" />
     <ClCompile Include="Zip.cpp" />
     <QtRcc Include="mainwindow.qrc" />
     <QtUic Include="framelesswindow\framelesswindow.ui" />
@@ -391,7 +395,6 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     <QtUic Include="GuiScanHook.ui" />
     <QtUic Include="mainwindow.ui" />
     <QtMoc Include="mainwindow.h" />
-    <ClCompile Include="Banner.cpp" />
     <ClCompile Include="CmdArg.cpp" />
     <ClCompile Include="DarkStyle.cpp" />
     <ClCompile Include="GuiMain.cpp" />
@@ -415,11 +418,11 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Banner.h" />
     <ClInclude Include="CmdArg.h" />
     <ClInclude Include="DownloadProgress.h" />
     <QtMoc Include="DownloadProgressWindow.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="PDB Download.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="ShortCut.h" />
     <QtMoc Include="framelesswindow\windowdragger.h" />
@@ -429,8 +432,9 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     <ClInclude Include="InjectionLib.h" />
     <ClInclude Include="Process.h" />
     <ClInclude Include="DragDropWindow.h" />
+    <ClInclude Include="StatusBox.h" />
+    <ClInclude Include="Update.h" />
     <ClInclude Include="Zip.h" />
-    <QtMoc Include="MyTreeWidget.h" />
     <QtMoc Include="GuiScanHook.h" />
     <QtMoc Include="GuiProcess.h" />
     <QtMoc Include="GuiMain.h" />

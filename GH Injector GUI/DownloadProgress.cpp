@@ -4,8 +4,31 @@
 
 DownloadProgress::DownloadProgress()
 {
-	m_fProgress = 0.0f;
-	m_szStatus  = "";
+	m_fProgress     = 0.0f;
+	m_sStatus       = "";
+    m_sUrl          = L"";
+    m_bRedownload   = false;
+}
+
+DownloadProgress::DownloadProgress(std::wstring url, bool redownload)
+{
+    m_fProgress     = 0.0f;
+    m_sStatus       = "";
+    m_sUrl          = url;
+    m_bRedownload   = redownload;
+
+    if (m_bRedownload)
+    {
+        //yes, this is necessary because DeleteUrlCacheEntryW is shit
+        auto str_pos = m_sUrl.find('\x20', 0);
+        while (str_pos != std::string::npos)
+        {
+            m_sUrl.replace(str_pos, 1, L"%20");
+            str_pos += 3;
+
+            str_pos = m_sUrl.find('\x20', str_pos);
+        }
+    }
 }
 
 HRESULT __stdcall DownloadProgress::QueryInterface(const IID & riid, void ** ppvObject)
@@ -61,6 +84,12 @@ HRESULT __stdcall DownloadProgress::GetBindInfo(DWORD * grfBINDF, BINDINFO * pbi
     UNREFERENCED_PARAMETER(grfBINDF);
     UNREFERENCED_PARAMETER(pbindinfo);
 
+    if (m_bRedownload)
+    {
+        //yes, this is necessary because UrlDownloadToFile keeps ignoring literally every flag I pass to it via grfBINDF
+        DeleteUrlCacheEntryW(m_sUrl.c_str());
+    }
+
     return S_OK;
 }
 
@@ -96,19 +125,19 @@ HRESULT __stdcall DownloadProgress::OnProgress(ULONG ulProgress, ULONG ulProgres
 	switch (status)
 	{
 		case BINDSTATUS::BINDSTATUS_CONNECTING:
-			m_szStatus = "Connecting to server...";
+			m_sStatus = "Connecting to server...";
 			break;
 
 		case BINDSTATUS::BINDSTATUS_BEGINDOWNLOADDATA:
-			m_szStatus = "Beginning download...";
+			m_sStatus = "Beginning download...";
 			break;
 
 		case BINDSTATUS::BINDSTATUS_DOWNLOADINGDATA:
-			m_szStatus = "Downloading...";
+			m_sStatus = "Downloading...";
 			break;
 
 		case BINDSTATUS::BINDSTATUS_ENDDOWNLOADDATA:
-			m_szStatus = "Download finished";
+			m_sStatus = "Download finished";
 			break;
 	}
 
@@ -122,5 +151,5 @@ float DownloadProgress::GetDownloadProgress()
 
 std::string DownloadProgress::GetStatusText()
 {
-	return m_szStatus;
+	return m_sStatus;
 }

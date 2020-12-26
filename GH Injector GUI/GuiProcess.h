@@ -4,11 +4,22 @@
 #include "Process.h"
 #include "framelesswindow.h"
 
+Q_GUI_EXPORT QPixmap qt_pixmapFromWinHICON(HICON icon);
+
 struct Process_State_Struct
 {
 	QString			txtFilter;
 	int				cmbArch;
 	bool			cbSession;
+};
+
+class TreeWidgetItem : public QTreeWidgetItem 
+{
+public:
+	TreeWidgetItem(int type = 0);
+
+private:
+	bool operator< (const QTreeWidgetItem & rhs) const;
 };
 
 class GuiProcess : public QWidget
@@ -27,8 +38,13 @@ private:
 	Process_State_Struct	*	pss;
 	Process_Struct			*	ps;
 	QFileSystemModel			model;
-	SORT_PS						sort_prev;
+	SORT_SENSE					sort_sense;
 	bool						native;
+	int							m_OwnSession;
+	std::vector<Process_Struct*> m_ProcList;
+
+	QPixmap pxm_error;
+	QPixmap pxm_generic;
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;

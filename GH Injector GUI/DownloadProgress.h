@@ -9,11 +9,14 @@
 class DownloadProgress : public IBindStatusCallback 
 {
     float m_fProgress;
-    std::string m_szStatus;
+    std::string m_sStatus;
+    std::wstring m_sUrl;
+    bool m_bRedownload;
 
 public:
 
     DownloadProgress();
+    DownloadProgress(std::wstring url, bool redownload = false);
 
     HRESULT __stdcall QueryInterface(const IID & riid, void ** ppvObject);
 

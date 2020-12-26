@@ -11,6 +11,7 @@
 #include <functional>
 #include <guiddef.h>
 #include <iostream>
+#include <Shlobj.h>
 #include <shlguid.h>
 #include <shobjidl.h>
 #include <sstream>

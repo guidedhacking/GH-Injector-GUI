@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Banner.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="CmdArg.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -34,9 +31,6 @@
     <ClCompile Include="mainwindow.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="MyTreeWidget.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="framelesswindow\windowdragger.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -58,11 +52,17 @@
     <ClCompile Include="main.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="Update.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="PDB Download.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="StatusBox.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Banner.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="DownloadProgress.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -96,6 +96,15 @@
     <ClInclude Include="CmdArg.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="Update.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="PDB Download.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="StatusBox.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="gh_resource\GH Icon.ico">
@@ -126,9 +135,6 @@
       <Filter>Headerdateien</Filter>
     </QtMoc>
     <QtMoc Include="mainwindow.h">
-      <Filter>Headerdateien</Filter>
-    </QtMoc>
-    <QtMoc Include="MyTreeWidget.h">
       <Filter>Headerdateien</Filter>
     </QtMoc>
     <QtMoc Include="framelesswindow\windowdragger.h">

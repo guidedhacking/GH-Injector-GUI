@@ -1,8 +1,5 @@
 #pragma once
 
-//forward declaration because project structure is just fucked lmao
-class GuiMain;
-
 #include "framelesswindow/framelesswindow.h"
 #include "ui_GuiMain.h"
 #include "GuiProcess.h"
@@ -22,16 +19,15 @@ public:
 	GuiMain(QWidget * parent = Q_NULLPTR, FramelessWindow * FramelessParent = Q_NULLPTR);
 	~GuiMain();
 
+	// Static
+
 	static int const EXIT_CODE_REBOOT;
+	static int const EXIT_CODE_UPDATE;
 
-	static ARCH str_to_arch(const QString str);
-	static QString arch_to_str(const ARCH arch);
-	Ui::GuiMainClass ui;
-
-	void add_file_to_list(QString str, bool active);
-	void slotReboot();
+	static QPixmap GetIconFromFileW(const wchar_t * szPath, UINT size, int index = 0);
 
 private:
+	Ui::GuiMainClass ui;
 
 	FramelessWindow * framelessParent;
 
@@ -51,14 +47,11 @@ private:
 	Process_Struct			* ps_picker;
 
 	bool ignoreUpdate;
-	bool lbl_hide_banner;
 	bool onReset;
 	bool native;
-	bool interrupt_download;
-	bool pre_main_exec_update;
 
-	std::string newest_version;
-	std::string current_version;
+	std::wstring newest_version;
+	std::wstring current_version;
 
 	int current_dpi;
 	int dragdrop_size;
@@ -73,6 +66,7 @@ private:
 	QTimer * t_Update_Proc;
 	QTimer * t_OnUserInput;
 
+	QPixmap pxm_banner;
 	QPixmap pxm_lul;
 	QPixmap pxm_error;
 	QPixmap pxm_generic;
@@ -81,7 +75,27 @@ private:
 
 	InjectionLib InjLib;
 
+	QRegExpValidator * rev_NumbersOnly;
+
+	// General
+	bool platformCheck();
+	void reboot();
+	void add_file_to_list(QString str, bool active);
+
+	void injec_status(bool ok, const QString msg);
+
+	// Update GUI
 	void toggleSelected();
+	void rb_unset_all();
+	void txt_pid_change();
+	void cmb_proc_name_change();
+	void btn_change();
+	void update_proc_icon();
+
+	// Settings
+	void save_settings();
+	void load_settings();
+	void settings_get_update();
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
@@ -95,33 +109,19 @@ signals:
 	void send_to_scan_hook(int pid, int error);
 
 private slots:
-	// Titelbar
+	// Titlebar
 	void closeEvent(QCloseEvent * event) override;
-	bool platformCheck();
 
 	// Settings
 	void rb_process_set();
 	void rb_pid_set();
-	void rb_unset_all();
-	void cmb_proc_name_change();
-	void txt_pid_change();
 	void btn_pick_process_click();
 	void update_process();
-	void update_proc_icon();
 
 	// Auto, Reset
 	void auto_inject();
 	void auto_loop_inject();
 	void reset_settings();
-	void hook_Scan();
-	void btn_change();
-
-	// Settings, Color
-	void save_settings();
-	void load_settings();
-	void settings_get_update();
-	void load_banner();
-	void hide_banner();
 
 	// Method, Cloaking, Advanced
 	void load_change(int index);
@@ -134,9 +134,13 @@ private slots:
 	void add_file_dialog();
 	void remove_file();
 	void select_file();
+
+	// Inject
 	void delay_inject();
 	void inject_file();
-	void injec_status(bool ok, const QString msg);
+
+	// Hook
+	void btn_hook_scan_click();
 
 	// Info
 	void tooltip_change();
@@ -145,13 +149,5 @@ private slots:
 	void open_log();
 
 	// Update
-	void update_download_progress(DownloadProgressWindow * wnd, DownloadProgress * progress);
-	void update_update_thread(DownloadProgressWindow * wnd, std::string version);
-	void update_injector(std::string version);
-	void update_init();
-	std::string get_newest_version();
-
-	// PDB Download
-	void pdb_download();
-	void pdb_download_update_thread(DownloadProgressWindow * wnd);
+	void update_clicked();
 };

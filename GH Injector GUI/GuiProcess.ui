@@ -88,20 +88,6 @@
          <string>Type</string>
         </property>
        </column>
-       <item>
-        <property name="text">
-         <string/>
-        </property>
-        <property name="text">
-         <string>123456</string>
-        </property>
-        <property name="text">
-         <string>xxxxxxxxxxxxxxxxxxxxxxx</string>
-        </property>
-        <property name="text">
-         <string>NONE</string>
-        </property>
-       </item>
       </widget>
      </item>
      <item row="3" column="0" colspan="2">

@@ -1,36 +1,40 @@
 ﻿#include "pch.h"
 
 #include "GuiMain.h"
-
-#include "Banner.h"
 #include "Process.h"
 #include "Injection.h"
 #include "Zip.h"
 #include "ShortCut.h"
 #include "DownloadProgress.h"
 #include "DownloadProgressWindow.h"
+#include "PDB Download.h"
+#include "Update.h"
 
-int const GuiMain::EXIT_CODE_REBOOT = -123456789;
+//don't want to include QWinExtras because of static build
+//but there's a problem with icon extraction returning invlid sizes so here we are
+
+int const GuiMain::EXIT_CODE_REBOOT = -1;
+int const GuiMain::EXIT_CODE_UPDATE = -2;
 
 GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	: QMainWindow(parent)
 {
+	drag_drop = nullptr;
+
 	framelessParent = FramelessParent;
 
 	settings_get_update();
 
-	interrupt_download = false;
-	pre_main_exec_update = true;
+	current_version = GH_INJ_VERSIONW;
+	newest_version	= get_newest_version();
 
-	current_version = GH_INJ_VERSIONA;
-	newest_version = get_newest_version();
-
-	if (!ignoreUpdate)
+	if (!ignoreUpdate && newest_version.compare(current_version) > 0)
 	{
-		update_init();
+		if (update_injector(newest_version, ignoreUpdate))
+		{
+			qApp->exit(EXIT_CODE_UPDATE);
+		}
 	}
-
-	pre_main_exec_update = false;
 
 	if (!platformCheck())
 	{
@@ -48,7 +52,7 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 
 	if (InjLib.LoadingStatus() && !InjLib.SymbolStatus())
 	{
-		pdb_download();
+		ShowPDBDownload(&InjLib);
 	}
 
 	if (!SetDebugPrivilege(true))
@@ -58,12 +62,55 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 
 	ui.setupUi(this);
 
+	t_Auto_Inj		= new QTimer(this);
+	t_Delay_Inj		= new QTimer(this);
+	t_Update_Proc	= new QTimer(this);
+	t_OnUserInput	= new QTimer(this);
+	pss				= new Process_State_Struct();
+	ps_picker		= new Process_Struct();
+
+	pxm_banner	= QPixmap(":/GuiMain/gh_resource/GH Banenr.png");
+	pxm_lul		= QPixmap(":/GuiMain/gh_resource/LUL Icon.png");
+	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
+	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
+
+	ui.lbl_img->setPixmap(pxm_banner);
+
+	ui.lbl_proc_icon->setStyleSheet("background: transparent");
+
+	if (!native)
+	{
+		// Won't work if not native
+		ui.cb_hijack->setChecked(false);
+		ui.cb_hijack->setDisabled(true);
+	}
+		
+	ui.tree_files->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
+	ui.tree_files->setColumnWidth(0, 50);
+	ui.tree_files->setColumnWidth(1, 125);
+	ui.tree_files->setColumnWidth(2, 320);
+	ui.tree_files->setColumnWidth(3, 100);
+
+	ui.btn_version->setText("V" GH_INJ_VERSIONA);
+
+	ui.btn_openlog->setIcon(QIcon(":/GuiMain/gh_resource/Log Icon.ico"));
+
+	QApplication::instance()->installEventFilter(this);
+	ui.tree_files->installEventFilter(this);
+	ui.txt_pid->installEventFilter(this);
+
+	rev_NumbersOnly = new QRegExpValidator(QRegExp("[0-9]+"));
+	ui.txt_pid->setValidator(rev_NumbersOnly);
+
 	if (this->statusBar())
 	{
 		this->statusBar()->hide();
 	}
-		
-	ui.tree_files->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
+
+	t_Delay_Inj->setSingleShot(true);
+	t_OnUserInput->setSingleShot(true);
+
+	onReset = false;
 
 	// Settings
 	connect(ui.rb_proc,		SIGNAL(clicked()), this, SLOT(rb_process_set()));
@@ -73,7 +120,7 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	// Auto, Reset, Color
 	connect(ui.cb_auto,		SIGNAL(clicked()), this, SLOT(auto_inject()));
 	connect(ui.btn_reset,	SIGNAL(clicked()), this, SLOT(reset_settings()));
-	connect(ui.btn_hooks,	SIGNAL(clicked()), this, SLOT(hook_Scan()));
+	connect(ui.btn_hooks,	SIGNAL(clicked()), this, SLOT(btn_hook_scan_click()));
 
 	// Method, Cloaking, Advanced
 	connect(ui.cmb_load,		SIGNAL(currentIndexChanged(int)),	this, SLOT(load_change(int)));
@@ -93,18 +140,10 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	connect(ui.btn_help,		SIGNAL(clicked()), this, SLOT(open_help()));
 	connect(ui.btn_openlog,		SIGNAL(clicked()), this, SLOT(open_log()));
 	connect(ui.btn_shortcut,	SIGNAL(clicked()), this, SLOT(generate_shortcut()));
-	connect(ui.btn_version,		SIGNAL(clicked()), this, SLOT(update_init()));
-
-	ui.btn_version->setText("V" GH_INJ_VERSIONA);
+	connect(ui.btn_version,		SIGNAL(clicked()), this, SLOT(update_clicked()));
 
 	gui_Picker		= new GuiProcess(&framelessPicker, &framelessPicker);
 	gui_Scanner		= new GuiScanHook(&framelessScanner, &framelessScanner, &InjLib);
-	t_Auto_Inj		= new QTimer(this);
-	t_Delay_Inj		= new QTimer(this);
-	t_Update_Proc	= new QTimer(this);
-	t_OnUserInput	= new QTimer(this);
-	pss				= new Process_State_Struct;
-	ps_picker		= new Process_Struct;
 	drag_drop		= new DragDropWindow();
 
 	framelessPicker.setWindowTitle("Select a process");
@@ -119,29 +158,6 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	framelessScanner.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	framelessScanner.setWindowModality(Qt::WindowModality::ApplicationModal);
 	
-	ui.btn_openlog->setIcon(QIcon(":/GuiMain/gh_resource/Log Icon.ico"));
-
-	t_Delay_Inj->setSingleShot(true);
-	t_OnUserInput->setSingleShot(true);
-
-	pss->cbSession	= true;
-	pss->cmbArch	= 0;
-	pss->txtFilter	= "";
-	
-	onReset			= false;
-	lbl_hide_banner = false;
-
-	ui.cmb_proc->setEditText("Broihon.exe");
-
-	ui.txt_arch->setText(QString::fromUtf8("\xF0\x9F\x98\x8E") + QString::fromUtf8("\xF0\x9F\x92\xA6"));
-	ui.txt_arch->setToolTip("Doin your mom doin doin your mom\nDoin your mom doin doin your mom\nDoin doin your mom doin doin your mom\nYou know we straight with doin your mom");
-
-	old_raw_pid		= 1337;
-	old_byname_pid	= 0;
-	old_bypid_pid	= 0;
-
-	memset(ps_picker, 0, sizeof(Process_Struct));
-
 	// Process Picker
 	connect(this,		SIGNAL(send_to_picker(Process_State_Struct *, Process_Struct *)),	gui_Picker, SLOT(get_from_inj(Process_State_Struct *, Process_Struct *)));
 	connect(gui_Picker, SIGNAL(send_to_inj(Process_State_Struct *, Process_Struct *)),		this,		SLOT(get_from_picker(Process_State_Struct *, Process_Struct *)));
@@ -154,58 +170,12 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	connect(t_Delay_Inj,	SIGNAL(timeout()), this, SLOT(inject_file()));
 	connect(t_Update_Proc,	SIGNAL(timeout()), this, SLOT(update_process()));
 
-	ui.tree_files->setColumnWidth(0, 50);
-	ui.tree_files->setColumnWidth(1, 125);
-	ui.tree_files->setColumnWidth(2, 320);
-	ui.tree_files->setColumnWidth(3, 100);
-
-	ui.tree_files->clear();
-
 	load_settings();
-	load_banner();
 	load_change(0);
 	create_change(0);
 	peh_change(0);
 	tooltip_change();
-	hide_banner();
 	auto_inject();
-
-	QSize winSize = this->parentWidget()->size();
-	winSize.setHeight(400);
-	winSize.setWidth(1000);
-	parentWidget()->resize(winSize);
-
-	ui.lbl_proc_icon->setStyleSheet("background: transparent");
-
-	QApplication::instance()->installEventFilter(this);
-	ui.tree_files->installEventFilter(this);
-	ui.txt_pid->installEventFilter(this);
-
-	ui.txt_pid->setValidator(new QRegExpValidator(QRegExp("[0-9]+")));
-
-	if (!native)
-	{
-		// Won't work if not native
-		ui.cb_hijack->setChecked(false);
-		ui.cb_hijack->setDisabled(true);
-	}
-
-	Process_Struct byName	= getProcessByNameW(ui.cmb_proc->currentText().toStdWString().c_str());
-	Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toInt());
-
-	if (ui.rb_pid->isChecked() && byPID.PID)
-	{
-		txt_pid_change();
-	}
-	else if (ui.rb_proc->isChecked() && byName.PID)
-	{
-		cmb_proc_name_change();
-	}
-
-	pxm_lul		= QPixmap(":/GuiMain/gh_resource/LUL Icon.png");
-	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
-	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
-
 	update_process();
 	update_proc_icon();
 	btn_change();
@@ -223,7 +193,7 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	};
 
 	current_dpi = framelessParent->logicalDpiX();
-	dragdrop_size = (int)(30.0f * current_dpi / 96.0f + 0.5f);
+	dragdrop_size	= (int)(30.0f * current_dpi / 96.0f + 0.5f);
 	dragdrop_offset = (int)(10.0f * current_dpi / 96.0f + 0.5f);
 
 	drag_drop->CreateDragDropWindow(reinterpret_cast<HWND>(framelessParent->winId()), dragdrop_size);
@@ -232,19 +202,17 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	auto cmp = newest_version.compare(current_version);
 	if (cmp > 0)
 	{
-		std::string update_txt = "This version of the GH Injector is outdated and might contain life-threatening bugs. The newest version is V" + newest_version + ". Click to update.";
-		ui.btn_version->setToolTip(update_txt.c_str());
+		std::wstring update_txt = L"This version of the GH Injector is outdated and might contain life-threatening bugs. The newest version is V" + newest_version + L". Click to update.";
+		ui.btn_version->setToolTip(QString::fromStdWString(update_txt));
 		ui.btn_version->setStyleSheet("background-color: red");
 	}
 	else if (cmp < 0)
 	{
 		ui.btn_version->setToolTip("Holy shit, your version is from the future.");
-		ui.btn_version->setDisabled(true);
 	}
 	else
 	{
 		ui.btn_version->setToolTip("You are using the newest version of the GH Injector.");
-		ui.btn_version->setDisabled(true);
 	}
 }
 
@@ -252,6 +220,7 @@ GuiMain::~GuiMain()
 {
 	save_settings();
 
+	delete rev_NumbersOnly;
 	delete drag_drop;
 	delete gui_Picker;
 	delete gui_Scanner;
@@ -337,9 +306,9 @@ void GuiMain::update_process()
 			{
 				ui.txt_pid->setText("0");
 				ui.txt_arch->setText("---");
-				ui.txt_arch->setToolTip("");
 				ui.txt_pid->setToolTip("");
 				ui.cmb_proc->setToolTip("");
+				ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
 
 				old_raw_pid = 0;
 
@@ -382,6 +351,7 @@ void GuiMain::update_process()
 			ui.txt_arch->setText("---");
 			ui.txt_pid->setToolTip("");
 			ui.cmb_proc->setToolTip("");
+			ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
 
 			old_raw_pid = 0;
 
@@ -414,46 +384,22 @@ void GuiMain::update_proc_icon()
 	ui.lbl_proc_icon->setFixedSize(QSize(size, size));
 
 	int pid = ui.txt_pid->text().toInt();
-	
+
 	Process_Struct ps = getProcessByPID(pid);
 
-	QPixmap new_icon;
+	QPixmap new_icon = QPixmap();
 
 	if (pid == 1337)
 	{
 		new_icon = pxm_lul.scaled(size, size);
 	}
-	else if (!ps.PID)
+	else if (!ps.PID || !lstrlenW(ps.szPath))
 	{
 		new_icon = pxm_error.scaled(size, size);
 	}
 	else
 	{
-		auto path = QString::fromWCharArray(ps.szPath);
-		model.setRootPath(path);
-		QIcon icon = model.fileIcon(model.index(path));
-		
-		if (icon.isNull())
-		{
-			new_icon = pxm_generic.scaled(size, size);
-		}
-		else
-		{
-			//grab highest resolution
-			QSize max = QSize(0, 0);
-
-			for (const auto & i : icon.availableSizes())
-			{
-				if (i.width() >= max.width())
-				{
-					max = i;
-				}
-			}
-
-			new_icon = icon.pixmap(max.width(), max.height());
-			new_icon = new_icon.scaled(size, size, Qt::AspectRatioMode::KeepAspectRatio, Qt::TransformationMode::SmoothTransformation);
-		}
-
+		new_icon = GetIconFromFileW(ps.szPath, size);
 		if (new_icon.isNull())
 		{
 			new_icon = pxm_generic.scaled(size, size);
@@ -463,65 +409,9 @@ void GuiMain::update_proc_icon()
 	ui.lbl_proc_icon->setPixmap(new_icon);
 }
 
-ARCH GuiMain::str_to_arch(const QString str)
-{
-	if (str == "x64")
-	{
-		return ARCH::X64;
-	}
-	else if (str == "x86")
-	{
-		return ARCH::X86;
-	}
-	
-	return ARCH::NONE;
-}
-
-QString GuiMain::arch_to_str(const ARCH arch)
-{
-	if (arch == ARCH::X64)
-	{
-		return QString("x64");
-	}
-	else if (arch == ARCH::X86)
-	{
-		return QString("x86");
-	}
-	
-	return QString("---");
-}
-
 void GuiMain::closeEvent(QCloseEvent * event)
 {
 	save_settings();
-}
-
-std::string GuiMain::get_newest_version()
-{
-	wchar_t cacheFile[MAX_PATH]{ 0 };
-	HRESULT hRes = URLDownloadToCacheFileW(nullptr, GH_VERSION_URL, cacheFile, sizeof(cacheFile) / sizeof(wchar_t), 0, nullptr);
-
-	if (hRes != S_OK)
-	{
-		return "0.0";
-	}
-
-	// Read file 
-	std::ifstream infile(cacheFile, std::ifstream::in);
-
-	if (!infile.good())
-	{
-		return "0.0";
-	}
-
-	// ???????????????
-	// Why is this different on local debug version
-	std::string strVer;
-	infile >> strVer;
-
-	infile.close();
-
-	return strVer;
 }
 
 bool GuiMain::eventFilter(QObject * obj, QEvent * event)
@@ -655,163 +545,6 @@ void GuiMain::toggleSelected()
 	}
 }
 
-#pragma region shitcode
-
-//the next three functions are the worst code ever written
-void GuiMain::update_download_progress(DownloadProgressWindow * wnd, DownloadProgress * progress)
-{
-	while (progress->GetDownloadProgress() < 1.0f && !interrupt_download)
-	{
-		wnd->SetProgress(0, progress->GetDownloadProgress());
-		wnd->SetStatus(progress->GetStatusText().c_str());
-
-		Sleep(25);
-	}
-
-	wnd->SetProgress(0, progress->GetDownloadProgress());
-
-	interrupt_download = false;
-}
-
-void GuiMain::update_update_thread(DownloadProgressWindow * wnd, std::string version)
-{
-	auto path = QCoreApplication::applicationDirPath().toStdString();
-	path += "/";
-
-	auto zip_path = path + GH_INJECTOR_ZIP;
-
-	DeleteFileA(zip_path.c_str());
-	std::string download_url = GH_DOWNLOAD_PREFIX;
-	download_url += version;
-	download_url += GH_DOWNLOAD_SUFFIX;
-
-	DownloadProgress progress;
-	auto thread = std::thread(&GuiMain::update_download_progress, this, wnd, &progress);
-
-	HRESULT hr = URLDownloadToFileA(nullptr, download_url.c_str(), zip_path.c_str(), NULL, &progress);
-	if (FAILED(hr))
-	{
-		interrupt_download = true;
-		thread.join();
-
-		std::stringstream stream;
-		stream << std::hex << hr;
-		std::string new_status = "URLDownlaodToFileA failed with 0x";
-		new_status += stream.str();
-		wnd->SetStatus(new_status.c_str());
-		wnd->done(-1);
-
-		return;
-	}
-
-	thread.join();
-
-	if (!pre_main_exec_update)
-	{
-		save_settings();
-	}
-
-	HINSTANCE hMod = GetModuleHandle(GH_INJ_MOD_NAME);
-	while (hMod)
-	{
-		FreeLibrary(hMod);
-		hMod = GetModuleHandle(GH_INJ_MOD_NAME);
-	}
-
-	wnd->SetStatus("Injection module unlaoded");
-
-	auto old_path = path + "OLD.exe";
-	DeleteFileA(old_path.c_str());
-
-	if (!MoveFileA(QCoreApplication::applicationFilePath().toStdString().c_str(), old_path.c_str()))
-	{
-		std::stringstream stream;
-		stream << std::hex << GetLastError();
-		std::string new_status = "MoveFileA failed with 0x%08X";
-		new_status += stream.str();
-		wnd->SetStatus(new_status.c_str());
-		wnd->done(-1);
-
-		return;
-	}
-
-	wnd->SetStatus("Removing old files...");
-
-	DeleteFileW(GH_INJ_MOD_NAME86W);
-	DeleteFileW(GH_INJ_MOD_NAME64W);
-	DeleteFileA(GH_INJECTOR_SM_X86);
-	DeleteFileA(GH_INJECTOR_SM_X64);
-
-#ifdef _WIN64
-	DeleteFileA(GH_INJECTOR_EXE_X86);
-#else
-	DeleteFileA(GH_INJECTOR_EXE_X64);
-#endif
-
-	wnd->SetStatus("Unzip new files...");
-
-	if (Unzip(zip_path.c_str(), path.c_str()) != 0)
-	{
-		std::string new_status = "Failed to unzip files";
-		wnd->SetStatus(new_status.c_str());
-		wnd->done(-1);
-
-		return;
-	}
-
-	DeleteFileA(zip_path.c_str());
-
-	wnd->SetStatus("Launching updated version...");
-
-	auto new_path = path + "GH Injector.exe ";
-
-	STARTUPINFOA si{ 0 };
-	PROCESS_INFORMATION pi{ 0 };
-
-	std::stringstream stream;
-	stream << GetCurrentProcessId();
-	new_path += stream.str();
-
-	CreateProcessA(nullptr, (char *)new_path.c_str(), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
-
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-
-	Sleep(1000);
-
-	wnd->done(0);
-
-	ExitProcess(0);
-}
-
-void GuiMain::update_injector(std::string version)
-{	
-	std::vector<QString> labels;
-	labels.push_back("");
-
-	DownloadProgressWindow * wnd = new DownloadProgressWindow(QString("Updating to V") + version.c_str(), labels, "Initializing...", 250, &framelessUpdate, &framelessUpdate);
-	framelessUpdate.setContent(wnd);
-	framelessUpdate.setFixedSize(QSize(300, 120));
-	framelessUpdate.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
-	framelessUpdate.setWindowModality(Qt::WindowModality::ApplicationModal);
-	framelessUpdate.show();
-
-	auto exec_thread = std::thread(&GuiMain::update_update_thread, this, wnd, version);
-	auto ret = wnd->exec();
-	if (ret == -1)
-	{
-		injec_status(false, wnd->GetStatus());
-	}
-
-	exec_thread.join();
-
-	delete wnd;
-
-	framelessUpdate.hide();
-}
-
-#pragma endregion
-
 bool GuiMain::platformCheck()
 {
 #ifdef _WIN64
@@ -924,10 +657,18 @@ void GuiMain::cmb_proc_name_change()
 #endif
 	}
 
-	ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
-	ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
+	if (lstrlenW(pl.szPath))
+	{
+		ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
+		ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
+	}
+	else
+	{
+		ui.cmb_proc->setToolTip("Can't resolve filepath.");
+		ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
+	}
 
-	ui.txt_arch->setText(GuiMain::arch_to_str(pl.Arch));
+	ui.txt_arch->setText(QString::fromStdWString(ArchToStrW(pl.Arch)));
 
 	if (ui.cmb_proc->findText(QString::fromWCharArray(pl.szName)) == -1)
 	{
@@ -975,10 +716,19 @@ void GuiMain::txt_pid_change()
 	}
 
 	ui.cmb_proc->setCurrentText(QString::fromWCharArray(pl.szName));
-	ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
-	ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
 
-	ui.txt_arch->setText(GuiMain::arch_to_str(pl.Arch));
+	if (lstrlenW(pl.szPath))
+	{
+		ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
+		ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
+	}
+	else
+	{
+		ui.cmb_proc->setToolTip("Can't resolve filepath.");
+		ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
+	}
+
+	ui.txt_arch->setText(QString::fromStdWString(ArchToStrW(pl.Arch)));
 
 	if (ui.cmb_proc->findText(QString::fromWCharArray(pl.szName)) == -1)
 	{
@@ -1026,7 +776,7 @@ void GuiMain::get_from_picker(Process_State_Struct * procStateStruct, Process_St
 
 		ui.cmb_proc->setCurrentIndex(ui.cmb_proc->findText(QString::fromWCharArray(ps_picker->szName)));
 		ui.txt_pid->setText(QString::number(ps_picker->PID));
-		ui.txt_arch->setText(GuiMain::arch_to_str(ps_picker->Arch));
+		ui.txt_arch->setText(QString::fromStdWString(ArchToStrW(ps_picker->Arch)));
 
 		update_proc_icon();
 		txt_pid_change();
@@ -1102,7 +852,7 @@ void GuiMain::auto_loop_inject()
 				continue;
 			}
 
-			if (str_to_arch((*it)->text(3)) != arch)
+			if (StrToArchW((*it)->text(3).toStdWString().c_str()) != arch)
 			{
 				continue;
 			}
@@ -1123,21 +873,6 @@ void GuiMain::auto_loop_inject()
 	}
 }
 
-void GuiMain::load_banner()
-{
-	QPixmap pix_banner;
-	pix_banner.loadFromData(getBanner(), getBannerLen(), "JPG");
-	ui.lbl_img->setPixmap(pix_banner);
-}
-
-void GuiMain::hide_banner()
-{
-	if (lbl_hide_banner == true)
-	{
-		ui.lbl_img->setVisible(false);
-	}
-}
-
 void GuiMain::reset_settings()
 {
 	onReset = true;
@@ -1150,15 +885,15 @@ void GuiMain::reset_settings()
 		iniFile.remove();
 	}
 
-	emit slotReboot();
+	emit reboot();
 }
 
-void GuiMain::slotReboot()
+void GuiMain::reboot()
 {
 	qApp->exit(GuiMain::EXIT_CODE_REBOOT);
 }
 
-void GuiMain::hook_Scan()
+void GuiMain::btn_hook_scan_click()
 {
 	drag_drop->SetPosition(-1, -1, false, false);
 
@@ -1266,7 +1001,6 @@ void GuiMain::save_settings()
 	// Not visible
 	settings.setValue("LASTDIR", lastPathStr);
 	settings.setValue("IGNOREUPDATES", ignoreUpdate);
-	settings.setValue("HIDEBANNER", lbl_hide_banner);
 	settings.setValue("STATE", saveState());
 	settings.setValue("GEOMETRY", framelessParent->saveGeometry());
 
@@ -1310,12 +1044,7 @@ void GuiMain::load_settings()
 		ui.cmb_proc->addItem(settings.value(QString::number(0)).toString());
 	}
 
-	if (!procSize)
-	{
-		ui.cmb_proc->setEditText("Broihon.exe");
-		ui.txt_pid->setText("1337");
-	}
-	else
+	if (procSize)
 	{
 		ui.cmb_proc->setCurrentIndex(settings.value("PROCESS").toInt());
 	}
@@ -1375,7 +1104,6 @@ void GuiMain::load_settings()
 	// Not visible
 	lastPathStr = settings.value("LASTDIR").toString();
 	ignoreUpdate = settings.value("IGNOREUPDATES").toBool();
-	lbl_hide_banner = settings.value("HIDEBANNER", false).toBool();
 	restoreState(settings.value("STATE").toByteArray());
 	framelessParent->restoreGeometry(settings.value("GEOMETRY").toByteArray());
 
@@ -1392,40 +1120,40 @@ void GuiMain::load_change(int index)
 	{
 		case INJECTION_MODE::IM_LoadLibraryExW:
 			ui.cmb_load->setToolTip("LoadLibraryExW is the default injection method which simply uses LoadLibraryExW.");
-			ui.grp_adv->setVisible(false);
-			ui.cb_unlink->setEnabled(true);
-
-			resize(sizeHint());
-			framelessParent->resize(framelessParent->sizeHint());
 			break;
+
 		case INJECTION_MODE::IM_LdrLoadDll:
 			ui.cmb_load->setToolTip("LdrLoadDll is an advanced injection method which uses LdrLoadDll and bypasses LoadLibrary(Ex) hooks.");
-			ui.grp_adv->setVisible(false);
-			ui.cb_unlink->setEnabled(true);
-
-			resize(sizeHint());
-			framelessParent->resize(framelessParent->sizeHint());
 			break;
+
 		case INJECTION_MODE::IM_LdrpLoadDll:
 			ui.cmb_load->setToolTip("LdrpLoadDll is an advanced injection method which uses LdrpLoadDll and bypasses LdrLoadDll hooks.");
-			ui.grp_adv->setVisible(false);
-			ui.cb_unlink->setEnabled(true);
-
-			resize(sizeHint());
-			framelessParent->resize(framelessParent->sizeHint());
 			break;
+
 		default:
 			ui.cmb_load->setToolTip("ManualMap is an advanced injection technique which bypasses most module detection methods.");
-			ui.grp_adv->setVisible(true);
-			ui.cb_unlink->setEnabled(false);
-			ui.cb_unlink->setChecked(false);
-			cb_main_clicked();
-			cb_page_protection_clicked();
-
-			resize(sizeHint());
-			framelessParent->resize(framelessParent->sizeHint());
 			break;
 	}
+
+	if (mode != INJECTION_MODE::IM_ManualMap && ui.grp_adv->isVisible())
+	{
+		ui.grp_adv->setVisible(false);
+		ui.cb_unlink->setEnabled(true);
+
+		resize(sizeHint());
+		framelessParent->resize(framelessParent->sizeHint());
+	}
+	else if (mode == INJECTION_MODE::IM_ManualMap && ui.grp_adv->isHidden())
+	{
+		ui.grp_adv->setVisible(true);
+		ui.cb_unlink->setEnabled(false);
+		ui.cb_unlink->setChecked(false);
+		cb_main_clicked();
+		cb_page_protection_clicked();
+
+		resize(sizeHint());
+		framelessParent->resize(framelessParent->sizeHint());
+	}	
 }
 
 void GuiMain::create_change(int index)
@@ -1438,23 +1166,29 @@ void GuiMain::create_change(int index)
 	{
 		case LAUNCH_METHOD::LM_NtCreateThreadEx:
 			ui.cmb_create->setToolTip("NtCreateThreadEx: Creates a simple remote thread to load the dll(s).");
-			ui.cb_clock->setEnabled(true);
 			break;
+
 		case LAUNCH_METHOD::LM_HijackThread:
 			ui.cmb_create->setToolTip("Thread hijacking: Redirects a thread to a codecave to load the dll(s).");
-			ui.cb_clock->setEnabled(false);
-			ui.cb_clock->setChecked(false);
 			break;
+
 		case LAUNCH_METHOD::LM_SetWindowsHookEx:
 			ui.cmb_create->setToolTip("SetWindowsHookEx: Adds a hook into the window callback list which then loads the dll(s).");
-			ui.cb_clock->setEnabled(false);
-			ui.cb_clock->setChecked(false);
 			break;
+
 		default:
 			ui.cmb_create->setToolTip("QueueUserAPC: Registers an asynchronous procedure call to the process' threads which then loads the dll(s).");
-			ui.cb_clock->setEnabled(false);
-			ui.cb_clock->setChecked(false);
 			break;
+	}
+
+	if (method == LAUNCH_METHOD::LM_NtCreateThreadEx && !ui.cb_clock->isEnabled())
+	{
+		ui.cb_clock->setEnabled(true);
+	}
+	else if (method != LAUNCH_METHOD::LM_NtCreateThreadEx && ui.cb_clock->isEnabled())
+	{
+		ui.cb_clock->setEnabled(false);
+		ui.cb_clock->setChecked(false);
 	}
 }
 
@@ -1558,7 +1292,7 @@ void GuiMain::add_file_to_list(QString str, bool active)
 	item->setCheckState(0, Qt::CheckState::Unchecked);
 	item->setText(1, fi.fileName());
 	item->setText(2, fi.absoluteFilePath());
-	item->setText(3, arch_to_str(arch));
+	item->setText(3, QString::fromStdWString(ArchToStrW(arch)));
 
 	if (active)
 	{
@@ -1733,7 +1467,7 @@ void GuiMain::inject_file()
 			continue;
 		}
 
-		file_arch = str_to_arch((*it)->text(3));
+		file_arch = StrToArchW((*it)->text(3).toStdWString().c_str());
 		if (file_arch == ARCH::NONE)
 		{
 			continue;
@@ -1807,8 +1541,6 @@ void GuiMain::inject_file()
 	if (ui.cb_close->isChecked())
 	{
 		qApp->exit(0);
-
-		return; //just in case lmao
 	}
 
 	QMessageBox messageBox;
@@ -1915,89 +1647,23 @@ void GuiMain::tooltip_change()
 
 void GuiMain::open_help()
 {
-	bool ok = QDesktopServices::openUrl(QUrl(GH_HELP_URL, QUrl::TolerantMode));
+	QDesktopServices::openUrl(QUrl(GH_HELP_URL, QUrl::TolerantMode));
 }
 
-void GuiMain::pdb_download_update_thread(DownloadProgressWindow * wnd)
+QPixmap GuiMain::GetIconFromFileW(const wchar_t * szPath, UINT size, int index)
 {
-	bool connected = false;
-
-	while (!InjLib.SymbolStatus())
+	HICON icon = NULL;
+	if (FAILED(SHDefExtractIconW(szPath, index, NULL, &icon, nullptr, size & 0xFFFF)))
 	{
-		float progress_0 = InjLib.DownloadProgress(false);
-		wnd->SetProgress(0, progress_0);
-
-#ifdef _WIN64
-		float progress_1 = InjLib.DownloadProgress(true);
-		wnd->SetProgress(1, progress_1);
-#endif
-
-		if (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
-		{
-			if (connected)
-			{
-				wnd->SetStatus("Waiting for internet connection...");
-				connected = false;
-				wnd->done(-1);
-				return;
-			}
-		}
-		else
-		{
-			if (!connected)
-			{
-				wnd->SetStatus("Downloading PDB files from the Microsoft Symbol Server...");
-				connected = true;
-			}
-		}
-
-		Sleep(25);
-	};
-
-	wnd->done(0);
-}
-
-//this code is terrible that it proves that god is dead
-void GuiMain::pdb_download()
-{
-	std::vector<QString> labels;
-	labels.push_back("ntdll.pdb");
-#ifdef _WIN64
-	labels.push_back("wntdll.pdb");
-#endif
-
-	DownloadProgressWindow * wnd = new DownloadProgressWindow("PDB Download", labels, "Waiting for connection...", 300, &framelessUpdate, &framelessUpdate);
-	framelessUpdate.setContent(wnd);
-	framelessUpdate.resize(QSize(300, 170));
-	framelessUpdate.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
-	framelessUpdate.show();
-
-	auto exec_thread = std::thread(&GuiMain::pdb_download_update_thread, this, wnd);
-	if (wnd->exec() == -1)
-	{
-		injec_status(false, "Download interrupted. The PDB files are necessary\nfor the injector to work.\nMake sure your PC is connected to the internet.");
+		return QPixmap();
 	}
-	exec_thread.join();
 
-	delete wnd;
+	QPixmap pixmap = qt_pixmapFromWinHICON(icon);
 
-	framelessUpdate.hide();
+	DestroyIcon(icon);
+
+	return pixmap;
 }
-
-// -p "ProcessName"
-// -f "FileName"
-// -d delay (default = 0)
-// -t timeout (default = 2000)
-// -l 0-3 (launchmethod, default = 0)
-// -s 0-3 (startmethod, default = 0)
-// -peh 0-2 (default = 0)
-// -log
-// -unlink
-// -cloak
-// -randomize
-// -copy
-// -hijack
-// -mmflags hex_value (manual mapping flags)
 
 void GuiMain::generate_shortcut()
 {
@@ -2063,7 +1729,7 @@ void GuiMain::generate_shortcut()
 		}
 
 		// Check architecture
-		ARCH file_arch = str_to_arch((*it)->text(3));
+		ARCH file_arch = StrToArchW((*it)->text(3).toStdWString().c_str());
 		if (file_arch != target_arch)
 		{
 			continue;
@@ -2180,47 +1846,16 @@ void GuiMain::open_log()
 	}
 }
 
-void GuiMain::update_init()
+void GuiMain::update_clicked()
 {
-	if (newest_version.compare(current_version) > 0)
+	save_settings();
+
+	drag_drop->SetPosition(-1, -1, false, false);
+
+	if (update_injector(newest_version, ignoreUpdate))
 	{
-		std::string update_msg = "This version of the GH Injector is outdated.\nThe newest version is V";
-		update_msg += newest_version;
-		update_msg += ".\n";
-		update_msg += "Do you want to update?";
-
-		QMessageBox box;
-		box.setWindowTitle("New version available");
-		box.setText(update_msg.c_str());
-		box.addButton(QMessageBox::Yes);
-		box.addButton(QMessageBox::No);
-		box.addButton(QMessageBox::Ignore);
-		box.setDefaultButton(QMessageBox::Yes);
-		box.setIcon(QMessageBox::Icon::Information);
-
-		if (drag_drop)
-		{
-			drag_drop->SetPosition(-1, -1, false, false);
-		}
-
-		auto res = box.exec();
-
-		if (res == QMessageBox::Yes)
-		{
-			ignoreUpdate = false;
-
-			update_injector(newest_version);
-		}
-		else if (res == QMessageBox::Ignore)
-		{
-			ignoreUpdate = true;
-		}
-
-		if (drag_drop)
-		{
-			drag_drop->SetPosition(-1, -1, false, true);
-		}
+		qApp->exit(EXIT_CODE_UPDATE);
 	}
 
-	return;
+	drag_drop->SetPosition(-1, -1, false, true);
 }
