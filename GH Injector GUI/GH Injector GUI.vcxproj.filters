@@ -116,7 +116,6 @@
     <Image Include="gh_resource\Log Icon.ico">
       <Filter>Ressourcendateien</Filter>
     </Image>
-    <Image Include="gh_resource\LUL Icon.ico" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="DarkStyle.h">

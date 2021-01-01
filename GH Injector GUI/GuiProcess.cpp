@@ -12,10 +12,14 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 
 	ps	= nullptr;
 	pss = nullptr;
-	sort_sense = SORT_SENSE::SS_PID_LO;
+	sort_sense = SORT_SENSE::SS_ARCH_LO;
+
+	update_list = new QTimer();
 
 	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
 	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
+
+	m_ProcList.clear();
 
 	connect(ui.btn_refresh, SIGNAL(clicked()),						this, SLOT(refresh_process()));
 	connect(ui.cmb_arch,	SIGNAL(currentIndexChanged(int)),		this, SLOT(filter_change(int)));
@@ -26,24 +30,34 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	connect(ui.tree_process,			SIGNAL(doubleClicked(const QModelIndex &)),	this, SLOT(double_click_process(const QModelIndex &)));
 	connect(ui.tree_process->header(),	SIGNAL(sectionClicked(int)),				this, SLOT(custom_sort(int)));
 
+	connect(update_list, SIGNAL(timeout()), this, SLOT(refresh_process()));
+	update_list->start(1000);
+
 	ui.tree_process->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
 	ui.tree_process->setColumnWidth(0, 50);
 	ui.tree_process->setColumnWidth(1, 50);
 	ui.tree_process->setColumnWidth(2, 200);
 	ui.tree_process->setColumnWidth(3, 50);
 
-	native = IsNativeProcess(GetCurrentProcessId());
-
 	installEventFilter(this);
 	ui.tree_process->installEventFilter(this);
 
 	setFixedHeight(520);
-	m_OwnSession = getProcSession(GetCurrentProcessId());
+
+	own_session = getProcSession(GetCurrentProcessId());
 }
 
 GuiProcess::~GuiProcess()
 {
+	for (auto i : m_ProcList)
+	{
+		if (i)
+		{
+			delete i;
+		}
+	}
 
+	delete[] update_list;
 }
 
 bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
@@ -91,8 +105,8 @@ void GuiProcess::refresh_gui()
 
 		if (ui.cb_session->isChecked())
 		{
-			int target_session = getProcSession((*it)->text(1).toInt());
-			if (target_session != m_OwnSession && m_OwnSession != -1)
+			int target_session = (*it)->text(4).toInt();
+			if (target_session != own_session && own_session != -1)
 			{
 				(*it)->setHidden(true);
 
@@ -106,6 +120,7 @@ void GuiProcess::refresh_gui()
 			if (!contains)
 			{
 				(*it)->setHidden(true);
+
 				continue;
 			}
 		}
@@ -120,71 +135,88 @@ void GuiProcess::refresh_gui()
 
 void GuiProcess::refresh_process()
 {
-	getProcessList(m_ProcList, true);
+	if (!getProcessList(m_ProcList, true))
+	{
+		return;
+	}
 
 	if (sort_sense != SORT_SENSE::SS_PID_LO)
 	{
 		sortProcessList(m_ProcList, sort_sense);
 	}
 
-	int index = 0;
+	bool update_tree = false;
 
-	for (QTreeWidgetItemIterator item(ui.tree_process); *item; ++item)
+	for (int i = 0; i < ui.tree_process->topLevelItemCount(); )
 	{
-		int PID = (*item)->text(1).toInt();
+		int pid = ui.tree_process->topLevelItem(i)->text(1).toInt();
 
-		static auto search_list = [&pid = PID](const Process_Struct * entry) -> bool
+		auto search_list = [pid](const Process_Struct * entry) -> bool
 		{
 			return (pid == entry->PID);
 		};
 
 		auto ret = std::find_if(m_ProcList.begin(), m_ProcList.end(), search_list);
-		if (ret == m_ProcList.end() && m_ProcList.back()->PID != PID)
+		if (ret == m_ProcList.end() && m_ProcList.back()->PID != pid)
 		{
-			delete (*item);
+			delete ui.tree_process->topLevelItem(i);
+
+			update_tree = true;
+
+			continue;
 		}
+
+		++i;
 	}
 
 	for (int i = 0; i < m_ProcList.size(); ++i)
 	{
-		QTreeWidgetItem * current_item = ui.tree_process->topLevelItem(i);
-		
-		if (current_item && current_item->text(1).toInt() == m_ProcList[i]->PID)
-		{
-			continue;
-		}		
+		int pid = -1;
+		auto * current_item = ui.tree_process->topLevelItem(i);
 
-		TreeWidgetItem * new_item = new TreeWidgetItem(0);
-
-		new_item->setText(1, QString::number(m_ProcList[i]->PID));
-		new_item->setText(2, QString::fromWCharArray(m_ProcList[i]->szName));
-		new_item->setText(3, QString::fromStdWString(ArchToStrW(m_ProcList[i]->Arch)));
-
-		QIcon new_icon;
-
-		if (m_ProcList[i]->hIcon)
+		if (current_item)
 		{
-			new_icon = qt_pixmapFromWinHICON(m_ProcList[i]->hIcon);
-		}
-		else if (lstrlenW(m_ProcList[i]->szPath))
-		{
-			new_icon = pxm_generic;
-		}
-		else
-		{
-			new_icon = pxm_error;
+			pid = current_item->text(1).toInt();
 		}
 
-		new_item->setIcon(0, new_icon);
+		if (m_ProcList[i]->PID != pid)
+		{
+			TreeWidgetItem * item = new TreeWidgetItem();
+			item->setText(1, QString::number(m_ProcList[i]->PID));
+			item->setText(2, QString::fromStdWString(m_ProcList[i]->szName));
+			item->setText(3, QString::fromStdWString(ArchToStrW(m_ProcList[i]->Arch)));
+			item->setText(4, QString::number(m_ProcList[i]->Session));
 
-		ui.tree_process->insertTopLevelItem(i, new_item);
+			QPixmap icon;
+
+			if (m_ProcList[i]->hIcon)
+			{
+				icon = qt_pixmapFromWinHICON(m_ProcList[i]->hIcon);
+			}
+
+			if (icon.isNull())
+			{
+				if (lstrlenW(m_ProcList[i]->szPath))
+				{
+					icon = pxm_generic;
+				}
+				else
+				{
+					icon = pxm_error;
+				}
+			}
+
+			item->setIcon(0, icon);
+
+			ui.tree_process->insertTopLevelItem(i, item);
+
+			update_tree = true;
+		}
 	}
 
-	emit refresh_gui();
-
-	if (sort_sense != SORT_SENSE::SS_PID_LO)
+	if (update_tree)
 	{
-		sortProcessList(m_ProcList, SORT_SENSE::SS_PID_LO);
+		emit refresh_gui();
 	}
 }
 
@@ -227,12 +259,11 @@ void GuiProcess::proc_select(bool ignore)
 
 void GuiProcess::custom_sort(int column)
 {
-	column = column;
 	auto order = ui.tree_process->header()->sortIndicatorOrder();
 
 	switch (order)
 	{
-		case Qt::AscendingOrder:
+		case Qt::DescendingOrder:
 			switch (column)
 			{
 				case 1:
@@ -249,7 +280,7 @@ void GuiProcess::custom_sort(int column)
 			}
 			break;
 		
-		case Qt::DescendingOrder:
+		case Qt::AscendingOrder:
 			switch (column)
 			{
 				case 1:
@@ -297,78 +328,63 @@ void GuiProcess::get_from_inj(Process_State_Struct * procStateStruct, Process_St
 TreeWidgetItem::TreeWidgetItem(int type)
 	: QTreeWidgetItem(type)
 {
+
 }
 
 bool TreeWidgetItem::operator<(const QTreeWidgetItem & rhs) const
 {
 	int column = treeWidget()->sortColumn();
-	auto order = treeWidget()->header()->sortIndicatorOrder();
+	auto direction = treeWidget()->header()->sortIndicatorOrder();
 
-	switch (order)
+	switch (column)
 	{
-		case Qt::AscendingOrder:
-			switch (column)
+		case 1:
+			return (text(1).toInt() > rhs.text(1).toInt());
+
+		case 2:
+		{
+			int cmp = text(2).compare(rhs.text(2), Qt::CaseSensitivity::CaseInsensitive);
+
+			if (cmp == 0)
 			{
-				case 1: //SORT_SENSE::SS_PID_LO
-					return (text(1).toInt() < rhs.text(1).toInt());
+				return (text(1).toInt() > rhs.text(1).toInt());
+			}
 
-				case 2: //SORT_SENSE::SS_NAME_LO
+			return (cmp > 0);
+		}
+
+		case 3:
+		{
+			int cmp = text(3).compare(rhs.text(3), Qt::CaseSensitivity::CaseInsensitive);
+
+			if (cmp == 0)
+			{
+				cmp = text(2).compare(rhs.text(2), Qt::CaseSensitivity::CaseInsensitive);
+
+				if (cmp == 0)
 				{
-					int cmp = text(2).compare(rhs.text(2), Qt::CaseSensitivity::CaseInsensitive);
-
-					if (cmp == 0)
+					if (direction == Qt::SortOrder::AscendingOrder)
 					{
-						return (text(1).toInt() < rhs.text(1).toInt());
+						return  (text(1).toInt() < rhs.text(1).toInt());
 					}
-
-					return (cmp < 0);
+					else
+					{
+						return  (text(1).toInt() > rhs.text(1).toInt());;
+					}
 				}
 
-				case 3: //SORT_SENSE::SS_ARCH_LO
+				if (direction == Qt::SortOrder::AscendingOrder)
 				{
-					int cmp = text(3).compare(rhs.text(3), Qt::CaseSensitivity::CaseInsensitive);
-
-					if (cmp == 0)
-					{
-						return (text(1).toInt() < rhs.text(1).toInt());
-					}
-
+					return (cmp < 0);
+				}
+				else
+				{
 					return (cmp > 0);
 				}
 			}
-			break;
 
-		case Qt::DescendingOrder:
-			switch (column)
-			{
-				case 1: //SORT_SENSE::SS_PID_HI
-					return (text(1).toInt() > rhs.text(1).toInt());
-
-				case 2: //SORT_SENSE::SS_NAME_HI
-				{
-					int cmp = text(2).compare(rhs.text(2), Qt::CaseSensitivity::CaseInsensitive);
-
-					if (cmp == 0)
-					{
-						return (text(1).toInt() > rhs.text(1).toInt());
-					}
-
-					return (cmp > 0);
-				}				
-
-				case 3: //SORT_SENSE::SS_ARCH_HI
-				{
-					int cmp = text(3).compare(rhs.text(3), Qt::CaseSensitivity::CaseInsensitive);
-
-					if (cmp == 0)
-					{
-						return (text(1).toInt() < rhs.text(1).toInt());
-					}
-
-					return (cmp < 0);
-				}
-			}
-			break;
+			return (cmp < 0);
+		}
 	}
 
 	return false;

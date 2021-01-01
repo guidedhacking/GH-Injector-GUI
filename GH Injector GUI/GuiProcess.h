@@ -37,10 +37,9 @@ private:
 
 	Process_State_Struct	*	pss;
 	Process_Struct			*	ps;
-	QFileSystemModel			model;
+	QTimer					*	update_list;
 	SORT_SENSE					sort_sense;
-	bool						native;
-	int							m_OwnSession;
+	int							own_session;
 	std::vector<Process_Struct*> m_ProcList;
 
 	QPixmap pxm_error;

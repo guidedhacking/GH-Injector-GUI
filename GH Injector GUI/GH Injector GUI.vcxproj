@@ -451,7 +451,6 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     <Image Include="gh_resource\DragDrop Icon.ico" />
     <Image Include="gh_resource\GH Icon.ico" />
     <Image Include="gh_resource\Log Icon.ico" />
-    <Image Include="gh_resource\LUL Icon.ico" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="ToDo.txt" />

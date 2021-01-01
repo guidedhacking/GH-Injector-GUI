@@ -178,11 +178,9 @@ std::string ArchToStrA(ARCH arch)
 	{
 		case ARCH::X64:
 			return "x64";
-			break;
 
 		case ARCH::X86:
 			return "x86";
-			break;
 	}
 
 	return "";
@@ -194,11 +192,9 @@ std::wstring ArchToStrW(ARCH arch)
 	{
 		case ARCH::X64:
 			return L"x64";
-			break;
 
 		case ARCH::X86:
 			return L"x86";
-			break;
 	}
 
 	return L"";
@@ -242,13 +238,13 @@ int getProcSession(const int PID)
 
 bool getProcFullPathA(char * szfullPath, DWORD BufferSize, int PID)
 {
-	HANDLE hOpenProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, NULL, PID);
+	HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, PID);
 
-	if (hOpenProc != NULL)
+	if (hProc != NULL)
 	{
-		BOOL bRet = QueryFullProcessImageNameA(hOpenProc, 0, szfullPath, &BufferSize);
+		BOOL bRet = QueryFullProcessImageNameA(hProc, 0, szfullPath, &BufferSize);
 
-		CloseHandle(hOpenProc);
+		CloseHandle(hProc);
 
 		return (bRet == TRUE);
 	}
@@ -258,15 +254,15 @@ bool getProcFullPathA(char * szfullPath, DWORD BufferSize, int PID)
 
 bool getProcFullPathW(wchar_t * szfullPath, DWORD BufferSize, int PID)
 {
-	HANDLE hOpenProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, NULL, PID);
+	HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, PID);
 
-	if (hOpenProc != NULL)
+	if (hProc != NULL)
 	{
-		BOOL bRet = QueryFullProcessImageNameW(hOpenProc, 0, szfullPath, &BufferSize);
+		BOOL bRet = QueryFullProcessImageNameW(hProc, 0, szfullPath, &BufferSize);
 
-		CloseHandle(hOpenProc);
+		CloseHandle(hProc);
 
-		return (bRet == TRUE);
+		return (bRet != FALSE);
 	}
 
 	return false;
@@ -291,41 +287,43 @@ Process_Struct getProcessByNameW(const wchar_t * szProcess)
 
 	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
 
-	if (hSnapshot && hSnapshot != INVALID_HANDLE_VALUE)
+	if (!hSnapshot || hSnapshot == INVALID_HANDLE_VALUE)
 	{
-		PROCESSENTRY32W procEntry = { 0 };
-		procEntry.dwSize = sizeof(PROCESSENTRY32W);
+		return ps_item;
+	}
 
-		if (Process32FirstW(hSnapshot, &procEntry))
+	PROCESSENTRY32W PE32 = { 0 };
+	PE32.dwSize = sizeof(PROCESSENTRY32W);
+
+	BOOL bRet = Process32FirstW(hSnapshot, &PE32);
+
+	while (bRet)
+	{
+		if (!strcicmpW(PE32.szExeFile, szProcess))
 		{
-			do
+			ps_item.Arch = getProcArch(PE32.th32ProcessID);
+			
+			if (ps_item.Arch != ARCH::NONE)
 			{
-				if (!strcicmpW(procEntry.szExeFile, szProcess))
-				{
-					ps_item.Arch = getProcArch(procEntry.th32ProcessID);
-
-					if (ps_item.Arch != ARCH::NONE)
-					{
 #ifndef _WIN64
-						if (ps_item.Arch != ARCH::X86)
-						{
-							continue;
-						}
+				if (ps_item.Arch != ARCH::X86)
+				{
+					continue;
+				}
 #endif
 
-						ps_item.PID = procEntry.th32ProcessID;
-						lstrcpyW(ps_item.szName, procEntry.szExeFile);
-						getProcFullPathW(ps_item.szPath, sizeof(Process_Struct::szPath) / sizeof(Process_Struct::szPath[0]), ps_item.PID);
+				ps_item.PID = PE32.th32ProcessID;
+				lstrcpyW(ps_item.szName, PE32.szExeFile);
+				getProcFullPathW(ps_item.szPath, sizeof(Process_Struct::szPath) / sizeof(Process_Struct::szPath[0]), ps_item.PID);
 
-						break;
-					}
-				}
-
-			} while (Process32NextW(hSnapshot, &procEntry));
+				break;
+			}
 		}
 
-		CloseHandle(hSnapshot);
+		bRet = Process32NextW(hSnapshot, &PE32);
 	}
+
+	CloseHandle(hSnapshot);
 
 	return ps_item;
 }
@@ -339,41 +337,25 @@ Process_Struct getProcessByPID(const int PID)
 		return ps_item;
 	}
 
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+	auto arch = getProcArch(PID);
 
-	if (hSnapshot && hSnapshot != INVALID_HANDLE_VALUE)
-	{
-		PROCESSENTRY32W procEntry = { 0 };
-		procEntry.dwSize = sizeof(PROCESSENTRY32W);
-
-		if (Process32FirstW(hSnapshot, &procEntry))
-		{
-			do
-			{
-				if (procEntry.th32ProcessID == PID)
-				{
-					ps_item.Arch = getProcArch(procEntry.th32ProcessID);
-					if (ps_item.Arch != ARCH::NONE)
-					{
 #ifndef _WIN64
-						if (ps_item.Arch != ARCH::X86)
-						{
-							continue;
-						}
+	if (arch != ARCH::X86)
+	{
+		return ps_item;
+	}
 #endif
-						ps_item.PID		= procEntry.th32ProcessID;
-						ps_item.Arch	= getProcArch(procEntry.th32ProcessID);
-						lstrcpyW(ps_item.szName, procEntry.szExeFile);
-						getProcFullPathW(ps_item.szPath, sizeof(Process_Struct::szPath) / sizeof(Process_Struct::szPath[0]), ps_item.PID);
 
-						break;
-					}
-				}
-
-			} while (Process32NextW(hSnapshot, &procEntry));
+	if (arch != ARCH::NONE && getProcFullPathW(ps_item.szPath, sizeof(Process_Struct::szPath) / sizeof(Process_Struct::szPath[0]), PID))
+	{
+		std::wstring ws(ps_item.szPath);
+		auto pos = ws.find_last_of('\\');
+		if (pos)
+		{
+			lstrcpyW(ps_item.szName, ps_item.szPath + pos + 1);
+			ps_item.PID		= PID;
+			ps_item.Arch	= arch;
 		}
-		
-		CloseHandle(hSnapshot);
 	}
 
 	return ps_item;
@@ -381,14 +363,16 @@ Process_Struct getProcessByPID(const int PID)
 
 bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 {
-	static auto sort_entries = [](const PROCESSENTRY32W & a, const PROCESSENTRY32W & b)
+	bool native = IsNativeProcess(GetCurrentProcessId());
+
+	static auto sort_entries = [](const PROCESSENTRY32W & lhs, const PROCESSENTRY32W & rhs)
 	{
-		return (a.th32ProcessID < b.th32ProcessID);
+		return (lhs.th32ProcessID < rhs.th32ProcessID);
 	};
 
-	static auto sort_list = [](const Process_Struct * a, const Process_Struct * b)
+	static auto sort_list = [](const Process_Struct * lhs, const Process_Struct * rhs)
 	{
-		return (a->PID < b->PID);
+		return (lhs->PID < rhs->PID);
 	};
 
 	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
@@ -413,8 +397,15 @@ bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 
 			continue;
 		}
-		
+
+#ifndef _WIN64
+		if (native || !native && !IsNativeProcess(PE32.th32ProcessID))
+		{
+			entries.push_back(PE32);
+		}
+#else	
 		entries.push_back(PE32);
+#endif
 		
 		bRet = Process32NextW(hSnapshot, &PE32);
 	}
@@ -430,7 +421,7 @@ bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 
 	for (const auto & i : entries)
 	{
-		static auto search_entries = [&pid = i.th32ProcessID](const Process_Struct * entry) -> bool
+		auto search_entries = [pid = i.th32ProcessID](const Process_Struct * entry) -> bool
 		{
 			return (pid == entry->PID);
 		};
@@ -438,7 +429,7 @@ bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 		if (list.size())
 		{
 			auto ret = std::find_if(list.begin(), list.end(), search_entries);
-			if (ret == list.end() && list.back()->PID != i.th32ProcessID)
+			if (ret != list.end() || list.back()->PID == i.th32ProcessID)
 			{
 				continue;
 			}
@@ -446,8 +437,10 @@ bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 
 		Process_Struct * ps_item = new Process_Struct();
 
-		ps_item->PID	= i.th32ProcessID;
-		ps_item->Arch	= getProcArch(i.th32ProcessID);
+		ps_item->PID		= i.th32ProcessID;
+		ps_item->Arch		= getProcArch(i.th32ProcessID);
+		ps_item->Session	= getProcSession(i.th32ProcessID);
+
 		lstrcpyW(ps_item->szName, i.szExeFile);
 
 		bool path_valid = getProcFullPathW(ps_item->szPath, sizeof(Process_Struct::szPath) / sizeof(Process_Struct::szPath[0]), ps_item->PID);
@@ -529,7 +522,14 @@ bool sortProcessList(std::vector<Process_Struct*> & pl, SORT_SENSE sort)
 			{
 				if (lhs->Arch == rhs->Arch)
 				{
-					return (lhs->PID < rhs->PID);
+					auto cmp = strcicmpW(lhs->szName, rhs->szName);
+
+					if (cmp == 0)
+					{
+						return (lhs->PID < rhs->PID);
+					}
+
+					return (cmp < 0);
 				}
 
 				return ((int)lhs->Arch > (int)rhs->Arch);
@@ -541,7 +541,14 @@ bool sortProcessList(std::vector<Process_Struct*> & pl, SORT_SENSE sort)
 			{
 				if (lhs->Arch == rhs->Arch)
 				{
-					return (lhs->PID < rhs->PID);
+					auto cmp = strcicmpW(lhs->szName, rhs->szName);
+
+					if (cmp == 0)
+					{
+						return (lhs->PID < rhs->PID);
+					}
+
+					return (cmp < 0);
 				}
 				
 				return ((int)lhs->Arch < (int)rhs->Arch);

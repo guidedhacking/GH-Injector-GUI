@@ -16,7 +16,7 @@ constexpr auto GH_INJECTOR_SM_X64 = "GH Injector SM - x64.exe";
 constexpr auto GH_INJECTOR_LOGA = "GH_Inj_Log.txt";
 constexpr auto GH_INJECTOR_LOGW = L"GH_Inj_Log.txt";
 
-constexpr auto GH_HELP_URL = "https://guidedhacking.com/resources/guided-hacking-dll-injector.4/";
+constexpr auto GH_HELP_URL = "https://guidedhacking.com/threads/guidedhacking-dll-injector.8417/";
 constexpr auto GH_LOG_URL = "https://pastebin.com/eN7KPX3x";
 
 constexpr auto GH_DOWNLOAD_PREFIX = L"https://guidedhacking.com/gh/inj/V";

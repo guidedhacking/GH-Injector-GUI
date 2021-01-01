@@ -69,7 +69,7 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	pss				= new Process_State_Struct();
 	ps_picker		= new Process_Struct();
 
-	pxm_banner	= QPixmap(":/GuiMain/gh_resource/GH Banenr.png");
+	pxm_banner	= QPixmap(":/GuiMain/gh_resource/GH Banner.png");
 	pxm_lul		= QPixmap(":/GuiMain/gh_resource/LUL Icon.png");
 	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
 	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
@@ -141,7 +141,7 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	connect(ui.btn_openlog,		SIGNAL(clicked()), this, SLOT(open_log()));
 	connect(ui.btn_shortcut,	SIGNAL(clicked()), this, SLOT(generate_shortcut()));
 	connect(ui.btn_version,		SIGNAL(clicked()), this, SLOT(update_clicked()));
-
+	
 	gui_Picker		= new GuiProcess(&framelessPicker, &framelessPicker);
 	gui_Scanner		= new GuiScanHook(&framelessScanner, &framelessScanner, &InjLib);
 	drag_drop		= new DragDropWindow();
@@ -157,7 +157,7 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	framelessScanner.resize(QSize(320, 230));
 	framelessScanner.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	framelessScanner.setWindowModality(Qt::WindowModality::ApplicationModal);
-	
+
 	// Process Picker
 	connect(this,		SIGNAL(send_to_picker(Process_State_Struct *, Process_Struct *)),	gui_Picker, SLOT(get_from_inj(Process_State_Struct *, Process_Struct *)));
 	connect(gui_Picker, SIGNAL(send_to_inj(Process_State_Struct *, Process_Struct *)),		this,		SLOT(get_from_picker(Process_State_Struct *, Process_Struct *)));
@@ -441,7 +441,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 	}
 	else if (event->type() == QEvent::Resize)
 	{
-		if (obj == ui.tree_files)
+		if (obj == ui.tree_files && drag_drop)
 		{
 			auto pos = ui.tree_files->header()->pos();
 			pos = ui.tree_files->header()->mapToGlobal(pos);
@@ -450,7 +450,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 	}
 	else if (event->type() == QEvent::Move)
 	{
-		if (obj == framelessParent)
+		if (obj == framelessParent && drag_drop)
 		{
 			auto pos = ui.tree_files->header()->pos();
 			pos = ui.tree_files->header()->mapToGlobal(pos);
@@ -460,7 +460,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 	else if (event->type() == QEvent::ApplicationStateChange)
 	{
 		auto * ascEvent = static_cast<QApplicationStateChangeEvent *>(event);
-		if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive)
+		if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive && drag_drop)
 		{
 			update_proc_icon();
 
@@ -470,11 +470,11 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 		}
 		else
 		{
-			if (framelessParent->isMinimized())
+			if (framelessParent->isMinimized() && drag_drop)
 			{
 				drag_drop->SetPosition(-1, -1, true, false);
 			}
-			else
+			else if (drag_drop)
 			{
 				auto pos = ui.tree_files->header()->pos();
 				pos = ui.tree_files->header()->mapToGlobal(pos);
@@ -485,7 +485,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 	else if (event->type() == QEvent::WindowStateChange)
 	{
 		auto * wscEvent = static_cast<QWindowStateChangeEvent *>(event);
-		if (framelessParent->isMinimized())
+		if (framelessParent->isMinimized() && drag_drop)
 		{
 			drag_drop->SetPosition(-1, -1, true, false);
 		}
@@ -494,7 +494,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 	}
 	else if (event->type() == QEvent::ScreenChangeInternal || event->type() == QEvent::WindowChangeInternal)
 	{
-		if (current_dpi != framelessParent->logicalDpiX())
+		if (current_dpi != framelessParent->logicalDpiX() && drag_drop)
 		{
 			drag_drop->Close();
 
@@ -511,7 +511,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 			update_proc_icon();
 		}
 	}
-	else if (event->type() == QEvent::Close)
+	else if (event->type() == QEvent::Close && drag_drop)
 	{
 		drag_drop->SetPosition(-1, -1, false, true);
 	}
@@ -610,7 +610,10 @@ void GuiMain::rb_unset_all()
 
 void GuiMain::btn_pick_process_click()
 {
-	drag_drop->SetPosition(-1, -1, false, false);
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, false);
+	}
 
 	framelessPicker.show();
 
@@ -786,7 +789,10 @@ void GuiMain::get_from_picker(Process_State_Struct * procStateStruct, Process_St
 	btn_change();
 	printf("return from picker\n");
 
-	drag_drop->SetPosition(-1, -1, false, true);
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, true);
+	}
 }
 
 void GuiMain::get_from_scan_hook(int pid, int error)
@@ -795,7 +801,10 @@ void GuiMain::get_from_scan_hook(int pid, int error)
 
 	printf("return from scan hook\n");
 
-	drag_drop->SetPosition(-1, -1, false, true);
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, true);
+	}
 }
 
 void GuiMain::auto_inject()
@@ -895,7 +904,10 @@ void GuiMain::reboot()
 
 void GuiMain::btn_hook_scan_click()
 {
-	drag_drop->SetPosition(-1, -1, false, false);
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, false);
+	}
 
 	framelessScanner.show();
 
@@ -1849,13 +1861,17 @@ void GuiMain::open_log()
 void GuiMain::update_clicked()
 {
 	save_settings();
-
-	drag_drop->SetPosition(-1, -1, false, false);
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, false);
+	}
 
 	if (update_injector(newest_version, ignoreUpdate))
 	{
 		qApp->exit(EXIT_CODE_UPDATE);
 	}
-
-	drag_drop->SetPosition(-1, -1, false, true);
+	if (drag_drop)
+	{
+		drag_drop->SetPosition(-1, -1, false, true);
+	}
 }

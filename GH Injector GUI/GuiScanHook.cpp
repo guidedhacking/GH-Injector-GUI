@@ -30,8 +30,6 @@ GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, In
 	if (!InjLib->LoadingStatus())
 	{
 		emit injec_status(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
-
-		return;
 	}
 }
 
