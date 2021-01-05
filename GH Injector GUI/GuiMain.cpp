@@ -9,19 +9,24 @@
 #include "DownloadProgressWindow.h"
 #include "PDB Download.h"
 #include "Update.h"
+#include "DebugConsole.h"
 
 //don't want to include QWinExtras because of static build
 //but there's a problem with icon extraction returning invlid sizes so here we are
 
+int const GuiMain::EXIT_CODE_CLOSE	= 0;
 int const GuiMain::EXIT_CODE_REBOOT = -1;
 int const GuiMain::EXIT_CODE_UPDATE = -2;
 
-GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
+GuiMain::GuiMain(QWidget * parent)
 	: QMainWindow(parent)
 {
-	drag_drop = nullptr;
+	framelessParent = new FramelessWindow();
+	framelessParent->setTitleBar(false);
+	framelessParent->setResizeHorizontal(true);
+	framelessParent->setContent(this);
 
-	framelessParent = FramelessParent;
+	drag_drop = nullptr;
 
 	settings_get_update();
 
@@ -55,6 +60,11 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 		ShowPDBDownload(&InjLib);
 	}
 
+	if (InjLib.LoadingStatus())
+	{
+		InjLib.SetPrintCallback(g_print_to_console_raw);
+	}
+
 	if (!SetDebugPrivilege(true))
 	{
 		emit injec_status(false, "Failed to enable debug privileges. This might affect the functionality of the injector.");
@@ -68,14 +78,14 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	t_OnUserInput	= new QTimer(this);
 	pss				= new Process_State_Struct();
 	ps_picker		= new Process_Struct();
-
+	
 	pxm_banner	= QPixmap(":/GuiMain/gh_resource/GH Banner.png");
 	pxm_lul		= QPixmap(":/GuiMain/gh_resource/LUL Icon.png");
 	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
 	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
 
 	ui.lbl_img->setPixmap(pxm_banner);
-
+	
 	ui.lbl_proc_icon->setStyleSheet("background: transparent");
 
 	if (!native)
@@ -84,16 +94,23 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 		ui.cb_hijack->setChecked(false);
 		ui.cb_hijack->setDisabled(true);
 	}
+
+	auto banner_height = pxm_banner.height();
+	ui.btn_close->setFixedHeight(banner_height / 2);
+	ui.btn_minimize->setFixedHeight(banner_height / 2);
+	ui.btn_close->setFixedWidth(50);
+	ui.btn_minimize->setFixedWidth(50);
 		
 	ui.tree_files->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
 	ui.tree_files->setColumnWidth(0, 50);
-	ui.tree_files->setColumnWidth(1, 125);
-	ui.tree_files->setColumnWidth(2, 320);
-	ui.tree_files->setColumnWidth(3, 100);
+	ui.tree_files->setColumnWidth(1, 135);
+	ui.tree_files->setColumnWidth(2, 360);
+	ui.tree_files->setColumnWidth(3, 50);
 
 	ui.btn_version->setText("V" GH_INJ_VERSIONA);
 
 	ui.btn_openlog->setIcon(QIcon(":/GuiMain/gh_resource/Log Icon.ico"));
+	ui.btn_console->setIcon(QIcon(":/GuiMain/gh_resource/Console.ico"));
 
 	QApplication::instance()->installEventFilter(this);
 	ui.tree_files->installEventFilter(this);
@@ -110,7 +127,15 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	t_Delay_Inj->setSingleShot(true);
 	t_OnUserInput->setSingleShot(true);
 
-	onReset = false;
+	onReset			= false;
+	onMove			= false;
+	consoleFirst	= true;
+	consoleOpen		= true;
+	mouse_pos = { 0, 0 };
+
+	// Window
+	connect(ui.btn_close,		SIGNAL(clicked()), this, SLOT(close_clicked()));
+	connect(ui.btn_minimize,	SIGNAL(clicked()), this, SLOT(minimize_clicked()));
 
 	// Settings
 	connect(ui.rb_proc,		SIGNAL(clicked()), this, SLOT(rb_process_set()));
@@ -138,23 +163,28 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	// Info
 	connect(ui.btn_tooltip,		SIGNAL(clicked()), this, SLOT(tooltip_change()));
 	connect(ui.btn_help,		SIGNAL(clicked()), this, SLOT(open_help()));
-	connect(ui.btn_openlog,		SIGNAL(clicked()), this, SLOT(open_log()));
 	connect(ui.btn_shortcut,	SIGNAL(clicked()), this, SLOT(generate_shortcut()));
 	connect(ui.btn_version,		SIGNAL(clicked()), this, SLOT(update_clicked()));
+	connect(ui.btn_console,		SIGNAL(clicked()), this, SLOT(open_console()));
+	connect(ui.btn_openlog,		SIGNAL(clicked()), this, SLOT(open_log()));
 	
+	framelessPicker.setMinimizeButton(false);
+	framelessPicker.setResizeHorizontal(true);
+
+	framelessScanner.setMinimizeButton(false);
+	framelessScanner.setResizeHorizontal(true);
+
 	gui_Picker		= new GuiProcess(&framelessPicker, &framelessPicker);
 	gui_Scanner		= new GuiScanHook(&framelessScanner, &framelessScanner, &InjLib);
 	drag_drop		= new DragDropWindow();
 
 	framelessPicker.setWindowTitle("Select a process");
 	framelessPicker.setContent(gui_Picker);
-	framelessPicker.resize(QSize(460, 500));
 	framelessPicker.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	framelessPicker.setWindowModality(Qt::WindowModality::ApplicationModal);
 	
 	framelessScanner.setWindowTitle("Scan for hooks");
 	framelessScanner.setContent(gui_Scanner);
-	framelessScanner.resize(QSize(320, 230));
 	framelessScanner.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	framelessScanner.setWindowModality(Qt::WindowModality::ApplicationModal);
 
@@ -169,6 +199,9 @@ GuiMain::GuiMain(QWidget * parent, FramelessWindow * FramelessParent)
 	connect(t_Auto_Inj,		SIGNAL(timeout()), this, SLOT(auto_loop_inject()));
 	connect(t_Delay_Inj,	SIGNAL(timeout()), this, SLOT(inject_file()));
 	connect(t_Update_Proc,	SIGNAL(timeout()), this, SLOT(update_process()));
+
+	ui.grp_adv->setVisible(false);
+	ui.cb_unlink->setEnabled(true);
 
 	load_settings();
 	load_change(0);
@@ -220,16 +253,16 @@ GuiMain::~GuiMain()
 {
 	save_settings();
 
-	delete rev_NumbersOnly;
 	delete drag_drop;
-	delete gui_Picker;
 	delete gui_Scanner;
-	delete t_Auto_Inj;
-	delete t_Delay_Inj;
-	delete t_Update_Proc;
-	delete t_OnUserInput;
+	delete gui_Picker;
+	delete rev_NumbersOnly;
 	delete pss;
 	delete ps_picker;
+	delete t_OnUserInput;
+	delete t_Update_Proc;
+	delete t_Delay_Inj;
+	delete t_Auto_Inj;
 
 	//force unload module because std::async increases LDR_DDAG_NODE::LoadCount
 	//but std::async threads get terminated without calling the DllMain with DLL_THREAD_DETACH
@@ -416,104 +449,194 @@ void GuiMain::closeEvent(QCloseEvent * event)
 
 bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 {
-	if (event->type() == QEvent::KeyPress)
+	switch (event->type())
 	{
-		if (obj == ui.tree_files)
+		case QEvent::KeyPress:
 		{
-			auto * keyEvent = static_cast<QKeyEvent *>(event);
-			if (keyEvent->key() == Qt::Key_Delete)
+			if (obj == ui.tree_files)
 			{
-				remove_file();
+				auto * keyEvent = static_cast<QKeyEvent *>(event);
+				if (keyEvent->key() == Qt::Key_Delete)
+				{
+					remove_file();
+				}
+				else if (keyEvent->key() == Qt::Key_Space)
+				{
+					toggleSelected();
+				}
 			}
-			else if (keyEvent->key() == Qt::Key_Space)
+			else if (obj == ui.txt_pid)
 			{
-				toggleSelected();
+				auto * keyEvent = static_cast<QKeyEvent *>(event);
+				if (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_9 || keyEvent->key() == Qt::Key_Backspace || keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Space)
+				{
+					t_OnUserInput->start(10000);
+				}
 			}
 		}
-		else if (obj == ui.txt_pid)
-		{
-			auto * keyEvent = static_cast<QKeyEvent *>(event);
-			if (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_9 || keyEvent->key() == Qt::Key_Backspace || keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Space)
-			{
-				t_OnUserInput->start(10000);
-			}
-		}
-	}
-	else if (event->type() == QEvent::Resize)
-	{
-		if (obj == ui.tree_files && drag_drop)
-		{
-			auto pos = ui.tree_files->header()->pos();
-			pos = ui.tree_files->header()->mapToGlobal(pos);
-			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
-		}
-	}
-	else if (event->type() == QEvent::Move)
-	{
-		if (obj == framelessParent && drag_drop)
-		{
-			auto pos = ui.tree_files->header()->pos();
-			pos = ui.tree_files->header()->mapToGlobal(pos);
-			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
-		}
-	}
-	else if (event->type() == QEvent::ApplicationStateChange)
-	{
-		auto * ascEvent = static_cast<QApplicationStateChangeEvent *>(event);
-		if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive && drag_drop)
-		{
-			update_proc_icon();
+		break;
 
-			auto pos = ui.tree_files->header()->pos();
-			pos = ui.tree_files->header()->mapToGlobal(pos);
-			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
-		}
-		else
+		case QEvent::Resize:
 		{
+			if (obj == ui.tree_files)
+			{
+				if (drag_drop)
+				{
+					auto pos = ui.tree_files->header()->pos();
+					pos = ui.tree_files->header()->mapToGlobal(pos);
+					drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
+				}
+
+				auto * resizeEvent = static_cast<QResizeEvent *>(event);
+				ui.tree_files->setColumnWidth(2, resizeEvent->size().width() - 250);
+				ui.tree_files->setColumnWidth(3, 50);
+			}
+		}
+		break;
+
+		case QEvent::Move:
+		{
+			if (obj == framelessParent && drag_drop)
+			{
+				auto pos = ui.tree_files->header()->pos();
+				pos = ui.tree_files->header()->mapToGlobal(pos);
+				drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
+			}
+		}
+		break;
+
+		case QEvent::ApplicationStateChange:
+		{
+			auto * ascEvent = static_cast<QApplicationStateChangeEvent *>(event);
+			if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive && drag_drop)
+			{
+				update_proc_icon();
+
+				auto pos = ui.tree_files->header()->pos();
+				pos = ui.tree_files->header()->mapToGlobal(pos);
+
+				if (framelessParent->hasFocus())
+				{
+					drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
+				}
+				else
+				{
+					drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
+				}
+			}
+			else
+			{
+				if (framelessParent->isMinimized() && drag_drop)
+				{
+					drag_drop->SetPosition(-1, -1, true, false);
+				}
+				else if (drag_drop)
+				{
+					auto pos = ui.tree_files->header()->pos();
+					pos = ui.tree_files->header()->mapToGlobal(pos);
+					drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
+				}
+			}
+		}
+		break;
+
+		case QEvent::WindowStateChange:
+		{
+			auto * wscEvent = static_cast<QWindowStateChangeEvent *>(event);
 			if (framelessParent->isMinimized() && drag_drop)
 			{
 				drag_drop->SetPosition(-1, -1, true, false);
 			}
-			else if (drag_drop)
+
+			update_proc_icon();
+		}
+		break;
+
+		case QEvent::ScreenChangeInternal:
+		case QEvent::WindowChangeInternal:
+		{
+			if (current_dpi != framelessParent->logicalDpiX() && drag_drop)
 			{
+				drag_drop->Close();
+
+				current_dpi = framelessParent->logicalDpiX();
+				dragdrop_size = (int)(30.0f * (float)current_dpi / 96.0f + 0.5f);
+				dragdrop_offset = (int)(10.0f * (float)current_dpi / 96.0f + 0.5f);
+
+				drag_drop->CreateDragDropWindow(reinterpret_cast<HWND>(framelessParent->winId()), dragdrop_size);
+
 				auto pos = ui.tree_files->header()->pos();
 				pos = ui.tree_files->header()->mapToGlobal(pos);
 				drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
+
+				update_proc_icon();
 			}
 		}
-	}
-	else if (event->type() == QEvent::WindowStateChange)
-	{
-		auto * wscEvent = static_cast<QWindowStateChangeEvent *>(event);
-		if (framelessParent->isMinimized() && drag_drop)
+		break;
+
+		case QEvent::Close:
 		{
-			drag_drop->SetPosition(-1, -1, true, false);
+			if (drag_drop)
+			{
+				drag_drop->SetPosition(-1, -1, false, true);
+			}
 		}
+		break;
 
-		update_proc_icon();
-	}
-	else if (event->type() == QEvent::ScreenChangeInternal || event->type() == QEvent::WindowChangeInternal)
-	{
-		if (current_dpi != framelessParent->logicalDpiX() && drag_drop)
+		case QEvent::MouseButtonPress:
 		{
-			drag_drop->Close();
+			if (obj == ui.lbl_img)
+			{
+				auto * mouseEvent = static_cast<QMouseEvent *>(event);
 
-			current_dpi = framelessParent->logicalDpiX();
-			dragdrop_size = (int)(30.0f * current_dpi / 96.0f + 0.5f);
-			dragdrop_offset = (int)(10.0f * current_dpi / 96.0f + 0.5f);
+				if (mouseEvent->buttons() & Qt::MouseButton::LeftButton)
+				{
+					mouse_pos = ui.lbl_img->mapToGlobal(mouseEvent->pos());
 
-			drag_drop->CreateDragDropWindow(reinterpret_cast<HWND>(framelessParent->winId()), dragdrop_size);
-
-			auto pos = ui.tree_files->header()->pos();
-			pos = ui.tree_files->header()->mapToGlobal(pos);
-			drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
-			
-			update_proc_icon();
+					onMove = true;
+				}
+			}
 		}
-	}
-	else if (event->type() == QEvent::Close && drag_drop)
-	{
-		drag_drop->SetPosition(-1, -1, false, true);
+		break;
+
+		case QEvent::MouseMove:
+		{
+			if (obj == ui.lbl_img && onMove)
+			{
+				auto * mouseEvent = static_cast<QMouseEvent *>(event);
+
+				if (mouseEvent->buttons() & Qt::MouseButton::LeftButton)
+				{
+					auto glb_mousepos = ui.lbl_img->mapToGlobal(mouseEvent->pos());
+					auto delta = glb_mousepos - mouse_pos;
+
+					if (delta.x() || delta.y())
+					{
+						auto newpos = framelessParent->pos() + delta;
+						mouse_pos = glb_mousepos;
+
+						framelessParent->move(newpos);
+					}
+				}
+			}
+		}
+		break;
+
+		case QEvent::MouseButtonRelease:
+		{
+			if (obj == ui.lbl_img && onMove)
+			{
+				auto pos = this->mapToGlobal(QPoint(0, 0));
+				if (pos.y() < 0)
+				{
+					auto old_pos = framelessParent->pos();
+					framelessParent->move(old_pos.x(), old_pos.y() - pos.y() + 1);
+				}
+
+				onMove = false;
+			}
+		}
+		break;
 	}
 
 	return QObject::eventFilter(obj, event);
@@ -902,6 +1025,18 @@ void GuiMain::reboot()
 	qApp->exit(GuiMain::EXIT_CODE_REBOOT);
 }
 
+void GuiMain::close_clicked()
+{
+	save_settings();
+
+	qApp->exit(GuiMain::EXIT_CODE_CLOSE);
+}
+
+void GuiMain::minimize_clicked()
+{
+	framelessParent->on_minimizeButton_clicked();
+}
+
 void GuiMain::btn_hook_scan_click()
 {
 	if (drag_drop)
@@ -1009,10 +1144,11 @@ void GuiMain::save_settings()
 
 	// Info
 	settings.setValue("TOOLTIPSON", ui.btn_tooltip->isChecked());
+	settings.setValue("IGNOREUPDATES", ignoreUpdate);
+	settings.setValue("CONSOLE", g_Console->isVisible());
 
 	// Not visible
 	settings.setValue("LASTDIR", lastPathStr);
-	settings.setValue("IGNOREUPDATES", ignoreUpdate);
 	settings.setValue("STATE", saveState());
 	settings.setValue("GEOMETRY", framelessParent->saveGeometry());
 
@@ -1112,10 +1248,11 @@ void GuiMain::load_settings()
 
 	// Info
 	ui.btn_tooltip->setChecked(settings.value("TOOLTIPSON").toBool());
+	consoleOpen = settings.value("CONSOLE").toBool();
+	ignoreUpdate = settings.value("IGNOREUPDATES").toBool();
 
 	// Not visible
 	lastPathStr = settings.value("LASTDIR").toString();
-	ignoreUpdate = settings.value("IGNOREUPDATES").toBool();
 	restoreState(settings.value("STATE").toByteArray());
 	framelessParent->restoreGeometry(settings.value("GEOMETRY").toByteArray());
 
@@ -1140,6 +1277,10 @@ void GuiMain::load_change(int index)
 
 		case INJECTION_MODE::IM_LdrpLoadDll:
 			ui.cmb_load->setToolTip("LdrpLoadDll is an advanced injection method which uses LdrpLoadDll and bypasses LdrLoadDll hooks.");
+			break;
+
+		case INJECTION_MODE::IM_LdrpLoadDllInternal:
+			ui.cmb_load->setToolTip("LdrpLoadDllInternal is an experimental injection method which uses LdrpLoadDllInternal.");
 			break;
 
 		default:
@@ -1311,6 +1452,12 @@ void GuiMain::add_file_to_list(QString str, bool active)
 		item->setCheckState(0, Qt::CheckState::Checked);
 	}
 
+	if (ui.btn_tooltip->isChecked())
+	{
+		item->setToolTip(1, fi.fileName());
+		item->setToolTip(2, fi.absoluteFilePath());
+	}
+
 #ifndef _WIN64
 	if (arch != ARCH::X86)
 	{
@@ -1412,10 +1559,11 @@ void GuiMain::inject_file()
 
 	switch (ui.cmb_load->currentIndex())
 	{
-		case 1:  data.Mode = INJECTION_MODE::IM_LdrLoadDll;		break;
-		case 2:  data.Mode = INJECTION_MODE::IM_LdrpLoadDll;	break;
-		case 3:  data.Mode = INJECTION_MODE::IM_ManualMap;		break;
-		default: data.Mode = INJECTION_MODE::IM_LoadLibraryExW; break;
+		case 1:  data.Mode = INJECTION_MODE::IM_LdrLoadDll;				break;
+		case 2:  data.Mode = INJECTION_MODE::IM_LdrpLoadDll;			break;
+		case 3:  data.Mode = INJECTION_MODE::IM_LdrpLoadDllInternal;	break;
+		case 4:  data.Mode = INJECTION_MODE::IM_ManualMap;				break;
+		default: data.Mode = INJECTION_MODE::IM_LoadLibraryExW;			break;
 	}
 
 	switch (ui.cmb_create->currentIndex())
@@ -1507,7 +1655,8 @@ void GuiMain::inject_file()
 		return;
 	}
 
-	std::wstring results;
+	std::vector<std::string> results;
+	int inj_count = 1;
 
 	for (const auto & i : items)
 	{
@@ -1515,48 +1664,38 @@ void GuiMain::inject_file()
 
 		auto dll_name_pos = i.first.find_last_of('\\') + 1;
 		auto dll_name = i.first.substr(dll_name_pos);
-		results += dll_name + L":\n";
-
-		std::wstringstream stream;
-		std::wstring result;
 
 		DWORD res = InjLib.InjectFuncW(&data);
-		if (res != ERROR_SUCCESS)
-		{
-			stream << std::hex << res;
 
-			//manually add leading 0's to error code
-			result = std::wstring(8 - stream.str().length(), '0') + stream.str();
-			results += L"     Error = 0x";
+		char buffer[MAX_PATH * 2]{ 0 };
+
+		if (res != 0)
+		{
+			sprintf_s(buffer, "Injection (%d/%d) failed:\n  Error = %08X\n", inj_count, (int)items.size(), res);
 		}
 		else
 		{
-			stream << std::hex << reinterpret_cast<UINT_PTR>(data.hDllOut);
-
-			//manually add leading 0's to error code
-			if (i.second == ARCH::X86)
-			{
-				result = std::wstring(8 - stream.str().length(), '0') + stream.str();
-			}
-			else
-			{
-				result = std::wstring(0x10 - stream.str().length(), '0') + stream.str();
-			}
-
-			results += L"     DllBase = 0x";
+			sprintf_s(buffer, "Injection (%d/%d) succeeded:\n  %ls = %p\n", inj_count, (int)items.size(), dll_name.c_str(), data.hDllOut);
 		}
 
-		results += result;
-		results += L"\n\n";
+		results.push_back(std::string(buffer));
+
+		g_print("Injection %d/%d finished\n", inj_count, items.size());
+
+		++inj_count;
 	}
 
 	if (ui.cb_close->isChecked())
 	{
-		qApp->exit(0);
+		save_settings();
+
+		qApp->exit(EXIT_CODE_CLOSE);
 	}
 
-	QMessageBox messageBox;
-	messageBox.information(0, "Injection result(s)", QString::fromWCharArray(results.c_str()));
+	for (auto i : results)
+	{
+		g_print_to_console_raw(i.c_str());
+	}
 }
 
 void GuiMain::injec_status(bool ok, const QString msg)
@@ -1566,16 +1705,33 @@ void GuiMain::injec_status(bool ok, const QString msg)
 		drag_drop->SetPosition(-1, -1, false, false);
 	}
 
+	FramelessWindow parent;
+	parent.setMinimizeButton(false);
+
+	QMessageBox * box = Q_NULLPTR;
+
 	if (ok)
 	{
-		QMessageBox messageBox;
-		messageBox.information(0, "Success", msg);
+		parent.setWindowTitle("Success");
+		box = new QMessageBox(QMessageBox::Icon::Information, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
 	}
 	else
 	{
-		QMessageBox messageBox;
-		messageBox.critical(0, "Error", msg);
+		parent.setWindowTitle("Error");
+		box = new QMessageBox(QMessageBox::Icon::Critical, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
 	}
+
+	if (box == Q_NULLPTR)
+	{
+		return;
+	}
+
+	parent.setContent(box);
+	parent.show();
+	parent.setFixedWidth(box->width() + 40);
+	box->exec();
+
+	delete box;
 
 	if (drag_drop)
 	{
@@ -1585,8 +1741,11 @@ void GuiMain::injec_status(bool ok, const QString msg)
 
 void GuiMain::tooltip_change()
 {
+	int duration = 1;
+
 	if (ui.btn_tooltip->isChecked())
 	{
+		duration = -1;
 		ui.btn_tooltip->setText("Disable tooltips");
 	}
 	else
@@ -1594,11 +1753,6 @@ void GuiMain::tooltip_change()
 		ui.btn_tooltip->setText("Enable tooltips");
 	}
 
-	int duration = 1;
-	if (ui.btn_tooltip->isChecked())
-	{
-		duration = -1;
-	}
 
 	// Settings
 	ui.lbl_proc->setToolTipDuration(duration);
@@ -1655,6 +1809,21 @@ void GuiMain::tooltip_change()
 	ui.btn_shortcut->setToolTipDuration(duration);
 	ui.btn_version->setToolTipDuration(duration);
 	ui.btn_openlog->setToolTipDuration(duration);
+	ui.btn_console->setToolTipDuration(duration);
+
+	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
+	{
+		if (duration < 0)
+		{
+			(*it)->setToolTip(1, (*it)->text(1));
+			(*it)->setToolTip(2, (*it)->text(2));
+		}
+		else
+		{
+			(*it)->setToolTip(1, "");
+			(*it)->setToolTip(2, "");
+		}
+	}
 }
 
 void GuiMain::open_help()
@@ -1675,6 +1844,19 @@ QPixmap GuiMain::GetIconFromFileW(const wchar_t * szPath, UINT size, int index)
 	DestroyIcon(icon);
 
 	return pixmap;
+}
+
+void GuiMain::show()
+{
+	framelessParent->show();
+}
+
+void GuiMain::open_console_if()
+{
+	if (consoleOpen)
+	{
+		open_console();
+	}
 }
 
 void GuiMain::generate_shortcut()
@@ -1793,6 +1975,7 @@ void GuiMain::generate_shortcut()
 		case 1:		shortCut += L" -l 1";	break;
 		case 2:		shortCut += L" -l 2";	break;
 		case 3:		shortCut += L" -l 3";	break;
+		case 4:		shortCut += L" -l 4";	break;
 		default: break;
 	}
 
@@ -1813,7 +1996,7 @@ void GuiMain::generate_shortcut()
 	if (ui.cb_hijack->isChecked())			shortCut += L" -hijack";
 
 	DWORD Flags = 0;
-	if (ui.cmb_load->currentIndex() == 3)
+	if (ui.cmb_load->currentIndex() == (int)INJECTION_MODE::IM_ManualMap)
 	{
 		if (ui.cb_clean->isChecked())		Flags |= INJ_MM_CLEAN_DATA_DIR;
 		if (ui.cb_cookie->isChecked())		Flags |= INJ_MM_INIT_SECURITY_COOKIE;
@@ -1840,14 +2023,35 @@ void GuiMain::generate_shortcut()
 	if (bLink)
 	{
 		QString msg = fileName + " \n" + QString::fromStdWString(shortCut);
-		QMessageBox messageBox;
-		messageBox.information(0, "Success", msg);
-		messageBox.setFixedSize(500, 200);
+
+		injec_status(true, msg);
 	}
 	else
 	{
 		emit injec_status(false, "Shortcut generation failed");
 	}
+}
+
+void GuiMain::open_console()
+{
+	if (consoleFirst)
+	{
+		auto pos = this->mapToGlobal(QPoint(0, 0));
+		auto size = this->size();
+
+		auto new_pos = QPoint(pos.x() + size.width(), pos.y());
+		auto new_size = QSize(300, size.height());
+
+		g_Console->move(new_pos);
+		g_Console->setSize(new_size);
+
+		consoleFirst = false;
+	}	
+
+	g_Console->open();
+	g_print("Console opened");
+
+	consoleOpen = true;
 }
 
 void GuiMain::open_log()
@@ -1861,6 +2065,7 @@ void GuiMain::open_log()
 void GuiMain::update_clicked()
 {
 	save_settings();
+
 	if (drag_drop)
 	{
 		drag_drop->SetPosition(-1, -1, false, false);
@@ -1870,6 +2075,7 @@ void GuiMain::update_clicked()
 	{
 		qApp->exit(EXIT_CODE_UPDATE);
 	}
+
 	if (drag_drop)
 	{
 		drag_drop->SetPosition(-1, -1, false, true);

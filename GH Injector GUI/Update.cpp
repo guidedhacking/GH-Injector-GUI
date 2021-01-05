@@ -37,7 +37,11 @@ bool update_injector(std::wstring newest_version, bool & ignore)
 {
 	std::wstring update_msg;
 
+	FramelessWindow parent;
+	parent.setMinimizeButton(false);
+
 	QMessageBox box;
+	box.setWindowFlags(Qt::WindowType::FramelessWindowHint);
 
 	int cmp = newest_version.compare(GH_INJ_VERSIONW);
 	if (cmp > 0)
@@ -47,16 +51,20 @@ bool update_injector(std::wstring newest_version, bool & ignore)
 		update_msg += L".\n";
 		update_msg += L"Do you want to update?";
 
-		box.setWindowTitle("New version available");
+		parent.setWindowTitle("New version available");
 		box.addButton(QMessageBox::Ignore);
 	}
-	else
+	else if (cmp == 0)
 	{
 		update_msg = L"You are already using the newest version of the GH Injector.\nDo you want to redownload V";
 		update_msg += GH_INJ_VERSIONW;
 		update_msg += L"?";
 
-		box.setWindowTitle("Redownload");
+		parent.setWindowTitle("Redownload");
+	}
+	else
+	{
+		return false;
 	}
 
 	box.setText(QString::fromStdWString(update_msg));
@@ -65,6 +73,10 @@ bool update_injector(std::wstring newest_version, bool & ignore)
 	box.setDefaultButton(QMessageBox::Yes);
 	box.setIcon(QMessageBox::Icon::Information);
 
+	parent.setContent(&box);
+	parent.show();
+	parent.setFixedWidth(box.width() + 40);
+	
 	auto res = box.exec();
 
 	if (res == QMessageBox::No)

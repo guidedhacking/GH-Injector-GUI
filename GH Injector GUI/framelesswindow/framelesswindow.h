@@ -25,11 +25,30 @@ class FramelessWindow : public QWidget
 {
 	Q_OBJECT
 
+private:
+	QWidget * content;
+
+	bool resize_left;
+	bool resize_right;
+	bool resize_top;
+	bool resize_bottom;
+
 public:
 	explicit FramelessWindow(QWidget * parent = Q_NULLPTR);
 	virtual ~FramelessWindow();
 	void setContent(QWidget * w);
+	void setTitleBar(bool active);
+	void setMinimizeButton(bool active);
 
+	void setResizeLeft	(bool enabled = false);
+	void setResizeRight	(bool enabled = false);
+	void setResizeTop	(bool enabled = false);
+	void setResizeBottom(bool enabled = false);
+
+	void setResizeHorizontal(bool enabled = false);
+	void setResizeVertical	(bool enabled = false);
+
+	void setResize(bool enabled = false);
 
 private:
 	bool leftBorderHit(const QPoint & pos);
@@ -38,11 +57,12 @@ private:
 	bool bottomBorderHit(const QPoint & pos);
 	void styleWindow(bool bActive, bool bNoState);
 
+	void updateSizePolicy();
+
 public slots:
 	void setWindowTitle(const QString & text);
 	void setWindowIcon(const QIcon & ico);
-
-private slots:
+	
 	void on_applicationStateChanged(Qt::ApplicationState state);
 	void on_minimizeButton_clicked();
 	void on_closeButton_clicked();

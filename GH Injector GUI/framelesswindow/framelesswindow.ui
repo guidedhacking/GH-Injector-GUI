@@ -10,6 +10,12 @@
     <height>398</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="windowTitle">
    <string/>
   </property>
@@ -82,7 +88,7 @@
         <property name="styleSheet">
          <string notr="true">#windowTitlebar{border: 0px none palette(base); border-top-left-radius:5px; border-top-right-radius:5px; background-color:palette(shadow); height:20px;}</string>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,1,0,0">
+        <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,0">
          <property name="spacing">
           <number>0</number>
          </property>
@@ -151,7 +157,7 @@
          <item>
           <widget class="QLabel" name="titleText">
            <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+            <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
@@ -170,7 +176,7 @@
             <string>Frameless Window (Dark Style)</string>
            </property>
            <property name="alignment">
-            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+            <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
            </property>
           </widget>
          </item>
@@ -198,10 +204,10 @@
   image:url(:/images/icon_window_minimize.png);
 }
 #minimizeButton:hover{
-  background-color:palette(alternate-base);
+  background-color:palette(highlight);
 }
 #minimizeButton:pressed{
-  background-color:palette(highlight);
+  background-color:palette(alternate-base);
 }</string>
            </property>
            <property name="text">
@@ -234,10 +240,10 @@
   border-top-right-radius: 5px;
 }
 #closeButton:hover{
-  background-color:palette(alternate-base);
+  background-color: rgb(232, 17, 35);
 }
 #closeButton:pressed{
-  background-color:palette(highlight);
+  background-color: rgb(241, 112, 122);
 }</string>
            </property>
           </widget>

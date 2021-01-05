@@ -37,12 +37,19 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 
 	ui->setupUi(this);
 
+	resize_left		= false;
+	resize_right	= false;
+	resize_top		= false;
+	resize_bottom	= false;
+
+	content = Q_NULLPTR;
+
 	// shadow under window title text
 	QGraphicsDropShadowEffect * textShadow = new QGraphicsDropShadowEffect;
 	textShadow->setBlurRadius(4.0);
 	textShadow->setColor(QColor(0, 0, 0));
 	textShadow->setOffset(0.0);
-	ui->titleText->setGraphicsEffect(textShadow);
+	//ui->titleText->setGraphicsEffect(textShadow);
 
 	// window shadow
 	QGraphicsDropShadowEffect * windowShadow = new QGraphicsDropShadowEffect;
@@ -54,6 +61,15 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	QObject::connect(qApp, &QGuiApplication::applicationStateChanged, this,
 		&FramelessWindow::on_applicationStateChanged);
 	setMouseTracking(true);
+
+	auto al = ui->titleText->alignment();
+	al.setFlag(Qt::AlignmentFlag::AlignVCenter);
+	ui->titleText->setAlignment(al);
+
+	auto x = ui->titleText->x();
+	auto txt_height = ui->titleText->sizeHint().height();
+	auto bar_height = ui->windowTitlebar->height();
+	ui->titleText->move(x, bar_height / 2 - txt_height / 2);
 
 	// important to watch mouse move from all child widgets
 	QApplication::instance()->installEventFilter(this);
@@ -84,7 +100,89 @@ void FramelessWindow::changeEvent(QEvent * event)
 
 void FramelessWindow::setContent(QWidget * w)
 {
+	content = w;
+
 	ui->windowContent->layout()->addWidget(w);
+}
+
+void FramelessWindow::setTitleBar(bool active)
+{
+	if (active)
+	{
+		ui->windowTitlebar->setHidden(false);
+	}
+	else
+	{
+		ui->windowTitlebar->setHidden(true);
+	}
+}
+
+void FramelessWindow::setMinimizeButton(bool active)
+{
+	if (active)
+	{
+		ui->minimizeButton->setDisabled(false);
+		ui->minimizeButton->setHidden(false);
+	}
+	else
+	{
+		ui->minimizeButton->setHidden(true);
+		ui->minimizeButton->setDisabled(true);
+	}
+}
+
+void FramelessWindow::setResizeLeft(bool enabled)
+{
+	resize_left = enabled;
+
+	updateSizePolicy();
+}
+
+void FramelessWindow::setResizeRight(bool enabled)
+{
+	resize_right = enabled;
+
+	updateSizePolicy();
+}
+
+void FramelessWindow::setResizeTop(bool enabled)
+{
+	resize_top = enabled;
+
+	updateSizePolicy();
+}
+
+void FramelessWindow::setResizeBottom(bool enabled)
+{
+	resize_bottom = enabled;
+
+	updateSizePolicy();
+}
+
+void FramelessWindow::setResizeHorizontal(bool enabled)
+{
+	resize_left		= enabled;
+	resize_right	= enabled;
+
+	updateSizePolicy();
+}
+
+void FramelessWindow::setResizeVertical(bool enabled)
+{
+	resize_top		= enabled;
+	resize_bottom	= enabled;
+
+	updateSizePolicy();
+}
+
+void FramelessWindow::setResize(bool enabled)
+{
+	resize_left		= enabled;
+	resize_right	= enabled;
+	resize_top		= enabled;
+	resize_bottom	= enabled;
+
+	updateSizePolicy();
 }
 
 void FramelessWindow::setWindowTitle(const QString & text)
@@ -171,6 +269,38 @@ void FramelessWindow::styleWindow(bool bActive, bool bNoState)
 	}    // if (bActive) { else no focus
 }
 
+void FramelessWindow::updateSizePolicy()
+{
+	QSizePolicy policy;
+
+	if (resize_left || resize_right)
+	{
+		policy.setHorizontalPolicy(QSizePolicy::Policy::MinimumExpanding);
+	}
+	else
+	{
+		policy.setHorizontalPolicy(QSizePolicy::Policy::Fixed);
+	}
+
+	if (resize_top || resize_bottom)
+	{
+		policy.setVerticalPolicy(QSizePolicy::Policy::MinimumExpanding);
+	}
+	else
+	{
+		policy.setVerticalPolicy(QSizePolicy::Policy::Fixed);
+	}
+
+	this->setSizePolicy(policy);
+	this->ui->windowFrame->setSizePolicy(policy);
+	this->ui->windowContent->setSizePolicy(policy);
+
+	if (content)
+	{
+		this->content->setSizePolicy(policy);
+	}
+}
+
 void FramelessWindow::on_applicationStateChanged(Qt::ApplicationState state)
 {
 	if (windowState().testFlag(Qt::WindowNoState))
@@ -241,8 +371,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		// top right corner
 		if (m_bDragTop && m_bDragRight)
 		{
-			int diff =
-				globalMousePos.x() - (m_StartGeometry.x() + m_StartGeometry.width());
+			int diff = globalMousePos.x() - (m_StartGeometry.x() + m_StartGeometry.width());
 			int neww = m_StartGeometry.width() + diff;
 			diff = globalMousePos.y() - m_StartGeometry.y();
 			int newy = m_StartGeometry.y() + diff;
@@ -273,8 +402,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		// bottom right corner
 		else if (m_bDragBottom && m_bDragLeft)
 		{
-			int diff =
-				globalMousePos.y() - (m_StartGeometry.y() + m_StartGeometry.height());
+			int diff = globalMousePos.y() - (m_StartGeometry.y() + m_StartGeometry.height());
 			int newh = m_StartGeometry.height() + diff;
 			diff = globalMousePos.x() - m_StartGeometry.x();
 			int newx = m_StartGeometry.x() + diff;
@@ -289,12 +417,30 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		else if (m_bDragTop)
 		{
 			int diff = globalMousePos.y() - m_StartGeometry.y();
-			int newy = m_StartGeometry.y() + diff;
-			if (newy > 0 && newy < h - 50)
+			int newh = m_StartGeometry.height() - diff / 2;
+			if (newh > 0 && newh < h - 50)
 			{
+				int old_height = 0;
+				if (content)
+				{
+					old_height = content->height();
+				}
+
 				QRect newg = m_StartGeometry;
-				newg.setY(newy);
+				newg.setHeight(newh);
 				setGeometry(newg);
+
+				int new_height = 0;
+				if (content)
+				{
+					new_height = content->height();
+				}
+
+				if (old_height != new_height || !content)
+				{
+					newg.setY(globalMousePos.y());
+					setGeometry(newg);
+				}
 			}
 		}
 		else if (m_bDragLeft)
@@ -310,8 +456,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		}
 		else if (m_bDragRight)
 		{
-			int diff =
-				globalMousePos.x() - (m_StartGeometry.x() + m_StartGeometry.width());
+			int diff = globalMousePos.x() - (m_StartGeometry.x() + m_StartGeometry.width());
 			int neww = m_StartGeometry.width() + diff;
 			if (neww > 0)
 			{
@@ -323,8 +468,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		}
 		else if (m_bDragBottom)
 		{
-			int diff =
-				globalMousePos.y() - (m_StartGeometry.y() + m_StartGeometry.height());
+			int diff = globalMousePos.y() - (m_StartGeometry.y() + m_StartGeometry.height());
 			int newh = m_StartGeometry.height() + diff;
 			if (newh > 0)
 			{
@@ -384,47 +528,59 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 // pos in global virtual desktop coordinates
 bool FramelessWindow::leftBorderHit(const QPoint & pos)
 {
-	const QRect & rect = this->geometry();
-	if (pos.x() >= rect.x() && pos.x() <= rect.x() + CONST_DRAG_BORDER_SIZE)
+	if (resize_left)
 	{
-		return true;
+		const QRect & rect = this->geometry();
+		if (pos.x() >= rect.x() && pos.x() <= rect.x() + CONST_DRAG_BORDER_SIZE)
+		{
+			return true;
+		}
 	}
+
 	return false;
 }
 
 bool FramelessWindow::rightBorderHit(const QPoint & pos)
 {
-	const QRect & rect = this->geometry();
-	int tmp = rect.x() + rect.width();
-	if (pos.x() <= tmp && pos.x() >= (tmp - CONST_DRAG_BORDER_SIZE))
+	if (resize_right)
 	{
-		return true;
+		const QRect & rect = this->geometry();
+		int tmp = rect.x() + rect.width();
+		if (pos.x() <= tmp && pos.x() >= (tmp - CONST_DRAG_BORDER_SIZE))
+		{
+			return true;
+		}
 	}
+
 	return false;
 }
 
 bool FramelessWindow::topBorderHit(const QPoint & pos)
 {
-	return false;
-
-	const QRect & rect = this->geometry();
-	if (pos.y() >= rect.y() && pos.y() <= rect.y() + CONST_DRAG_BORDER_SIZE)
+	if (resize_top)
 	{
-		return true;
+		const QRect & rect = this->geometry();
+		if (pos.y() >= rect.y() && pos.y() <= rect.y() + CONST_DRAG_BORDER_SIZE)
+		{
+			return true;
+		}
 	}
+
 	return false;
 }
 
 bool FramelessWindow::bottomBorderHit(const QPoint & pos)
 {
-	return false;
-
-	const QRect & rect = this->geometry();
-	int tmp = rect.y() + rect.height();
-	if (pos.y() <= tmp && pos.y() >= (tmp - CONST_DRAG_BORDER_SIZE))
+	if (resize_bottom)
 	{
-		return true;
+		const QRect & rect = this->geometry();
+		int tmp = rect.y() + rect.height();
+		if (pos.y() <= tmp && pos.y() >= (tmp - CONST_DRAG_BORDER_SIZE))
+		{
+			return true;
+		}
 	}
+
 	return false;
 }
 

@@ -16,15 +16,18 @@ class GuiMain : public QMainWindow
 	Q_OBJECT
 
 public:
-	GuiMain(QWidget * parent = Q_NULLPTR, FramelessWindow * FramelessParent = Q_NULLPTR);
+	GuiMain(QWidget * parent = Q_NULLPTR);
 	~GuiMain();
 
 	// Static
 
+	static int const EXIT_CODE_CLOSE;
 	static int const EXIT_CODE_REBOOT;
 	static int const EXIT_CODE_UPDATE;
 
 	static QPixmap GetIconFromFileW(const wchar_t * szPath, UINT size, int index = 0);
+	void show();
+	void open_console_if();
 
 private:
 	Ui::GuiMainClass ui;
@@ -48,7 +51,12 @@ private:
 
 	bool ignoreUpdate;
 	bool onReset;
+	bool onMove;
 	bool native;
+	bool consoleOpen;
+	bool consoleFirst;
+
+	QPoint mouse_pos;
 
 	std::wstring newest_version;
 	std::wstring current_version;
@@ -111,6 +119,8 @@ signals:
 private slots:
 	// Titlebar
 	void closeEvent(QCloseEvent * event) override;
+	void close_clicked();
+	void minimize_clicked();
 
 	// Settings
 	void rb_process_set();
@@ -146,6 +156,7 @@ private slots:
 	void tooltip_change();
 	void open_help();
 	void generate_shortcut();
+	void open_console();
 	void open_log();
 
 	// Update

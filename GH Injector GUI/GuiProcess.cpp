@@ -1,12 +1,14 @@
 #include "pch.h"
 
 #include "GuiProcess.h"
-#include "GuiMain.h"
 
 GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	: QWidget(parent)
 {
 	ui.setupUi(this);
+		
+	FramelessParent->setFixedHeight(550);
+	setFixedHeight(500);
 
 	frameless_parent = FramelessParent;
 
@@ -38,12 +40,11 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	ui.tree_process->setColumnWidth(1, 50);
 	ui.tree_process->setColumnWidth(2, 200);
 	ui.tree_process->setColumnWidth(3, 50);
+	ui.tree_process->setColumnWidth(4, 0);
 
 	installEventFilter(this);
 	ui.tree_process->installEventFilter(this);
-
-	setFixedHeight(520);
-
+	
 	own_session = getProcSession(GetCurrentProcessId());
 }
 

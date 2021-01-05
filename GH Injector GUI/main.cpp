@@ -7,6 +7,7 @@
 #include "InjectionLib.h"
 #include "DragDropWindow.h"
 #include "resource.h"
+#include "DebugConsole.h"
 
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup")
 
@@ -43,23 +44,25 @@ int wmain(int argc, wchar_t * argv[])
 
 		QApplication::setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 
-		FramelessWindow framelessWindow;
-
 		DarkStyle * dark = new DarkStyle;
 		QApplication::setStyle(dark);
 		QApplication::setPalette(QApplication::style()->standardPalette());
 
-		framelessWindow.setWindowTitle("GH Injector");
-		framelessWindow.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
-
-		GuiMain * MainWindow = new GuiMain(&framelessWindow, &framelessWindow);
+		g_Console = new DebugConsole();
+		
+		GuiMain * MainWindow = new GuiMain();
 		MainWindow->statusBar()->setSizeGripEnabled(false);
-
-		framelessWindow.setContent(MainWindow);
-		framelessWindow.show();
+		MainWindow->show();
+		MainWindow->open_console_if();
 
 		currentExitCode = a.exec();
-	} while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
+
+		delete MainWindow;
+		delete g_Console;
+	} 
+	while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
+
+	Sleep(5000);
 
 	return currentExitCode;
 }

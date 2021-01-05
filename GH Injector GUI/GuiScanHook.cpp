@@ -1,7 +1,6 @@
 #include "pch.h"
 
 #include "GuiScanHook.h"
-#include "GuiMain.h"
 
 GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, InjectionLib * lib)
 	: QWidget(parent)
@@ -177,18 +176,33 @@ void GuiScanHook::unhook_clicked()
 
 void GuiScanHook::injec_status(bool ok, const QString msg)
 {
+	FramelessWindow parent;
+	parent.setMinimizeButton(false);
+
+	QMessageBox * box = Q_NULLPTR;
+
 	if (ok)
 	{
-		QMessageBox messageBox;
-		messageBox.information(0, "Success", msg);
-		messageBox.setFixedSize(500, 200);
+		parent.setWindowTitle("Success");
+		box = new QMessageBox(QMessageBox::Icon::Information, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
 	}
 	else
 	{
-		QMessageBox messageBox;
-		messageBox.critical(0, "Error", msg);
-		messageBox.setFixedSize(500, 200);
+		parent.setWindowTitle("Error");
+		box = new QMessageBox(QMessageBox::Icon::Critical, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
 	}
+
+	if (box == Q_NULLPTR)
+	{
+		return;
+	}
+
+	parent.setContent(box);
+	parent.show();
+	parent.setFixedWidth(box->width() + 40);
+	box->exec();
+
+	delete box;
 }
 
 void GuiScanHook::update_title(const QString title)

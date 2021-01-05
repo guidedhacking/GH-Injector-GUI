@@ -34,6 +34,8 @@ bool InjectionLib::Init()
 
 	GetDownloadProgress = reinterpret_cast<f_GetDownloadProgress>(GetProcAddress(hInjectionMod, "GetDownloadProgress"));
 
+	SetRawPrintCallback = reinterpret_cast<f_SetRawPrintCallback>(GetProcAddress(hInjectionMod, "SetRawPrintCallback"));
+
 	return LoadingStatus();
 }
 
@@ -44,7 +46,7 @@ bool InjectionLib::LoadingStatus()
 		return false;
 	}
 
-	if (InjectA == nullptr || InjectW == nullptr || ValidateFunc == nullptr || RestoreFunc == nullptr || GetVersionA == nullptr || GetVersionW == nullptr || GetSymbolState == nullptr || GetDownloadProgress == nullptr)
+	if (InjectA == nullptr || InjectW == nullptr || ValidateFunc == nullptr || RestoreFunc == nullptr || GetVersionA == nullptr || GetVersionW == nullptr || GetSymbolState == nullptr || GetDownloadProgress == nullptr || SetRawPrintCallback == nullptr)
 	{
 		return false;
 	}
@@ -169,4 +171,9 @@ std::wstring InjectionLib::VersionW()
 	}
 
 	return std::wstring(szVersion);
+}
+
+DWORD InjectionLib::SetPrintCallback(f_raw_print_callback callback)
+{
+	return SetRawPrintCallback(callback);
 }

@@ -21,6 +21,7 @@ public:
 	float DownloadProgress(bool bWow64);
 	std::string VersionA();
 	std::wstring VersionW();
+	DWORD SetPrintCallback(f_raw_print_callback callback);
 
 private:
 	HookInfo info[30];
@@ -44,4 +45,6 @@ private:
 	f_GetSymbolState GetSymbolState;
 
 	f_GetDownloadProgress GetDownloadProgress;
+
+	f_SetRawPrintCallback SetRawPrintCallback;
 };

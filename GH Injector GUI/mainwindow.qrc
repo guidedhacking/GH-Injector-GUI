@@ -36,5 +36,6 @@
         <file>gh_resource/Error Icon.png</file>
         <file>gh_resource/Generic Icon.png</file>
         <file>gh_resource/GH Banner.png</file>
+        <file>gh_resource/Console.ico</file>
     </qresource>
 </RCC>

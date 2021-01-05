@@ -355,6 +355,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DebugConsole.cpp" />
     <ClCompile Include="DownloadProgress.cpp" />
     <ClCompile Include="DownloadProgressWindow.cpp" />
     <ClCompile Include="framelesswindow\framelesswindow.cpp">
@@ -419,6 +420,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmdArg.h" />
+    <QtMoc Include="DebugConsole.h" />
     <ClInclude Include="DownloadProgress.h" />
     <QtMoc Include="DownloadProgressWindow.h" />
     <ClInclude Include="pch.h" />
