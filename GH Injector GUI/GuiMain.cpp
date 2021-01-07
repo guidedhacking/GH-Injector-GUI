@@ -1,22 +1,11 @@
 ﻿#include "pch.h"
 
 #include "GuiMain.h"
-#include "Process.h"
-#include "Injection.h"
-#include "Zip.h"
-#include "ShortCut.h"
-#include "DownloadProgress.h"
-#include "DownloadProgressWindow.h"
-#include "PDB Download.h"
-#include "Update.h"
-#include "DebugConsole.h"
 
-//don't want to include QWinExtras because of static build
-//but there's a problem with icon extraction returning invlid sizes so here we are
-
-int const GuiMain::EXIT_CODE_CLOSE	= 0;
-int const GuiMain::EXIT_CODE_REBOOT = -1;
-int const GuiMain::EXIT_CODE_UPDATE = -2;
+int const GuiMain::EXIT_CODE_CLOSE			= 0;
+int const GuiMain::EXIT_CODE_REBOOT			= -1;
+int const GuiMain::EXIT_CODE_UPDATE			= -2;
+int const GuiMain::EXIT_CODE_START_NATIVE	= -3;
 
 GuiMain::GuiMain(QWidget * parent)
 	: QMainWindow(parent)
@@ -28,9 +17,19 @@ GuiMain::GuiMain(QWidget * parent)
 
 	drag_drop = nullptr;
 
+	settings_get_console();
+
+	if (consoleOpen)
+	{
+		open_console();
+		consoleFirst = true;
+	}
+
+	g_Console->add_parent(framelessParent);
+
 	settings_get_update();
 
-	current_version = GH_INJ_VERSIONW;
+	current_version = GH_INJ_GUI_VERSIONW;
 	newest_version	= get_newest_version();
 
 	if (!ignoreUpdate && newest_version.compare(current_version) > 0)
@@ -43,7 +42,7 @@ GuiMain::GuiMain(QWidget * parent)
 
 	if (!platformCheck())
 	{
-		ExitProcess(0);
+		qApp->exit(GuiMain::EXIT_CODE_START_NATIVE);
 	}
 
 	native = IsNativeProcess(GetCurrentProcessId());
@@ -52,22 +51,22 @@ GuiMain::GuiMain(QWidget * parent)
 	{
 		QString failMsg = GH_INJ_MOD_NAMEA + QString(" not found");
 
-		emit injec_status(false, failMsg);
+		emit ShowStatusbox(false, failMsg);
 	}
 
-	if (InjLib.LoadingStatus() && !InjLib.SymbolStatus())
+	if (InjLib.LoadingStatus() && !InjLib.GetSymbolState())
 	{
 		ShowPDBDownload(&InjLib);
 	}
 
 	if (InjLib.LoadingStatus())
 	{
-		InjLib.SetPrintCallback(g_print_to_console_raw);
+		InjLib.SetRawPrintCallback(g_print_to_console_raw);
 	}
 
 	if (!SetDebugPrivilege(true))
 	{
-		emit injec_status(false, "Failed to enable debug privileges. This might affect the functionality of the injector.");
+		emit ShowStatusbox(false, "Failed to enable debug privileges. This might affect the functionality of the injector.");
 	}
 
 	ui.setupUi(this);
@@ -107,7 +106,9 @@ GuiMain::GuiMain(QWidget * parent)
 	ui.tree_files->setColumnWidth(2, 360);
 	ui.tree_files->setColumnWidth(3, 50);
 
-	ui.btn_version->setText("V" GH_INJ_VERSIONA);
+	std::string v = "V";
+	v += GH_INJ_GUI_VERSIONA;
+	ui.btn_version->setText(v.c_str());
 
 	ui.btn_openlog->setIcon(QIcon(":/GuiMain/gh_resource/Log Icon.ico"));
 	ui.btn_console->setIcon(QIcon(":/GuiMain/gh_resource/Console.ico"));
@@ -193,8 +194,8 @@ GuiMain::GuiMain(QWidget * parent)
 	connect(gui_Picker, SIGNAL(send_to_inj(Process_State_Struct *, Process_Struct *)),		this,		SLOT(get_from_picker(Process_State_Struct *, Process_Struct *)));
 
 	// Scan Hook
-	connect(this,			SIGNAL(send_to_scan_hook(int, int)),	gui_Scanner,	SLOT(get_from_inj_to_sh(int, int)));
-	connect(gui_Scanner,	SIGNAL(send_to_inj_sh(int, int)),		this,			SLOT(get_from_scan_hook(int, int)));
+	connect(this,			SIGNAL(send_to_scan_hook(int)),	gui_Scanner,	SLOT(get_from_inj_to_sh(int)));
+	connect(gui_Scanner,	SIGNAL(send_to_inj_sh()),		this,			SLOT(get_from_scan_hook()));
 
 	connect(t_Auto_Inj,		SIGNAL(timeout()), this, SLOT(auto_loop_inject()));
 	connect(t_Delay_Inj,	SIGNAL(timeout()), this, SLOT(inject_file()));
@@ -215,7 +216,7 @@ GuiMain::GuiMain(QWidget * parent)
 
 	t_Update_Proc->start(100);
 
-	if (!InjLib.LoadingStatus() || !InjLib.SymbolStatus())
+	if (!InjLib.LoadingStatus() || !InjLib.GetSymbolState())
 	{
 		ui.btn_inject->setEnabled(false);
 	}
@@ -279,9 +280,9 @@ GuiMain::~GuiMain()
 
 void GuiMain::update_process()
 {
-	int raw = ui.txt_pid->text().toInt();
+	DWORD raw = ui.txt_pid->text().toULong();
 	Process_Struct byName	= getProcessByNameW(ui.cmb_proc->currentText().toStdWString().c_str());
-	Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toInt());
+	Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toULong());
 
 	//avoid unnecessary updates
 	if (raw != old_raw_pid || byName.PID != old_byname_pid || byPID.PID != old_bypid_pid || (ui.cmb_proc->currentText().compare("Broihon.exe") == 0 && old_raw_pid != 1337))
@@ -444,6 +445,8 @@ void GuiMain::update_proc_icon()
 
 void GuiMain::closeEvent(QCloseEvent * event)
 {
+	UNREFERENCED_PARAMETER(event);
+
 	save_settings();
 }
 
@@ -505,17 +508,39 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 		}
 		break;
 
+		case QEvent::WindowActivate:
+		{
+			if (obj == framelessParent)
+			{
+				auto pos = ui.tree_files->header()->pos();
+				pos = ui.tree_files->header()->mapToGlobal(pos);
+				drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
+			}
+		}
+		break;
+
+		case QEvent::WindowDeactivate:
+		{
+			if (obj == framelessParent)
+			{
+				auto pos = ui.tree_files->header()->pos();
+				pos = ui.tree_files->header()->mapToGlobal(pos);
+				drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
+			}
+		}
+		break;
+
 		case QEvent::ApplicationStateChange:
 		{
 			auto * ascEvent = static_cast<QApplicationStateChangeEvent *>(event);
-			if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive && drag_drop)
+			if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive && framelessParent->isVisible() && drag_drop)
 			{
 				update_proc_icon();
 
 				auto pos = ui.tree_files->header()->pos();
 				pos = ui.tree_files->header()->mapToGlobal(pos);
 
-				if (framelessParent->hasFocus())
+				if (false)
 				{
 					drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
 				}
@@ -542,7 +567,6 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 
 		case QEvent::WindowStateChange:
 		{
-			auto * wscEvent = static_cast<QWindowStateChangeEvent *>(event);
 			if (framelessParent->isMinimized() && drag_drop)
 			{
 				drag_drop->SetPosition(-1, -1, true, false);
@@ -918,7 +942,7 @@ void GuiMain::get_from_picker(Process_State_Struct * procStateStruct, Process_St
 	}
 }
 
-void GuiMain::get_from_scan_hook(int pid, int error)
+void GuiMain::get_from_scan_hook()
 {
 	framelessPicker.hide();
 
@@ -1011,7 +1035,7 @@ void GuiMain::reset_settings()
 
 	QFileDialog fDialog(this, "Select dll files", QApplication::applicationDirPath(), "Dynamic Link Libraries (*.dll)");
 
-	QFile iniFile(GH_SETTINGS_INI);
+	QFile iniFile(GH_SETTINGS_INIA);
 	if (iniFile.exists())
 	{
 		iniFile.remove();
@@ -1046,22 +1070,38 @@ void GuiMain::btn_hook_scan_click()
 
 	framelessScanner.show();
 
-	emit send_to_scan_hook(ps_picker->PID, 0);
+	emit send_to_scan_hook(ps_picker->PID);
 }
 
 void GuiMain::settings_get_update()
 {
-	QFile iniFile(GH_SETTINGS_INI);
+	QFile iniFile(GH_SETTINGS_INIA);
 	if (!iniFile.exists())
 	{
 		ignoreUpdate = false;
 	}
 
-	QSettings settings(GH_SETTINGS_INI, QSettings::IniFormat);
+	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
 	settings.setIniCodec("UTF-8");
 
 	settings.beginGroup("CONFIG");
 	ignoreUpdate = settings.value("IGNOREUPDATES").toBool();
+	settings.endGroup();
+}
+
+void GuiMain::settings_get_console()
+{
+	QFile iniFile(GH_SETTINGS_INIA);
+	if (!iniFile.exists())
+	{
+		ignoreUpdate = false;
+	}
+
+	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
+	settings.setIniCodec("UTF-8");
+
+	settings.beginGroup("CONFIG");
+	consoleOpen = settings.value("CONSOLE").toBool();
 	settings.endGroup();
 }
 
@@ -1074,14 +1114,13 @@ void GuiMain::save_settings()
 		return;
 	}
 
-	QSettings settings(GH_SETTINGS_INI, QSettings::IniFormat);
+	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
 	settings.setIniCodec("UTF-8");
 
 	settings.beginWriteArray("FILES");
-	int i = 0;
 
 	QTreeWidgetItemIterator it(ui.tree_files);
-	for (; *it; ++it, ++i)
+	for (int i = 0; *it; ++it, ++i)
 	{
 		if (!FileExistsW((*it)->text(2).toStdWString().c_str()))
 		{
@@ -1157,7 +1196,7 @@ void GuiMain::save_settings()
 
 void GuiMain::load_settings()
 {
-	QFile iniFile(GH_SETTINGS_INI);
+	QFile iniFile(GH_SETTINGS_INIA);
 	if (!iniFile.exists())
 	{
 		lastPathStr = QApplication::applicationDirPath();
@@ -1168,7 +1207,7 @@ void GuiMain::load_settings()
 		return;
 	}
 
-	QSettings settings(GH_SETTINGS_INI, QSettings::IniFormat);
+	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
 	settings.setIniCodec("UTF-8");
 
 	int fileSize = settings.beginReadArray("FILES");
@@ -1515,8 +1554,8 @@ void GuiMain::delay_inject()
 
 void GuiMain::inject_file()
 {
-	INJECTIONDATAW data;
-	memset(&data, 0, sizeof(INJECTIONDATAW));
+	INJECTIONDATAW inj_data;
+	memset(&inj_data, 0, sizeof(INJECTIONDATAW));
 
 	ARCH file_arch = ARCH::NONE;
 	ARCH proc_arch = ARCH::NONE;
@@ -1529,12 +1568,12 @@ void GuiMain::inject_file()
 
 		if (ps.PID && ps.Arch != ARCH::NONE)
 		{
-			data.ProcessID	= ps.PID;
-			proc_arch		= ps.Arch;
+			inj_data.ProcessID	= ps.PID;
+			proc_arch			= ps.Arch;
 		}
 		else
 		{
-			emit injec_status(false, "Invalid PID");
+			emit ShowStatusbox(false, "Invalid PID");
 
 			return;
 		}
@@ -1546,12 +1585,12 @@ void GuiMain::inject_file()
 
 		if (ps.PID && ps.Arch != ARCH::NONE)
 		{
-			data.ProcessID	= ps.PID;
-			proc_arch		= ps.Arch;
+			inj_data.ProcessID	= ps.PID;
+			proc_arch			= ps.Arch;
 		}
 		else
 		{
-			emit injec_status(false, "Invalid process name");
+			emit ShowStatusbox(false, "Invalid process name");
 
 			return;
 		}
@@ -1559,62 +1598,62 @@ void GuiMain::inject_file()
 
 	switch (ui.cmb_load->currentIndex())
 	{
-		case 1:  data.Mode = INJECTION_MODE::IM_LdrLoadDll;				break;
-		case 2:  data.Mode = INJECTION_MODE::IM_LdrpLoadDll;			break;
-		case 3:  data.Mode = INJECTION_MODE::IM_LdrpLoadDllInternal;	break;
-		case 4:  data.Mode = INJECTION_MODE::IM_ManualMap;				break;
-		default: data.Mode = INJECTION_MODE::IM_LoadLibraryExW;			break;
+		case 1:  inj_data.Mode = INJECTION_MODE::IM_LdrLoadDll;				break;
+		case 2:  inj_data.Mode = INJECTION_MODE::IM_LdrpLoadDll;			break;
+		case 3:  inj_data.Mode = INJECTION_MODE::IM_LdrpLoadDllInternal;	break;
+		case 4:  inj_data.Mode = INJECTION_MODE::IM_ManualMap;				break;
+		default: inj_data.Mode = INJECTION_MODE::IM_LoadLibraryExW;			break;
 	}
 
 	switch (ui.cmb_create->currentIndex())
 	{
-		case 1:  data.Method = LAUNCH_METHOD::LM_HijackThread;		break;
-		case 2:  data.Method = LAUNCH_METHOD::LM_SetWindowsHookEx;	break;
-		case 3:  data.Method = LAUNCH_METHOD::LM_QueueUserAPC;		break;
-		default: data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;	break;
+		case 1:  inj_data.Method = LAUNCH_METHOD::LM_HijackThread;		break;
+		case 2:  inj_data.Method = LAUNCH_METHOD::LM_SetWindowsHookEx;	break;
+		case 3:  inj_data.Method = LAUNCH_METHOD::LM_QueueUserAPC;		break;
+		default: inj_data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;	break;
 	}
 
-	if (ui.cmb_peh->currentIndex() == 1)	data.Flags |= INJ_ERASE_HEADER;
-	if (ui.cmb_peh->currentIndex() == 2)	data.Flags |= INJ_FAKE_HEADER;
-	if (ui.cb_unlink->isChecked())			data.Flags |= INJ_UNLINK_FROM_PEB;
-	if (ui.cb_clock->isChecked())			data.Flags |= INJ_THREAD_CREATE_CLOAKED;
-	if (ui.cb_random->isChecked())			data.Flags |= INJ_SCRAMBLE_DLL_NAME;
-	if (ui.cb_copy->isChecked())			data.Flags |= INJ_LOAD_DLL_COPY;
-	if (ui.cb_hijack->isChecked())			data.Flags |= INJ_HIJACK_HANDLE;
+	if (ui.cmb_peh->currentIndex() == 1)	inj_data.Flags |= INJ_ERASE_HEADER;
+	if (ui.cmb_peh->currentIndex() == 2)	inj_data.Flags |= INJ_FAKE_HEADER;
+	if (ui.cb_unlink->isChecked())			inj_data.Flags |= INJ_UNLINK_FROM_PEB;
+	if (ui.cb_clock->isChecked())			inj_data.Flags |= INJ_THREAD_CREATE_CLOAKED;
+	if (ui.cb_random->isChecked())			inj_data.Flags |= INJ_SCRAMBLE_DLL_NAME;
+	if (ui.cb_copy->isChecked())			inj_data.Flags |= INJ_LOAD_DLL_COPY;
+	if (ui.cb_hijack->isChecked())			inj_data.Flags |= INJ_HIJACK_HANDLE;
 
-	if (data.Mode == INJECTION_MODE::IM_ManualMap)
+	if (inj_data.Mode == INJECTION_MODE::IM_ManualMap)
 	{
-		if (ui.cb_clean->isChecked())		data.Flags |= INJ_MM_CLEAN_DATA_DIR;
-		if (ui.cb_cookie->isChecked())		data.Flags |= INJ_MM_INIT_SECURITY_COOKIE;
-		if (ui.cb_imports->isChecked())		data.Flags |= INJ_MM_RESOLVE_IMPORTS;
-		if (ui.cb_delay->isChecked())		data.Flags |= INJ_MM_RESOLVE_DELAY_IMPORTS;
-		if (ui.cb_tls->isChecked())			data.Flags |= INJ_MM_EXECUTE_TLS;
-		if (ui.cb_seh->isChecked())			data.Flags |= INJ_MM_ENABLE_EXCEPTIONS;
-		if (ui.cb_protection->isChecked())	data.Flags |= INJ_MM_SET_PAGE_PROTECTIONS;
-		if (ui.cb_main->isChecked())		data.Flags |= INJ_MM_RUN_DLL_MAIN;
+		if (ui.cb_clean->isChecked())		inj_data.Flags |= INJ_MM_CLEAN_DATA_DIR;
+		if (ui.cb_cookie->isChecked())		inj_data.Flags |= INJ_MM_INIT_SECURITY_COOKIE;
+		if (ui.cb_imports->isChecked())		inj_data.Flags |= INJ_MM_RESOLVE_IMPORTS;
+		if (ui.cb_delay->isChecked())		inj_data.Flags |= INJ_MM_RESOLVE_DELAY_IMPORTS;
+		if (ui.cb_tls->isChecked())			inj_data.Flags |= INJ_MM_EXECUTE_TLS;
+		if (ui.cb_seh->isChecked())			inj_data.Flags |= INJ_MM_ENABLE_EXCEPTIONS;
+		if (ui.cb_protection->isChecked())	inj_data.Flags |= INJ_MM_SET_PAGE_PROTECTIONS;
+		if (ui.cb_main->isChecked())		inj_data.Flags |= INJ_MM_RUN_DLL_MAIN;
 	}
 
-	data.GenerateErrorLog = ui.cb_error->isChecked();
+	inj_data.GenerateErrorLog = ui.cb_error->isChecked();
 
 	int Timeout = ui.sp_timeout->value();
 	if (Timeout > 0)
 	{
-		data.Timeout = Timeout;
+		inj_data.Timeout = Timeout;
 	}
 	else
 	{
-		data.Timeout = 2000;
+		inj_data.Timeout = 2000;
 	}
 
 	if (!InjLib.LoadingStatus())
 	{
-		emit injec_status(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
+		emit ShowStatusbox(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
 		return;
 	}
 
-	if (!InjLib.SymbolStatus())
+	if (!InjLib.GetSymbolState())
 	{
-		emit injec_status(false, "PDB download not finished.");
+		emit ShowStatusbox(false, "PDB download not finished.");
 		return;
 	}
 	
@@ -1651,21 +1690,71 @@ void GuiMain::inject_file()
 
 	if (items.empty())
 	{
-		emit injec_status(false, "No file(s) selected");
+		emit ShowStatusbox(false, "No file(s) selected");
 		return;
 	}
 
 	std::vector<std::string> results;
 	int inj_count = 1;
 
+	auto good_sleep = [](DWORD time)
+	{
+		if (time < 25)
+		{
+			Sleep(time);
+
+			return;
+		}
+
+		auto current = GetTickCount64();
+		auto t = current + time;
+	
+		while (current < t)
+		{
+			QCoreApplication::processEvents();
+
+			auto elapsed = current - GetTickCount64();
+			
+			if (elapsed < 10)
+			{
+				Sleep(10 - elapsed);
+			}
+			
+			current += 10;
+		}
+	};
+
 	for (const auto & i : items)
 	{
-		wcscpy_s(data.szDllPath, i.first.c_str());
+		wcscpy_s(inj_data.szDllPath, i.first.c_str());
 
 		auto dll_name_pos = i.first.find_last_of('\\') + 1;
 		auto dll_name = i.first.substr(dll_name_pos);
 
-		DWORD res = InjLib.InjectFuncW(&data);
+		DWORD res = 0;
+
+		g_print("Launching injection thread\n");
+
+		std::shared_future<DWORD> inj_result = std::async(std::launch::async, &InjectionLib::InjectW, &InjLib, &inj_data);
+
+		auto end_tick = GetTickCount64() + inj_data.Timeout;
+		while (inj_result.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready && end_tick > GetTickCount64())
+		{
+			good_sleep(50);
+		}
+
+		if (inj_result.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+		{
+			g_print("Injection thread timed out\n");
+
+			return;
+		}
+		else
+		{
+			g_print("Injection thread returned\n");
+
+			res = inj_result.get();
+		}
 
 		char buffer[MAX_PATH * 2]{ 0 };
 
@@ -1675,7 +1764,7 @@ void GuiMain::inject_file()
 		}
 		else
 		{
-			sprintf_s(buffer, "Injection (%d/%d) succeeded:\n  %ls = %p\n", inj_count, (int)items.size(), dll_name.c_str(), data.hDllOut);
+			sprintf_s(buffer, "Injection (%d/%d) succeeded:\n  %ls = %p\n", inj_count, (int)items.size(), dll_name.c_str(), inj_data.hDllOut);
 		}
 
 		results.push_back(std::string(buffer));
@@ -1692,50 +1781,9 @@ void GuiMain::inject_file()
 		qApp->exit(EXIT_CODE_CLOSE);
 	}
 
-	for (auto i : results)
+	for (const auto & i : results)
 	{
 		g_print_to_console_raw(i.c_str());
-	}
-}
-
-void GuiMain::injec_status(bool ok, const QString msg)
-{
-	if (drag_drop)
-	{
-		drag_drop->SetPosition(-1, -1, false, false);
-	}
-
-	FramelessWindow parent;
-	parent.setMinimizeButton(false);
-
-	QMessageBox * box = Q_NULLPTR;
-
-	if (ok)
-	{
-		parent.setWindowTitle("Success");
-		box = new QMessageBox(QMessageBox::Icon::Information, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
-	}
-	else
-	{
-		parent.setWindowTitle("Error");
-		box = new QMessageBox(QMessageBox::Icon::Critical, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
-	}
-
-	if (box == Q_NULLPTR)
-	{
-		return;
-	}
-
-	parent.setContent(box);
-	parent.show();
-	parent.setFixedWidth(box->width() + 40);
-	box->exec();
-
-	delete box;
-
-	if (drag_drop)
-	{
-		drag_drop->SetPosition(-1, -1, false, true);
 	}
 }
 
@@ -1828,7 +1876,7 @@ void GuiMain::tooltip_change()
 
 void GuiMain::open_help()
 {
-	QDesktopServices::openUrl(QUrl(GH_HELP_URL, QUrl::TolerantMode));
+	ShellExecuteW(0, 0, GH_HELP_URLW, 0, 0, SW_SHOW);
 }
 
 QPixmap GuiMain::GetIconFromFileW(const wchar_t * szPath, UINT size, int index)
@@ -1880,7 +1928,7 @@ void GuiMain::generate_shortcut()
 		}
 		else
 		{
-			emit injec_status(false, "Invalid PID");
+			emit ShowStatusbox(false, "Invalid PID");
 			return;
 		}
 	}
@@ -1893,7 +1941,7 @@ void GuiMain::generate_shortcut()
 
 		if (!ps_local.PID)
 		{
-			emit injec_status(false, "The specified process doesn't exist.");
+			emit ShowStatusbox(false, "The specified process doesn't exist.");
 			return;
 		}
 
@@ -1942,7 +1990,7 @@ void GuiMain::generate_shortcut()
 
 	if (!fileFound)
 	{
-		emit injec_status(false, "No valid file selected.");
+		emit ShowStatusbox(false, "No valid file selected.");
 
 		return;
 	}
@@ -2024,11 +2072,11 @@ void GuiMain::generate_shortcut()
 	{
 		QString msg = fileName + " \n" + QString::fromStdWString(shortCut);
 
-		injec_status(true, msg);
+		ShowStatusbox(true, msg);
 	}
 	else
 	{
-		emit injec_status(false, "Shortcut generation failed");
+		emit ShowStatusbox(false, "Shortcut generation failed");
 	}
 }
 
@@ -2056,9 +2104,9 @@ void GuiMain::open_console()
 
 void GuiMain::open_log()
 {
-	if (FileExistsW(GH_INJECTOR_LOGW))
+	if (FileExistsW(GH_INJ_LOGW))
 	{
-		ShellExecuteW(NULL, L"edit", GH_INJECTOR_LOGW, nullptr, nullptr, SW_SHOW);
+		ShellExecuteW(NULL, L"edit", GH_INJ_LOGW, nullptr, nullptr, SW_SHOW);
 	}
 }
 

@@ -245,7 +245,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -266,7 +266,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpegd.dll "$(OutDir)imageformats\"</Comm
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -292,9 +292,10 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpegd.dll "$(OutDir)imageformats\"</Comm
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level4</WarningLevel>
     </ClCompile>
     <PostBuildEvent />
     <PostBuildEvent>
@@ -314,7 +315,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -336,7 +337,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -349,7 +350,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalOptions>/Zm114 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -429,7 +430,6 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     <ClInclude Include="ShortCut.h" />
     <QtMoc Include="framelesswindow\windowdragger.h" />
     <QtMoc Include="framelesswindow\framelesswindow.h" />
-    <ClInclude Include="Globals.h" />
     <ClInclude Include="Injection.h" />
     <ClInclude Include="InjectionLib.h" />
     <ClInclude Include="Process.h" />

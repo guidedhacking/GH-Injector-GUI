@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pch.h"
+
 #include "framelesswindow.h"
 
 class DebugConsole : public QWidget
@@ -17,6 +19,7 @@ public:
 	void setSize(const QSize & s);
 	int print(const char * format, ...);
 	void print_raw(const char * szText);
+	void add_parent(QWidget * parent);
 
 private:
 	bool onDelete;
@@ -24,6 +27,10 @@ private:
 	FramelessWindow * m_FramelessParent;
 	QListWidget * m_Content;
 	QGridLayout * m_Layout;
+
+	QString m_OldSelection;
+
+	QWidget * m_parent;
 
 	static void ImTheTrashMan(const wchar_t * expression, const wchar_t * function, const wchar_t * file, unsigned int line, uintptr_t pReserved);
 

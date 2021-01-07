@@ -23,7 +23,7 @@ void ShowPDBDownload(InjectionLib * InjLib)
 	auto worker = std::thread(&pdb_download_update_thread, ProgressWindow, InjLib);
 	if (ProgressWindow->exec() == -1)
 	{
-		//injec_status(false, "Download interrupted. The PDB files are necessary\nfor the injector to work.\nMake sure your PC is connected to the internet.");
+		ShowStatusbox(false, "Download interrupted. The PDB files are necessary\nfor the injector to work.\nMake sure your PC is connected to the internet.");
 	}
 
 	worker.join();
@@ -39,13 +39,13 @@ void pdb_download_update_thread(DownloadProgressWindow * ProgressWindow, Injecti
 {
 	bool connected = false;
 
-	while (!InjLib->SymbolStatus())
+	while (!InjLib->GetSymbolState())
 	{
-		float progress_0 = InjLib->DownloadProgress(false);
+		float progress_0 = InjLib->GetDownloadProgress(false);
 		ProgressWindow->SetProgress(0, progress_0);
 
 #ifdef _WIN64
-		float progress_1 = InjLib->DownloadProgress(true);
+		float progress_1 = InjLib->GetDownloadProgress(true);
 		ProgressWindow->SetProgress(1, progress_1);
 #endif
 

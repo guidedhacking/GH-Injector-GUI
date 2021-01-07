@@ -13,32 +13,105 @@
 
 #pragma once
 
-#define GH_INJ_VERSIONW L"4.2"
-#define GH_INJ_VERSIONA "4.2"
+#include "pch.h"
 
-#define GH_INJ_MOD_NAME64W L"GH Injector - x64.dll"
-#define GH_INJ_MOD_NAME86W L"GH Injector - x86.dll"
+constexpr auto GH_INJ_GUI_VERSIONA = "4.3";
+constexpr auto GH_INJ_GUI_VERSIONW = L"4.3";
 
-#define GH_INJ_MOD_NAME64A "GH Injector - x64.dll"
-#define GH_INJ_MOD_NAME86A "GH Injector - x86.dll"
+constexpr auto GH_INJ_EXE_NAME64A = "GH Injector - x64.exe";
+constexpr auto GH_INJ_EXE_NAME64W = L"GH Injector - x64.exe";
+
+constexpr auto GH_INJ_EXE_NAME86A = "GH Injector - x86.exe";
+constexpr auto GH_INJ_EXE_NAME86W = L"GH Injector - x86.exe";
+
+constexpr auto GH_INJ_MOD_NAME64A = "GH Injector - x64.dll";
+constexpr auto GH_INJ_MOD_NAME86W = L"GH Injector - x86.dll";
+
+constexpr auto GH_INJ_MOD_NAME86A = "GH Injector - x86.dll";
+constexpr auto GH_INJ_MOD_NAME64W = L"GH Injector - x64.dll";
+
+constexpr auto GH_INJ_SM_NAME64A = "GH Injector SM - x64.exe";
+constexpr auto GH_INJ_SM_NAME64W = L"GH Injector SM - x64.exe";
+
+constexpr auto GH_INJ_SM_NAME86A = "GH Injector SM - x86.exe";
+constexpr auto GH_INJ_SM_NAME86W = L"GH Injector SM - x86.exe";
+
+constexpr auto GH_INJ_ZIPA = "GH Injector.zip";
+constexpr auto GH_INJ_ZIPW = L"GH Injector.zip";
+
+constexpr auto GH_INJ_LOGA = "GH_Inj_Log.txt";
+constexpr auto GH_INJ_LOGW = L"GH_Inj_Log.txt";
+
+constexpr auto GH_HELP_URLA = "https://guidedhacking.com/threads/guidedhacking-dll-injector.8417/";
+constexpr auto GH_HELP_URLW = L"https://guidedhacking.com/threads/guidedhacking-dll-injector.8417/";
+
+constexpr auto GH_DOWNLOAD_PREFIXA = "https://guidedhacking.com/gh/inj/V";
+constexpr auto GH_DOWNLOAD_PREFIXW = L"https://guidedhacking.com/gh/inj/V";
+
+constexpr auto GH_DOWNLOAD_SUFFIXA = "/GH Injector.zip";
+constexpr auto GH_DOWNLOAD_SUFFIXW = L"/GH Injector.zip";
+
+constexpr auto GH_VERSION_URLA = "https://guidedhacking.com/gh/inj/";
+constexpr auto GH_VERSION_URLW = L"https://guidedhacking.com/gh/inj/";
+
+constexpr auto GH_SETTINGS_INIA = "Settings.ini";
+constexpr auto GH_SETTINGS_INIW = L"Settings.ini";
 
 #ifdef _WIN64
-#define GH_INJ_MOD_NAMEW GH_INJ_MOD_NAME64W
-#define GH_INJ_MOD_NAMEA GH_INJ_MOD_NAME64A
+constexpr auto GH_INJ_MOD_NAMEA = GH_INJ_MOD_NAME64A;
+constexpr auto GH_INJ_MOD_NAMEW = GH_INJ_MOD_NAME64W;
+constexpr auto GH_INJ_EXE_NAMEA = GH_INJ_EXE_NAME64A;
+constexpr auto GH_INJ_EXE_NAMEW = GH_INJ_EXE_NAME64W;
+constexpr auto GH_INJ_SM_NAMEA = GH_INJ_MOD_NAME64A;
+constexpr auto GH_INJ_SM_NAMEW = GH_INJ_MOD_NAME64W;
 #else
-#define GH_INJ_MOD_NAMEW GH_INJ_MOD_NAME86W
-#define GH_INJ_MOD_NAMEA GH_INJ_MOD_NAME86A
+constexpr auto GH_INJ_MOD_NAMEA = GH_INJ_MOD_NAME86A;
+constexpr auto GH_INJ_MOD_NAMEW = GH_INJ_MOD_NAME86W;
+constexpr auto GH_INJ_EXE_NAMEA = GH_INJ_EXE_NAME86A;
+constexpr auto GH_INJ_EXE_NAMEW = GH_INJ_EXE_NAME86W;
+constexpr auto GH_INJ_SM_NAMEA = GH_INJ_MOD_NAME86A;
+constexpr auto GH_INJ_SM_NAMEW = GH_INJ_MOD_NAME86W;
 #endif
 
 #ifdef UNICODE
-#define GH_INJ_MOD_NAME GH_INJ_MOD_NAMEW
-#define GH_INJ_VERSION GH_INJ_VERSIONW
-#else
-#define GH_INJ_MOD_NAME GH_INJ_MOD_NAMEA
-#define GH_INJ_VERSION GH_INJ_VERSIONA
-#endif
+constexpr auto GH_INJ_GUI_VERSION	= GH_INJ_GUI_VERSIONW;
+constexpr auto GH_INJ_MOD_NAME		= GH_INJ_MOD_NAMEW;
+constexpr auto GH_INJ_EXE_NAME		= GH_INJ_EXE_NAMEW;
+constexpr auto GH_INJ_SM_NAME		= GH_INJ_SM_NAMEW;
+constexpr auto GH_INJ_ZIP			= GH_INJ_ZIPW;
+constexpr auto GH_INJ_LOG			= GH_INJ_LOGW;
+constexpr auto GH_HELP_URL			= GH_HELP_URLW;
+constexpr auto GH_DOWNLOAD_PREFIX	= GH_DOWNLOAD_PREFIXW;
+constexpr auto GH_DOWNLOAD_SUFFIX	= GH_DOWNLOAD_SUFFIXW;
+constexpr auto GH_VERSION_URL		= GH_VERSION_URLW;
+constexpr auto GH_SETTINGS_INI		= GH_SETTINGS_INIW;
 
-#include <Windows.h>
+constexpr auto GH_INJ_MOD_NAME64	= GH_INJ_MOD_NAME64W;
+constexpr auto GH_INJ_MOD_NAME86	= GH_INJ_MOD_NAME86W;
+constexpr auto GH_INJ_EXE_NAME64	= GH_INJ_EXE_NAME64W;
+constexpr auto GH_INJ_EXE_NAME86	= GH_INJ_EXE_NAME86W;
+constexpr auto GH_INJ_SM_NAME64		= GH_INJ_SM_NAME64W;
+constexpr auto GH_INJ_SM_NAME86		= GH_INJ_SM_NAME86W;
+#else
+constexpr auto GH_INJ_GUI_VERSION	= GH_INJ_GUI_VERSIONA:
+constexpr auto GH_INJ_MOD_NAME		= GH_INJ_MOD_NAMEA:
+constexpr auto GH_INJ_EXE_NAME		= GH_INJ_EXE_NAMEA:
+constexpr auto GH_INJ_SM_NAME		= GH_INJ_SM_NAMEA:
+constexpr auto GH_INJ_ZIP			= GH_INJ_ZIPA:
+constexpr auto GH_INJ_LOG			= GH_INJ_LOGA:
+constexpr auto GH_HELP_URL			= GH_HELP_URLA:
+constexpr auto GH_DOWNLOAD_PREFIX	= GH_DOWNLOAD_PREFIXA:
+constexpr auto GH_DOWNLOAD_SUFFIX	= GH_DOWNLOAD_SUFFIXA:
+constexpr auto GH_VERSION_URL		= GH_VERSION_URLA:
+constexpr auto GH_SETTINGS_INI		= GH_SETTINGS_INIA:
+
+constexpr auto GH_INJ_MOD_NAME64	= GH_INJ_MOD_NAME64A;
+constexpr auto GH_INJ_MOD_NAME86	= GH_INJ_MOD_NAME86A;
+constexpr auto GH_INJ_EXE_NAME64	= GH_INJ_EXE_NAME64A;
+constexpr auto GH_INJ_EXE_NAME86	= GH_INJ_EXE_NAME86A;
+constexpr auto GH_INJ_SM_NAME64		= GH_INJ_SM_NAME64A;
+constexpr auto GH_INJ_SM_NAME86		= GH_INJ_SM_NAME86A;
+#endif
 
 enum class INJECTION_MODE
 {

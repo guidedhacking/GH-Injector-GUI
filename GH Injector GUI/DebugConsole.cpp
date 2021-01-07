@@ -5,6 +5,9 @@
 DebugConsole::DebugConsole(QWidget * parent)
 	: QWidget(parent)
 {
+	m_OldSelection = "";
+	m_parent = Q_NULLPTR;
+
 	QSizePolicy policy;
 	policy.setHorizontalPolicy(QSizePolicy::Policy::MinimumExpanding);
 	policy.setVerticalPolicy(QSizePolicy::Policy::MinimumExpanding);
@@ -23,6 +26,7 @@ DebugConsole::DebugConsole(QWidget * parent)
 	this->setContentsMargins(m);
 	this->setLayout(m_Layout);
 	this->layout()->addWidget(m_Content);
+	this->installEventFilter(this);
 
 	m_FramelessParent = new FramelessWindow();
 	m_FramelessParent->setMinimizeButton(false);
@@ -30,6 +34,7 @@ DebugConsole::DebugConsole(QWidget * parent)
 	m_FramelessParent->setResizeBottom(true);
 	m_FramelessParent->setWindowTitle("Debug data");
 	m_FramelessParent->setContent(this);
+	m_FramelessParent->installEventFilter(this);
 
 	onDelete = false;
 }
@@ -44,6 +49,11 @@ void DebugConsole::open()
 {
 	m_FramelessParent->show();
 	show();
+
+	if (m_parent)
+	{
+		m_parent->show();
+	}
 }
 
 void DebugConsole::close()
@@ -109,14 +119,8 @@ int DebugConsole::print(const char * format, ...)
 	if (result > 0)
 	{
 		print_raw(buffer);
-
-		while (m_Content->count() > 50)
-		{
-			delete m_Content->item(0);
-		}
+		m_Content->scrollToBottom();
 	}
-
-	m_Content->scrollToBottom();
 
 	if (buffer)
 	{
@@ -135,7 +139,7 @@ void DebugConsole::print_raw(const char * szText)
 	
 	auto len = lstrlenA(szText);
 	
-	if (len > 1)
+	if (len > 0)
 	{
 		if (szText[len - 1] == '\n')
 		{
@@ -143,17 +147,28 @@ void DebugConsole::print_raw(const char * szText)
 			const_cast<char *>(szText)[len - 1] = '\0';
 		}
 	}
+	else
+	{
+		return;
+	}
+
+	printf("CONSOLE: %s\n", szText);
 
 	QListWidgetItem * new_item = new QListWidgetItem();
 	new_item->setText(szText);
 	m_Content->addItem(new_item);
 
-	while (m_Content->count() > 50)
+	while (m_Content->count() > 200)
 	{
 		delete m_Content->item(0);
 	}
 
 	m_Content->scrollToBottom();
+}
+
+void DebugConsole::add_parent(QWidget * parent)
+{
+	m_parent = parent;
 }
 
 void DebugConsole::ImTheTrashMan(const wchar_t * expression, const wchar_t * function, const wchar_t * file, unsigned int line, uintptr_t pReserved)
@@ -177,8 +192,40 @@ bool DebugConsole::eventFilter(QObject * obj, QEvent * event)
 		auto * keyEvent = static_cast<QKeyEvent *>(event);
 		if (keyEvent->matches(QKeySequence::Copy) || keyEvent->matches(QKeySequence::Cut))
 		{
-			printf("copy xd");
+			auto selected = m_Content->selectedItems();
+
+			if (!selected.isEmpty())
+			{
+				QString data;
+				for (const auto & i : selected)
+				{
+					data += i->text();
+					data += "\n";
+				}
+
+				if (data != m_OldSelection)
+				{
+					qApp->clipboard()->setText(data);
+
+					print("Copied to clipboard\n");
+
+					m_OldSelection = data;
+				}
+			}
 		}
+	}
+	if (event->type() == QEvent::Close)
+	{
+		if (m_parent)
+		{
+			m_parent->setWindowState(m_parent->windowState() & ~Qt::WindowMinimized | Qt::WindowActive);
+			m_parent->setFocus();
+			m_parent->show();
+		}
+	}
+	if (event->type() == QEvent::FocusOut)
+	{
+		m_OldSelection = "";
 	}
 
 	return QObject::eventFilter(obj, event);

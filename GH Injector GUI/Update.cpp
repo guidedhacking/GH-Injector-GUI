@@ -1,17 +1,16 @@
 #include "pch.h"
 
 #include "Update.h"
-#include "Zip.h"
 
 void update_download_progress(DownloadProgressWindow * UpdateWnd, DownloadProgress * progress, HANDLE hInterrupt);
 void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring version);
 
 std::wstring get_newest_version()
 {
-	DownloadProgress progress(GH_VERSION_URL, true);
+	DownloadProgress progress(GH_VERSION_URLW, true);
 
 	wchar_t cacheFile[MAX_PATH]{ 0 };
-	HRESULT hRes = URLDownloadToCacheFileW(nullptr, GH_VERSION_URL, cacheFile, sizeof(cacheFile) / sizeof(wchar_t), 0, &progress);
+	HRESULT hRes = URLDownloadToCacheFileW(nullptr, GH_VERSION_URLW, cacheFile, sizeof(cacheFile) / sizeof(wchar_t), 0, &progress);
 
 	if (hRes != S_OK)
 	{
@@ -43,7 +42,7 @@ bool update_injector(std::wstring newest_version, bool & ignore)
 	QMessageBox box;
 	box.setWindowFlags(Qt::WindowType::FramelessWindowHint);
 
-	int cmp = newest_version.compare(GH_INJ_VERSIONW);
+	int cmp = newest_version.compare(GH_INJ_GUI_VERSIONW);
 	if (cmp > 0)
 	{
 		update_msg = L"This version of the GH Injector is outdated.\nThe newest version is V";
@@ -57,7 +56,7 @@ bool update_injector(std::wstring newest_version, bool & ignore)
 	else if (cmp == 0)
 	{
 		update_msg = L"You are already using the newest version of the GH Injector.\nDo you want to redownload V";
-		update_msg += GH_INJ_VERSIONW;
+		update_msg += GH_INJ_GUI_VERSIONW;
 		update_msg += L"?";
 
 		parent.setWindowTitle("Redownload");
@@ -108,7 +107,7 @@ bool update_injector(std::wstring newest_version, bool & ignore)
 	auto ret = UpdateWnd->exec();
 	if (ret == -1)
 	{
-		//injec_status(false, wnd->GetStatus());
+		ShowStatusbox(false, UpdateWnd->GetStatus());
 	}
 
 	worker.join();
@@ -145,12 +144,14 @@ void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring versi
 	auto path = QCoreApplication::applicationDirPath().toStdWString();
 	path += L"/";
 
-	auto zip_path = path + GH_INJECTOR_ZIP;
+	auto zip_path = path;
+	zip_path += GH_INJ_ZIPW;
 
 	DeleteFileW(zip_path.c_str());
-	std::wstring download_url = GH_DOWNLOAD_PREFIX;
+
+	std::wstring download_url = GH_DOWNLOAD_PREFIXW;
 	download_url += version;
-	download_url += GH_DOWNLOAD_SUFFIX;
+	download_url += GH_DOWNLOAD_SUFFIXW;
 
 	HANDLE hInterrupt = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 
@@ -183,6 +184,7 @@ void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring versi
 	while (hMod)
 	{
 		FreeLibrary(hMod);
+
 		hMod = GetModuleHandle(GH_INJ_MOD_NAME);
 	}
 
@@ -205,15 +207,15 @@ void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring versi
 
 	UpdateWnd->SetStatus("Removing old files...");
 
-	DeleteFileW(GH_INJ_MOD_NAME86W);
-	DeleteFileW(GH_INJ_MOD_NAME64W);
-	DeleteFileA(GH_INJECTOR_SM_X86);
-	DeleteFileA(GH_INJECTOR_SM_X64);
+	DeleteFile(GH_INJ_MOD_NAME86);
+	DeleteFile(GH_INJ_MOD_NAME64);
+	DeleteFile(GH_INJ_SM_NAME86);
+	DeleteFile(GH_INJ_SM_NAME64);
 
 #ifdef _WIN64
-	DeleteFileA(GH_INJECTOR_EXE_X86);
+	DeleteFile(GH_INJ_EXE_NAME86);
 #else
-	DeleteFileA(GH_INJECTOR_EXE_X64);
+	DeleteFileA(GH_INJ_EXE_NAME64);
 #endif
 
 	UpdateWnd->SetStatus("Unzip new files...");

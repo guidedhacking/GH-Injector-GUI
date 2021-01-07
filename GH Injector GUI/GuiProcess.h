@@ -1,9 +1,15 @@
 #pragma once
 
-#include "ui_GuiProcess.h"
-#include "Process.h"
-#include "framelesswindow.h"
+#include "pch.h"
 
+#include "ui_GuiProcess.h"
+
+#include "DebugConsole.h"
+#include "framelesswindow.h"
+#include "Process.h"
+
+//don't want to include QWinExtras because of static build
+//but there's a problem with icon extraction returning invlid sizes so here we are
 Q_GUI_EXPORT QPixmap qt_pixmapFromWinHICON(HICON icon);
 
 struct Process_State_Struct

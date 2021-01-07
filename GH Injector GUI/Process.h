@@ -6,8 +6,6 @@
 
 #include "pch.h"
 
-#include <Windows.h>
-
 enum class ARCH : int
 {
 	NONE,
@@ -17,7 +15,7 @@ enum class ARCH : int
 
 struct Process_Struct
 {
-	int		PID;
+	DWORD	PID;
 	wchar_t	szName[100];
 	wchar_t szPath[MAX_PATH];
 	ARCH	Arch;

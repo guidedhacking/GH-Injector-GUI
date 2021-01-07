@@ -1,11 +1,6 @@
 ﻿#include "pch.h"
 
 #include "CmdArg.h"
-#include "Injection.h"
-#include "Process.h"
-#include "InjectionLib.h"
-
-#define INJ_KEEP_HEADER 0x0000
 
 int FindArg(int argc, const wchar_t * arg, wchar_t * argv[], bool Parameter = false);
 void help();
@@ -52,8 +47,8 @@ int CmdArg(int argc, wchar_t * argv[])
 
 	if (FindArg(argc, L"-version", argv))
 	{
-		printf("GH Injector Version = V%s\n", lib.VersionA().c_str());
-		printf("GH Injector GUI Version = V%s\n", GH_INJ_VERSIONA);
+		printf("GH Injector library Version = V%s\n", lib.GetVersionA().c_str());
+		printf("GH Injector GUI Version = V%s\n", GH_INJ_GUI_VERSIONA);
 
 		return -1;
 	}
@@ -196,7 +191,6 @@ int CmdArg(int argc, wchar_t * argv[])
 		if (mmflags_index)
 		{
 			wchar_t * szMMflags = argv[mmflags_index + 1];
-			wchar_t * pEnd = nullptr;
 			mmflags = std::stol(szMMflags, nullptr, 0x10);
 
 			DWORD mmflags_mask = MM_DEFAULT | INJ_MM_CLEAN_DATA_DIR;
@@ -227,7 +221,7 @@ int CmdArg(int argc, wchar_t * argv[])
 
 	printf("Timeout = %d\n", data.Timeout);
 
-	while (!lib.SymbolStatus())
+	while (!lib.GetSymbolState())
 	{
 		Sleep(10);
 	}
@@ -250,7 +244,7 @@ int CmdArg(int argc, wchar_t * argv[])
 
 	printf("Injecting\n");
 
-	DWORD inj_status = lib.InjectFuncW(&data);
+	DWORD inj_status = lib.InjectW(&data);
 	
 	if (inj_status != ERROR_SUCCESS)
 	{

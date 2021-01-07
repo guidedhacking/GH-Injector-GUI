@@ -363,7 +363,9 @@ Process_Struct getProcessByPID(const int PID)
 
 bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 {
+#ifndef _WIN64
 	bool native = IsNativeProcess(GetCurrentProcessId());
+#endif
 
 	static auto sort_entries = [](const PROCESSENTRY32W & lhs, const PROCESSENTRY32W & rhs)
 	{
@@ -644,8 +646,6 @@ int strcicmpA(const char * a, const char * b)
 			return c;
 		}
 	}
-
-	return 0;
 }
 
 int strcicmpW(const wchar_t * a, const wchar_t * b)
@@ -658,6 +658,4 @@ int strcicmpW(const wchar_t * a, const wchar_t * b)
 			return c;
 		}
 	}
-
-	return 0;
 }

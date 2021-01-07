@@ -9,8 +9,7 @@ GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, In
 
 	InjLib = lib;
 
-	m_pid = 0;
-	m_err = 0;
+	m_PID = 0;
 
 	frameless_parent = FramelessParent;
 
@@ -28,7 +27,7 @@ GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, In
 
 	if (!InjLib->LoadingStatus())
 	{
-		emit injec_status(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
+		emit ShowStatusbox(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
 	}
 }
 
@@ -61,12 +60,11 @@ std::vector<int> GuiScanHook::get_selected_indices()
 	return res;
 }
 
-void GuiScanHook::get_from_inj_to_sh(int pid, int error)
+void GuiScanHook::get_from_inj_to_sh(int PID)
 {
-	m_pid = pid;
-	m_err = 0;
+	m_PID = PID;
 
-	ui.btn_scan->setText("Scan PID " + QString::number(pid));
+	ui.btn_scan->setText("Scan PID " + QString::number(PID));
 
 	emit scan_clicked();
 }
@@ -82,14 +80,14 @@ void GuiScanHook::scan_clicked()
 		return;
 	}
 
-	if (m_pid == 0)
+	if (m_PID == 0)
 	{
 		setItem({ "Please select a process" });
 
 		return;
 	}
 
-	HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, m_pid);
+	HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, m_PID);
 	if (!hProc)
 	{
 		setItem({ "Please select a process" });
@@ -116,8 +114,8 @@ void GuiScanHook::scan_clicked()
 
 	std::vector<std::string> tempHookList;
 
-	int fail = InjLib->ScanHook(m_pid, tempHookList);
-	if (fail)
+	bool val_ret = InjLib->ValidateInjectionFunctions(m_PID, tempHookList);
+	if (!val_ret)
 	{
 		ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
 		setItem({ "Failed to scan for hooks" });
@@ -152,7 +150,7 @@ void GuiScanHook::unhook_clicked()
 		return;
 	}
 
-	if (m_pid == 0)
+	if (m_PID == 0)
 	{
 		return;
 	}
@@ -163,46 +161,15 @@ void GuiScanHook::unhook_clicked()
 		return;
 	}
 
-	int fail = InjLib->RestoreHook(selected);
-	if (fail)
+	bool res_ret = InjLib->RestoreInjectionFunctions(selected);
+	if (!res_ret)
 	{
-		injec_status(false, "Failed to restore hook(s)");
+		ShowStatusbox(false, "Failed to restore hook(s)");
 	}
 
 	List.clear();
 	model->setStringList(List);
 	scan_clicked();
-}
-
-void GuiScanHook::injec_status(bool ok, const QString msg)
-{
-	FramelessWindow parent;
-	parent.setMinimizeButton(false);
-
-	QMessageBox * box = Q_NULLPTR;
-
-	if (ok)
-	{
-		parent.setWindowTitle("Success");
-		box = new QMessageBox(QMessageBox::Icon::Information, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
-	}
-	else
-	{
-		parent.setWindowTitle("Error");
-		box = new QMessageBox(QMessageBox::Icon::Critical, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
-	}
-
-	if (box == Q_NULLPTR)
-	{
-		return;
-	}
-
-	parent.setContent(box);
-	parent.show();
-	parent.setFixedWidth(box->width() + 40);
-	box->exec();
-
-	delete box;
 }
 
 void GuiScanHook::update_title(const QString title)

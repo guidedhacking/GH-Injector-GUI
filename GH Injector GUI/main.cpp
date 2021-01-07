@@ -1,21 +1,22 @@
 #include "pch.h"
 
-#include "DarkStyle.h"
-#include "framelesswindow/framelesswindow.h"
-#include "GuiMain.h"
 #include "CmdArg.h"
-#include "InjectionLib.h"
-#include "DragDropWindow.h"
-#include "resource.h"
+#include "DarkStyle.h"
 #include "DebugConsole.h"
+#include "framelesswindow.h"
+#include "GuiMain.h"
 
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup")
 
+#define DEBUG_CONSOLE
+
 int wmain(int argc, wchar_t * argv[])
 {
+#ifdef DEBUG_CONSOLE
 	AllocConsole();
 	FILE * pFile = nullptr;
 	freopen_s(&pFile, "CONOUT$", "w", stdout);
+#endif
 
 	if (argc > 1)
 	{
@@ -23,7 +24,7 @@ int wmain(int argc, wchar_t * argv[])
 
 		if (ret != 0)
 		{
-			Sleep(-1);
+			Sleep((DWORD)-1);
 		}
 
 		Sleep(1500);
@@ -35,11 +36,12 @@ int wmain(int argc, wchar_t * argv[])
 	std::string s_argv = converter.to_bytes(argv[0]);
 	char * sz_argv = const_cast<char*>(s_argv.c_str());
 
+	QApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
+
 	// Restart Application loop
 	int currentExitCode = 0;
 	do
 	{
-		QApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
 		QApplication a(argc, &sz_argv);
 
 		QApplication::setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
@@ -49,11 +51,16 @@ int wmain(int argc, wchar_t * argv[])
 		QApplication::setPalette(QApplication::style()->standardPalette());
 
 		g_Console = new DebugConsole();
+
+		g_print("GH Injector V%ls\n", GH_INJ_GUI_VERSIONW);
+		g_print("Initializing GUI\n");
 		
 		GuiMain * MainWindow = new GuiMain();
 		MainWindow->statusBar()->setSizeGripEnabled(false);
 		MainWindow->show();
 		MainWindow->open_console_if();
+
+		g_print("GUI initialized\n");
 
 		currentExitCode = a.exec();
 
@@ -61,8 +68,6 @@ int wmain(int argc, wchar_t * argv[])
 		delete g_Console;
 	} 
 	while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
-
-	Sleep(5000);
 
 	return currentExitCode;
 }

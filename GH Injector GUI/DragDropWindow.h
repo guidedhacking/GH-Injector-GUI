@@ -1,9 +1,8 @@
 #pragma once
 
-//forward declaration because project structure is just fucked lmao
-class DragDropWindow;
+#include "pch.h"
 
-#include "GuiMain.h"
+#include "DebugConsole.h"
 
 class DragDropWindow
 {
@@ -24,6 +23,7 @@ class DragDropWindow
 	void DrawIcon();
 
 public:
+	DragDropWindow();
 	~DragDropWindow();
 
 	HWND CreateDragDropWindow(HWND hParent, int Size = 30);

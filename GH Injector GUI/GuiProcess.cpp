@@ -150,7 +150,7 @@ void GuiProcess::refresh_process()
 
 	for (int i = 0; i < ui.tree_process->topLevelItemCount(); )
 	{
-		int pid = ui.tree_process->topLevelItem(i)->text(1).toInt();
+		DWORD pid = ui.tree_process->topLevelItem(i)->text(1).toULong();
 
 		auto search_list = [pid](const Process_Struct * entry) -> bool
 		{
@@ -172,7 +172,7 @@ void GuiProcess::refresh_process()
 
 	for (int i = 0; i < m_ProcList.size(); ++i)
 	{
-		int pid = -1;
+		DWORD pid = 0;
 		auto * current_item = ui.tree_process->topLevelItem(i);
 
 		if (current_item)
@@ -223,6 +223,8 @@ void GuiProcess::refresh_process()
 
 void GuiProcess::filter_change(int i)
 {
+	UNREFERENCED_PARAMETER(i);
+
 	emit refresh_gui();
 }
 
@@ -233,6 +235,8 @@ void GuiProcess::session_change()
 
 void GuiProcess::name_change(const QString & str)
 {
+	UNREFERENCED_PARAMETER(str);
+
 	emit refresh_gui();
 }
 
@@ -302,6 +306,8 @@ void GuiProcess::custom_sort(int column)
 
 void GuiProcess::double_click_process(const QModelIndex & index)
 {
+	UNREFERENCED_PARAMETER(index);
+
 	proc_select();
 }
 

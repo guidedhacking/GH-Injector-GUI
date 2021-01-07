@@ -1,13 +1,12 @@
 # Qt GH DLL Injector
 - Rebuild Guided Hacking DLL Injector
 - This Version works with MSVC2019 and QT 5.15.0
-- Static build tested only with x64 version
 
 # Modified version of this repo by multikill
 https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
 
 ## Picture
-![alt_text](https://i.gyazo.com/c51f23d282055f70b4e063d8981c66e9.png)
+![alt_text](https://i.gyazo.com/255233fcc5fa2cb3e9f5e41c94078845.png)
 
 ## How to build
 1. Visual Studio 2019
@@ -37,24 +36,15 @@ https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
 	2. Change C++ Language to std:c++17
 	3. Build and Copy to Project Folder
 
-## Feature:
+## Features:
 - Intelligent drag and drop that bypasses UIPI
 - Commandline interface
-- Hotkeys
-- Shortcute generater
-
-## ToDo:
-- shortcut generator
-- x86 static build
-- cleaning up this mess of a project
-
-## Bugs:
-- command output does not show (only debug)
+- Shortcut generater
+- Auto injection
 
 ## Credits:
 - https://guidedhacking.com/resources/guided-hacking-dll-injector.4/
 - https://github.com/Jorgen-VikingGod/Qt-Frameless-Window-DarkStyle
-- https://github.com/jarro2783/cxxopts
 - https://github.com/fpoussin/Qt5-MSVC-Static
 
 ## License

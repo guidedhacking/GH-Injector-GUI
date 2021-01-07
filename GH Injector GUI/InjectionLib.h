@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Injection.h"
+#include "DebugConsole.h"
+
+#define DECLARE_INJECTION_FUNCTION(name) f_##name m_##name
 
 class InjectionLib
 {
@@ -13,38 +16,37 @@ public:
 
 	void Unload();
 
-	DWORD InjectFuncA(INJECTIONDATAA * pData);
-	DWORD InjectFuncW(INJECTIONDATAW * pData);
-	int ScanHook(int pid, std::vector<std::string> & hList);
-	int RestoreHook(std::vector<int> & hList);
-	bool SymbolStatus();
-	float DownloadProgress(bool bWow64);
-	std::string VersionA();
-	std::wstring VersionW();
-	DWORD SetPrintCallback(f_raw_print_callback callback);
+	DWORD InjectA(INJECTIONDATAA * pData);
+	DWORD InjectW(INJECTIONDATAW * pData);
+	bool ValidateInjectionFunctions(int PID, std::vector<std::string> & hList);
+	bool RestoreInjectionFunctions(std::vector<int> & hList);
+	std::string GetVersionA();
+	std::wstring GetVersionW();
+	bool GetSymbolState();
+	float GetDownloadProgress(bool bWow64);
+	DWORD SetRawPrintCallback(f_raw_print_callback callback);
 
 private:
-	HookInfo info[30];
-	DWORD err1, err2;
 
-	UINT CountOut = 0;
-	UINT Changed = 0;
-	DWORD targetPid = 0;
+	static const UINT m_HookCount = 30;
 
-	HINSTANCE hInjectionMod;
+	HookInfo m_HookInfo[m_HookCount];
+	DWORD m_Err;
+	DWORD m_Win32Err;
 
-	f_InjectA InjectA;
-	f_InjectW InjectW;
+	UINT	m_CountOut;
+	UINT	m_Changed;
+	DWORD	m_TargetPID;
 
-	f_ValidateInjectionFunctions ValidateFunc;
-	f_RestoreInjectionFunctions RestoreFunc;
+	HINSTANCE m_hInjectionMod;
 
-	f_GetVersionA GetVersionA;
-	f_GetVersionW GetVersionW;
-
-	f_GetSymbolState GetSymbolState;
-
-	f_GetDownloadProgress GetDownloadProgress;
-
-	f_SetRawPrintCallback SetRawPrintCallback;
+	DECLARE_INJECTION_FUNCTION(InjectA);
+	DECLARE_INJECTION_FUNCTION(InjectW);
+	DECLARE_INJECTION_FUNCTION(ValidateInjectionFunctions);
+	DECLARE_INJECTION_FUNCTION(RestoreInjectionFunctions);
+	DECLARE_INJECTION_FUNCTION(GetVersionA);
+	DECLARE_INJECTION_FUNCTION(GetVersionW);
+	DECLARE_INJECTION_FUNCTION(GetSymbolState);
+	DECLARE_INJECTION_FUNCTION(GetDownloadProgress);
+	DECLARE_INJECTION_FUNCTION(SetRawPrintCallback);
 };

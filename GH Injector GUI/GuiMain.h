@@ -1,15 +1,22 @@
 #pragma once
 
-#include "framelesswindow/framelesswindow.h"
+#include "pch.h"
+
 #include "ui_GuiMain.h"
+
+#include "CmdArg.h"
+#include "DebugConsole.h"
+#include "DragDropWindow.h"
+#include "framelesswindow/framelesswindow.h"
 #include "GuiProcess.h"
 #include "GuiScanHook.h"
-#include "Process.h"
+#include "Injection.h"
 #include "InjectionLib.h"
-#include "Globals.h"
-#include "DownloadProgress.h"
-#include "DownloadProgressWindow.h"
-#include "DragDropWindow.h"
+#include "PDB Download.h"
+#include "Process.h"
+#include "ShortCut.h"
+#include "StatusBox.h"
+#include "Update.h"
 
 class GuiMain : public QMainWindow
 {
@@ -24,6 +31,7 @@ public:
 	static int const EXIT_CODE_CLOSE;
 	static int const EXIT_CODE_REBOOT;
 	static int const EXIT_CODE_UPDATE;
+	static int const EXIT_CODE_START_NATIVE;
 
 	static QPixmap GetIconFromFileW(const wchar_t * szPath, UINT size, int index = 0);
 	void show();
@@ -65,9 +73,9 @@ private:
 	int dragdrop_size;
 	int dragdrop_offset;
 
-	int old_raw_pid;
-	int old_byname_pid;
-	int old_bypid_pid;
+	DWORD old_raw_pid;
+	DWORD old_byname_pid;
+	DWORD old_bypid_pid;
 
 	QTimer * t_Auto_Inj;
 	QTimer * t_Delay_Inj;
@@ -90,8 +98,6 @@ private:
 	void reboot();
 	void add_file_to_list(QString str, bool active);
 
-	void injec_status(bool ok, const QString msg);
-
 	// Update GUI
 	void toggleSelected();
 	void rb_unset_all();
@@ -104,17 +110,18 @@ private:
 	void save_settings();
 	void load_settings();
 	void settings_get_update();
+	void settings_get_console();
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
 
 public slots:
 	void get_from_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
-	void get_from_scan_hook(int pid, int error);
+	void get_from_scan_hook();
 
 signals:
 	void send_to_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
-	void send_to_scan_hook(int pid, int error);
+	void send_to_scan_hook(int pid);
 
 private slots:
 	// Titlebar

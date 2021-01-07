@@ -58,10 +58,10 @@
     <ClCompile Include="PDB Download.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="StatusBox.cpp">
+    <ClCompile Include="DebugConsole.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="DebugConsole.cpp">
+    <ClCompile Include="StatusBox.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -70,9 +70,6 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="DragDropWindow.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="Globals.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="Injection.h">

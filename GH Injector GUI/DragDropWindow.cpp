@@ -1,10 +1,22 @@
 #include "pch.h"
-
-#include "DragDropWindow.h"
 #include "resource.h"
 
-const wchar_t DragDropWindow::m_szClassName[] = L"DragnDropWindow";
-int DragDropWindow::m_ClassRefCount = 0;
+#include "DragDropWindow.h"
+
+const wchar_t DragDropWindow::m_szClassName[]	= L"DragnDropWindow";
+int DragDropWindow::m_ClassRefCount				= 0;
+
+DragDropWindow::DragDropWindow()
+{
+	m_hMainWnd = NULL;
+	m_hDropWnd = NULL;
+	m_hDeviceContext = NULL;
+	m_hDropIcon = NULL;
+
+	m_x = 0;
+	m_y = 0;
+	m_size = 0;
+}
 
 DragDropWindow::~DragDropWindow()
 {
@@ -38,7 +50,7 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 
 		if (!RegisterClassEx(&wc))
 		{
-			printf("RegisterClassEx failed: %08X\n", GetLastError());
+			g_print("RegisterClassEx failed: %08X\n", GetLastError());
 
 			return NULL;
 		}
@@ -49,7 +61,7 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 	m_hDropWnd = CreateWindowExW(WS_EX_ACCEPTFILES | WS_EX_TOOLWINDOW, m_szClassName, nullptr, WS_BORDER | WS_POPUP, -1000000, -1000000, m_size, m_size, NULL, NULL, hInstance, this);
 	if (m_hDropWnd == NULL)
 	{
-		printf("CreateWindowExW failed: %08X\n", GetLastError());
+		g_print("CreateWindowExW failed: %08X\n", GetLastError());
 
 		if (m_ClassRefCount == 1)
 		{
@@ -66,7 +78,7 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 	m_hDropIcon = reinterpret_cast<HICON>(LoadImage(GetModuleHandle(0), MAKEINTRESOURCE(IDI_ICON2), IMAGE_ICON, m_size, m_size, NULL));
 	if (!m_hDropIcon)
 	{
-		printf("LoadImage failed: %08X\n", GetLastError());
+		g_print("LoadImage failed: %08X\n", GetLastError());
 	
 		DestroyWindow(m_hDropWnd);
 
@@ -83,7 +95,7 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 	m_hDeviceContext = GetDC(m_hDropWnd);
 	if (!m_hDeviceContext)
 	{
-		printf("GetDC failed: %08X\n", GetLastError());
+		g_print("GetDC failed: %08X\n", GetLastError());
 
 		DestroyIcon(m_hDropIcon);
 		DestroyWindow(m_hDropWnd);
@@ -135,7 +147,7 @@ void DragDropWindow::DrawIcon()
 	{
 		DWORD err = GetLastError();
 
-		printf("Draw Icon failed: %08X\n", err);
+		g_print("Draw Icon failed: %08X\n", err);
 	}
 }
 
@@ -192,7 +204,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 {
 	if (!hDrop)
 	{
-		printf("hDrop = 0\n");
+		g_print("hDrop = 0\n");
 
 		return;
 	}
@@ -200,7 +212,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 	auto DropCount = DragQueryFile(hDrop, 0xFFFFFFFF, nullptr, 0);
 	if (!DropCount)
 	{
-		printf("DropCount = 0\n");
+		g_print("DropCount = 0\n");
 		
 		return;
 	}
@@ -208,7 +220,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 	wchar_t ** Drops = new wchar_t * [DropCount]();
 	if (!Drops)
 	{
-		printf("Can't allocate memory for drops\n");
+		g_print("Can't allocate memory for drops\n");
 
 		return;
 	}
@@ -219,7 +231,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 
 		if (!BufferSize)
 		{
-			printf("DragQueryFile returned invalid size for drop %d\n", i);
+			g_print("DragQueryFile returned invalid size for drop %d\n", i);
 
 			continue;
 		}
@@ -230,14 +242,14 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 
 		if (!Drops[i])
 		{
-			printf("Can't allocate memory for drop %d\n", i);
+			g_print("Can't allocate memory for drop %d\n", i);
 
 			continue;
 		}
 
 		if (!DragQueryFile(hDrop, i, Drops[i], BufferSize))
 		{
-			printf("DragQueryFile failed for drop %d\n", i);
+			g_print("DragQueryFile failed for drop %d\n", i);
 
 			delete[] Drops[i];
 

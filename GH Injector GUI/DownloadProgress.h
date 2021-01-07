@@ -8,10 +8,10 @@
 
 class DownloadProgress : public IBindStatusCallback 
 {
-    float m_fProgress;
-    std::string m_sStatus;
-    std::wstring m_sUrl;
-    bool m_bRedownload;
+    float           m_fProgress;
+    std::string     m_sStatus;
+    std::wstring    m_sUrl;
+    bool            m_bRedownload;
 
 public:
 
