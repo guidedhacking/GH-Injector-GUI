@@ -9,4 +9,4 @@
 #include "Zip.h"
 
 std::wstring get_newest_version();
-bool update_injector(std::wstring newest_version, bool & ignore);
+bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * Lib);

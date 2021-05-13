@@ -37,7 +37,7 @@ HRESULT CreateLink(LPCWSTR lpszPathObj, LPCWSTR lpszPathLink, LPCWSTR lpszDesc, 
 	return hres;
 }
 
-bool CreateLinkWrapper(QString linkName, QString linkArgument)
+HRESULT CreateLinkWrapper(QString linkName, QString linkArgument)
 {
 	QString desPath = QCoreApplication::applicationDirPath() + "\\";
 	QString InjectorExe = QCoreApplication::applicationFilePath();
@@ -56,11 +56,5 @@ bool CreateLinkWrapper(QString linkName, QString linkArgument)
 	wchar_t str4[1024] = { 0 };
 	linkArgument.toWCharArray(str4);
 
-	HRESULT res = CreateLink(str1, completeLinkName.toStdWString().c_str(), str3, str4);
-	if (res == S_OK)
-	{
-		return true;
-	}
-
-	return false;
+	return CreateLink(str1, completeLinkName.toStdWString().c_str(), str3, str4);
 }

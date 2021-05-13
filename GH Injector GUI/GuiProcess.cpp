@@ -46,6 +46,10 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	ui.tree_process->installEventFilter(this);
 	
 	own_session = getProcSession(GetCurrentProcessId());
+
+	QMargins margins;
+	margins.setBottom(10);
+	setContentsMargins(margins);
 }
 
 GuiProcess::~GuiProcess()
@@ -132,6 +136,8 @@ void GuiProcess::refresh_gui()
 	}
 
 	frameless_parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
+
+	g_print("Processlist updated\n");
 }
 
 void GuiProcess::refresh_process()

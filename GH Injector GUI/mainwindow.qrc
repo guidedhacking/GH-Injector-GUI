@@ -4,6 +4,8 @@
         <file>images/icon_window_maximize.png</file>
         <file>images/icon_window_minimize.png</file>
         <file>images/icon_window_restore.png</file>
+        <file>images/icon_dock.png</file>
+        <file>images/icon_undock.png</file>
         <file>darkstyle/darkstyle.qss</file>
         <file>darkstyle/icon_branch_closed.png</file>
         <file>darkstyle/icon_branch_end.png</file>

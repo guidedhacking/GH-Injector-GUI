@@ -10,6 +10,7 @@
 #include <functional>
 #include <guiddef.h>
 #include <iostream>
+#include <objidl.h> 
 #include <Shlobj.h>
 #include <shlguid.h>
 #include <shobjidl.h>

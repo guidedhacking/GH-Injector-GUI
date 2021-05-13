@@ -21,6 +21,7 @@ int CmdArg(int argc, wchar_t * argv[])
 	if (argc < 2)
 	{
 		printf("Invalid argument count.\n");
+
 		help();
 
 		return -1;
@@ -44,6 +45,8 @@ int CmdArg(int argc, wchar_t * argv[])
 	{
 		printf("Injection library intialized\n");
 	}
+
+	lib.StartDownload();
 
 	if (FindArg(argc, L"-version", argv))
 	{
@@ -122,7 +125,7 @@ int CmdArg(int argc, wchar_t * argv[])
 	if (inj_mode_index)
 	{
 		injection_mode = std::stoi(argv[inj_mode_index + 1]);
-		if (injection_mode < 0 || injection_mode > 3)
+		if (injection_mode < 0 || injection_mode > 4)
 		{
 			injection_mode = 0;
 		}
@@ -135,7 +138,7 @@ int CmdArg(int argc, wchar_t * argv[])
 	if (inj_method_index)
 	{
 		launch_method = std::stoi(argv[inj_method_index + 1]);
-		if (launch_method < 0 || launch_method > 3)
+		if (launch_method < 0 || launch_method > 4)
 		{
 			launch_method = 0;
 		}
@@ -193,7 +196,7 @@ int CmdArg(int argc, wchar_t * argv[])
 			wchar_t * szMMflags = argv[mmflags_index + 1];
 			mmflags = std::stol(szMMflags, nullptr, 0x10);
 
-			DWORD mmflags_mask = MM_DEFAULT | INJ_MM_CLEAN_DATA_DIR;
+			DWORD mmflags_mask = MM_DEFAULT | INJ_MM_CLEAN_DATA_DIR | INJ_MM_SHIFT_MODULE_BASE;
 			mmflags &= mmflags_mask;
 		}
 
@@ -221,11 +224,42 @@ int CmdArg(int argc, wchar_t * argv[])
 
 	printf("Timeout = %d\n", data.Timeout);
 
-	while (!lib.GetSymbolState())
+	printf("Waiting for library to initialize\n");
+
+	auto symbol_state = lib.GetSymbolState();
+	while (symbol_state == INJ_ERR_SYMBOL_INIT_NOT_DONE)
 	{
 		Sleep(10);
+
+		symbol_state = lib.GetSymbolState();
 	}
 
+	if (symbol_state != INJ_ERR_SUCCESS)
+	{
+		printf("Failed to load PDBs: 0x%08X\n", symbol_state);
+
+		return -1;
+	}
+
+	printf("Symbol files initialized\n");
+	printf("Waiting for imports to be resolved\n");
+
+	auto import_state = lib.GetImportState();
+	while (import_state == INJ_ERR_IMPORT_HANDLER_NOT_DONE)
+	{
+		Sleep(10);
+
+		import_state = lib.GetImportState();
+	}
+
+	if (import_state != INJ_ERR_SUCCESS)
+	{
+		printf("Failed to resolve imports: 0x%08X\n", import_state);
+
+		return -1;
+	}
+
+	printf("Imports resolved\n");
 	printf("Injection library ready\n");
 
 	int delay = 0;
@@ -245,6 +279,8 @@ int CmdArg(int argc, wchar_t * argv[])
 	printf("Injecting\n");
 
 	DWORD inj_status = lib.InjectW(&data);
+
+	lib.Unload();
 	
 	if (inj_status != ERROR_SUCCESS)
 	{
@@ -300,7 +336,8 @@ void help()
 	printf("\t\t\t 0 = LoadLibraryExW (default)\n");
 	printf("\t\t\t 1 = LdrLoadDll\n");
 	printf("\t\t\t 2 = LdrpLoadDll\n");
-	printf("\t\t\t 3 = Manual Mapping\n\n");
+	printf("\t\t\t 3 = LdrpLoadDllInternal\n");
+	printf("\t\t\t 4 = Manual Mapping\n\n");
 
 	printf("\t-s [0,1,2,3]\n");
 	printf("\t\tThis argument specifies the launch method:\n");

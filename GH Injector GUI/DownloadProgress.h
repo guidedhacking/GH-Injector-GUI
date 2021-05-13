@@ -12,11 +12,14 @@ class DownloadProgress : public IBindStatusCallback
     std::string     m_sStatus;
     std::wstring    m_sUrl;
     bool            m_bRedownload;
+    HANDLE          m_hInterruptEvent;
 
 public:
 
     DownloadProgress();
     DownloadProgress(std::wstring url, bool redownload = false);
+    
+    ~DownloadProgress();
 
     HRESULT __stdcall QueryInterface(const IID & riid, void ** ppvObject);
 
@@ -41,5 +44,8 @@ public:
     HRESULT __stdcall OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText);
 
     float GetDownloadProgress();
+
     std::string GetStatusText();
+
+    BOOL SetInterruptEvent(HANDLE hInterrupt);
 };

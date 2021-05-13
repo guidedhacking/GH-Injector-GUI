@@ -15,6 +15,7 @@
 #define FRAMELESSWINDOW_H
 
 #include "..\pch.h"
+#include "ui_framelesswindow.h"
 
 namespace Ui
 {
@@ -27,6 +28,7 @@ class FramelessWindow : public QWidget
 
 private:
 	QWidget * content;
+	QWidget * m_dock_parent;
 
 	bool resize_left;
 	bool resize_right;
@@ -39,6 +41,7 @@ public:
 	void setContent(QWidget * w);
 	void setTitleBar(bool active);
 	void setMinimizeButton(bool active);
+	void setDockButton(bool active);
 
 	void setResizeLeft	(bool enabled = false);
 	void setResizeRight	(bool enabled = false);
@@ -49,6 +52,8 @@ public:
 	void setResizeVertical	(bool enabled = false);
 
 	void setResize(bool enabled = false);
+
+	void dock(bool docked = false, QWidget * dock_parent = nullptr);
 
 private:
 	bool leftBorderHit(const QPoint & pos);
@@ -64,9 +69,12 @@ public slots:
 	void setWindowIcon(const QIcon & ico);
 	
 	void on_applicationStateChanged(Qt::ApplicationState state);
+	void on_dockButton_clicked();
 	void on_minimizeButton_clicked();
 	void on_closeButton_clicked();
 	void on_windowTitlebar_doubleClicked();
+
+	void update_docked_pos();
 
 protected:
 	virtual void changeEvent(QEvent * event);
@@ -85,6 +93,8 @@ private:
 	bool m_bDragLeft;
 	bool m_bDragRight;
 	bool m_bDragBottom;
+	bool m_bDocked;
+	bool m_bUpdateDockPos;
 };
 
 #endif  // FRAMELESSWINDOW_H

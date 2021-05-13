@@ -22,13 +22,18 @@ public:
 	bool RestoreInjectionFunctions(std::vector<int> & hList);
 	std::string GetVersionA();
 	std::wstring GetVersionW();
-	bool GetSymbolState();
+	DWORD GetSymbolState();
+	DWORD GetImportState();
 	float GetDownloadProgress(bool bWow64);
+	void StartDownload();
+	void InterruptDownload();
 	DWORD SetRawPrintCallback(f_raw_print_callback callback);
 
 private:
 
 	static const UINT m_HookCount = 30;
+	
+	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> m_StringConverter;
 
 	HookInfo m_HookInfo[m_HookCount];
 	DWORD m_Err;
@@ -47,6 +52,9 @@ private:
 	DECLARE_INJECTION_FUNCTION(GetVersionA);
 	DECLARE_INJECTION_FUNCTION(GetVersionW);
 	DECLARE_INJECTION_FUNCTION(GetSymbolState);
+	DECLARE_INJECTION_FUNCTION(GetImportState);
 	DECLARE_INJECTION_FUNCTION(GetDownloadProgress);
+	DECLARE_INJECTION_FUNCTION(StartDownload);
+	DECLARE_INJECTION_FUNCTION(InterruptDownload);
 	DECLARE_INJECTION_FUNCTION(SetRawPrintCallback);
 };

@@ -8,14 +8,14 @@ int DragDropWindow::m_ClassRefCount				= 0;
 
 DragDropWindow::DragDropWindow()
 {
-	m_hMainWnd = NULL;
-	m_hDropWnd = NULL;
-	m_hDeviceContext = NULL;
-	m_hDropIcon = NULL;
+	m_hMainWnd			= NULL;
+	m_hDropWnd			= NULL;
+	m_hDeviceContext	= NULL;
+	m_hDropIcon			= NULL;
 
-	m_x = 0;
-	m_y = 0;
-	m_size = 0;
+	m_x		= 0;
+	m_y		= 0;
+	m_size	= 0;
 }
 
 DragDropWindow::~DragDropWindow()
@@ -25,8 +25,10 @@ DragDropWindow::~DragDropWindow()
 
 HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 {
-	m_hMainWnd = hParent;
-	m_size = Size;
+	g_print("Creating DragDrop window\n");
+
+	m_hMainWnd	= hParent;
+	m_size		= Size;
 
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
 
@@ -114,21 +116,29 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 	ChangeWindowMessageFilterEx(m_hDropWnd, WM_COPYDATA, MSGFLT_ALLOW, nullptr);
 	ChangeWindowMessageFilterEx(m_hDropWnd, 0x0049, MSGFLT_ALLOW, nullptr);
 
+	g_print(" HWND = %08X\n", (DWORD)(((UINT_PTR)m_hDropWnd) & 0xFFFFFFFF));
+
 	return m_hDropWnd;
 }
 
 void DragDropWindow::Close()
 {
+	g_print("Closing DragDrop window\n");
+
 	if (!m_hDropWnd)
 	{
 		return;
 	}
 
-	ReleaseDC(m_hDropWnd, m_hDeviceContext);
+	CloseWindow(m_hDropWnd);
 
+	ReleaseDC(m_hDropWnd, m_hDeviceContext);
+	DestroyIcon(m_hDropIcon);
 	DestroyWindow(m_hDropWnd);
 
-	DestroyIcon(m_hDropIcon);
+	m_hDeviceContext	= NULL;
+	m_hDropWnd			= NULL;
+	m_hDropIcon			= NULL;
 
 	--m_ClassRefCount;
 
@@ -136,8 +146,6 @@ void DragDropWindow::Close()
 	{
 		UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
 	}
-
-	m_hDropWnd = NULL;
 }
 
 void DragDropWindow::DrawIcon()
@@ -199,9 +207,10 @@ void DragDropWindow::SetPosition(int x, int y, bool hide, bool active)
 	}
 }
 
-
 void DragDropWindow::HandleDrop(HDROP hDrop)
 {
+	g_print("Dropping files\n");
+
 	if (!hDrop)
 	{
 		g_print("hDrop = 0\n");

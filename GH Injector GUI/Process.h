@@ -6,6 +6,8 @@
 
 #include "pch.h"
 
+#include "DebugConsole.h"
+
 enum class ARCH : int
 {
 	NONE,

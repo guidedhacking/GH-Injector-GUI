@@ -4,10 +4,19 @@
 
 DownloadProgress::DownloadProgress()
 {
-	m_fProgress     = 0.0f;
-	m_sStatus       = "";
-    m_sUrl          = L"";
-    m_bRedownload   = false;
+	m_fProgress         = 0.0f;
+	m_sStatus           = "";
+    m_sUrl              = L"";
+    m_bRedownload       = false;
+    m_hInterruptEvent   = nullptr;
+}
+
+DownloadProgress::~DownloadProgress()
+{
+    if (m_hInterruptEvent)
+    {
+        CloseHandle(m_hInterruptEvent);
+    }
 }
 
 DownloadProgress::DownloadProgress(std::wstring url, bool redownload)
@@ -115,6 +124,11 @@ HRESULT __stdcall DownloadProgress::OnProgress(ULONG ulProgress, ULONG ulProgres
 {
     UNREFERENCED_PARAMETER(szStatusText);
 
+    if (m_hInterruptEvent && WaitForSingleObject(m_hInterruptEvent, 0) == WAIT_OBJECT_0)
+    {
+        return E_ABORT;
+    }
+
 	BINDSTATUS status = (BINDSTATUS)ulStatusCode;
 
 	if (ulProgressMax)
@@ -152,4 +166,14 @@ float DownloadProgress::GetDownloadProgress()
 std::string DownloadProgress::GetStatusText()
 {
 	return m_sStatus;
+}
+
+BOOL DownloadProgress::SetInterruptEvent(HANDLE hInterrupt)
+{
+    if (m_hInterruptEvent)
+    {
+        CloseHandle(m_hInterruptEvent);
+    }
+
+    return DuplicateHandle(GetCurrentProcess(), hInterrupt, GetCurrentProcess(), &m_hInterruptEvent, NULL, FALSE, DUPLICATE_SAME_ACCESS);
 }

@@ -76,6 +76,7 @@ void GuiScanHook::scan_clicked()
 	if (!InjLib->LoadingStatus())
 	{
 		setItem({ "Injection library not loaded" });
+		g_print("Injection library not loaded\n");
 
 		return;
 	}
@@ -83,6 +84,7 @@ void GuiScanHook::scan_clicked()
 	if (m_PID == 0)
 	{
 		setItem({ "Please select a process" });
+		g_print("No process selected\n");
 
 		return;
 	}
@@ -91,6 +93,7 @@ void GuiScanHook::scan_clicked()
 	if (!hProc)
 	{
 		setItem({ "Please select a process" });
+		g_print("Invalid process id\n");
 
 		return;
 	}
@@ -99,6 +102,7 @@ void GuiScanHook::scan_clicked()
 	if (!GetExitCodeProcess(hProc, &dwExitCode))
 	{
 		setItem({ "Please select a process" });
+		g_print("Process doesn't exist\n");
 
 		return;
 	}
@@ -108,6 +112,7 @@ void GuiScanHook::scan_clicked()
 	if (dwExitCode != STILL_ACTIVE)
 	{
 		setItem({ "Please select a process" });
+		g_print("Process doesn't exist\n");
 
 		return;
 	}

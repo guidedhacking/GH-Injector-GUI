@@ -23,7 +23,9 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	m_bDragTop(false),
 	m_bDragLeft(false),
 	m_bDragRight(false),
-	m_bDragBottom(false)
+	m_bDragBottom(false),
+	m_bDocked(false),
+	m_bUpdateDockPos(false)
 {
 
 	setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
@@ -42,7 +44,8 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	resize_top		= false;
 	resize_bottom	= false;
 
-	content = Q_NULLPTR;
+	content			= Q_NULLPTR;
+	m_dock_parent	= Q_NULLPTR;
 
 	// shadow under window title text
 	QGraphicsDropShadowEffect * textShadow = new QGraphicsDropShadowEffect;
@@ -70,6 +73,8 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	auto txt_height = ui->titleText->sizeHint().height();
 	auto bar_height = ui->windowTitlebar->height();
 	ui->titleText->move(x, bar_height / 2 - txt_height / 2);
+
+	ui->dockButton->setIcon(QIcon(":/images/icon_dock.png"));
 
 	// important to watch mouse move from all child widgets
 	QApplication::instance()->installEventFilter(this);
@@ -131,6 +136,26 @@ void FramelessWindow::setMinimizeButton(bool active)
 	}
 }
 
+void FramelessWindow::setDockButton(bool active)
+{
+	if (active)
+	{
+		ui->dockButton->setDisabled(false);
+		ui->dockButton->setHidden(false);
+
+		ui->dockButton->setIcon(QIcon(":/images/icon_undock.png"));
+
+		m_bDocked = true;
+	}
+	else
+	{
+		ui->dockButton->setHidden(true);
+		ui->dockButton->setDisabled(true);
+
+		m_bDocked = false;
+	}
+}
+
 void FramelessWindow::setResizeLeft(bool enabled)
 {
 	resize_left = enabled;
@@ -183,6 +208,30 @@ void FramelessWindow::setResize(bool enabled)
 	resize_bottom	= enabled;
 
 	updateSizePolicy();
+}
+
+void FramelessWindow::dock(bool docked, QWidget * dock_parent)
+{
+	m_dock_parent = dock_parent;
+
+	if (m_dock_parent)
+	{
+		dock_parent->installEventFilter(this);
+	}
+
+	m_bDocked = docked;
+	
+	if (m_bDocked)
+	{
+		ui->dockButton->setIcon(QIcon(":/images/icon_undock.png"));
+		ui->dockButton->setToolTip("Undock");
+		update_docked_pos();
+	}
+	else
+	{
+		ui->dockButton->setIcon(QIcon(":/images/icon_dock.png"));
+		ui->dockButton->setToolTip("Dock");
+	}
 }
 
 void FramelessWindow::setWindowTitle(const QString & text)
@@ -327,6 +376,23 @@ void FramelessWindow::on_applicationStateChanged(Qt::ApplicationState state)
 	}
 }
 
+void FramelessWindow::on_dockButton_clicked()
+{
+	if (m_bDocked)
+	{
+		ui->dockButton->setIcon(QIcon(":/images/icon_dock.png"));
+		ui->dockButton->setToolTip("Dock");
+		m_bDocked = false;
+	}
+	else
+	{
+		ui->dockButton->setIcon(QIcon(":/images/icon_undock.png"));
+		ui->dockButton->setToolTip("Undock");
+		update_docked_pos();
+		m_bDocked = true;
+	}
+}
+
 void FramelessWindow::on_minimizeButton_clicked()
 {
 	setWindowState(Qt::WindowMinimized);
@@ -335,10 +401,37 @@ void FramelessWindow::on_minimizeButton_clicked()
 void FramelessWindow::on_closeButton_clicked()
 {
 	close();
+
+	if (content)
+	{
+		content->close();
+	}
 }
 
 void FramelessWindow::on_windowTitlebar_doubleClicked()
 {
+
+}
+
+void FramelessWindow::update_docked_pos()
+{
+	if (!m_dock_parent)
+	{
+		return;
+	}
+
+	m_bUpdateDockPos = true;
+
+	auto r			= m_dock_parent->childrenRect();	
+	auto p_pos		= m_dock_parent->mapToGlobal(r.topLeft());
+	auto dy			= size().height() - childrenRect().height();
+	auto new_pos	= QPoint(p_pos.x() + r.width() - 10, p_pos.y() - dy / 2);
+	auto new_size	= QSize(size().width(), r.height() + dy);
+
+	this->move(new_pos);
+	this->resize(new_size);
+
+	m_bUpdateDockPos = false;
 }
 
 void FramelessWindow::mouseDoubleClickEvent(QMouseEvent * event)
@@ -490,8 +583,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		{
 			setCursor(Qt::SizeBDiagCursor);
 		}
-		else if (leftBorderHit(globalMousePos) &&
-			bottomBorderHit(globalMousePos))
+		else if (leftBorderHit(globalMousePos) && bottomBorderHit(globalMousePos))
 		{
 			setCursor(Qt::SizeBDiagCursor);
 		}
@@ -515,10 +607,10 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 			}
 			else
 			{
-				m_bDragTop = false;
-				m_bDragLeft = false;
-				m_bDragRight = false;
-				m_bDragBottom = false;
+				m_bDragTop		= false;
+				m_bDragLeft		= false;
+				m_bDragRight	= false;
+				m_bDragBottom	= false;
 				setCursor(Qt::ArrowCursor);
 			}
 		}
@@ -642,18 +734,20 @@ void FramelessWindow::mousePressEvent(QMouseEvent * event)
 void FramelessWindow::mouseReleaseEvent(QMouseEvent * event)
 {
 	Q_UNUSED(event);
+
 	if (isMaximized())
 	{
 		return;
 	}
 
 	m_bMousePressed = false;
-	bool bSwitchBackCursorNeeded =
-		m_bDragTop || m_bDragLeft || m_bDragRight || m_bDragBottom;
-	m_bDragTop = false;
-	m_bDragLeft = false;
-	m_bDragRight = false;
-	m_bDragBottom = false;
+	bool bSwitchBackCursorNeeded = m_bDragTop || m_bDragLeft || m_bDragRight || m_bDragBottom;
+
+	m_bDragTop		= false;
+	m_bDragLeft		= false;
+	m_bDragRight	= false;
+	m_bDragBottom	= false;
+
 	if (bSwitchBackCursorNeeded)
 	{
 		setCursor(Qt::ArrowCursor);
@@ -690,6 +784,18 @@ bool FramelessWindow::eventFilter(QObject * obj, QEvent * event)
 				mouseReleaseEvent(pMouse);
 			}
 		}
+	}
+	else if (event->type() == QEvent::Move && obj == m_dock_parent && m_bDocked)
+	{		
+		update_docked_pos();
+	}
+	else if (event->type() == QEvent::Resize && obj == m_dock_parent && m_bDocked)
+	{
+		update_docked_pos();
+	}
+	else if (event->type() == QEvent::Move && obj == this && m_bDocked && !m_bUpdateDockPos && !m_bDragRight)
+	{
+		on_dockButton_clicked();
 	}
 
 	return QWidget::eventFilter(obj, event);

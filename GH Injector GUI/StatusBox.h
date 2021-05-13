@@ -5,3 +5,5 @@
 #include "framelesswindow.h"
 
 void ShowStatusbox(bool ok, const QString & msg);
+
+bool YesNoBox(const QString & title, const QString & msg);

@@ -127,7 +127,8 @@ enum class LAUNCH_METHOD
 	LM_NtCreateThreadEx,
 	LM_HijackThread,
 	LM_SetWindowsHookEx,
-	LM_QueueUserAPC
+	LM_QueueUserAPC,
+	LM_KernelCallback
 };
 
 //ansi version of the info structure:
@@ -171,8 +172,8 @@ struct INJECTIONDATAW
 //ValidateInjectionFunctions fills an std::vector with this info, result can simply be passed to RestoreInjectionFunctions
 struct HookInfo
 {
-	const char * ModuleName;
-	const char * FunctionName;
+	const wchar_t	* ModuleName;
+	const char		* FunctionName;
 
 	HINSTANCE		hModuleBase;
 	void		*	pFunc;
@@ -205,8 +206,14 @@ struct HookInfo
 #define INJ_MM_INIT_SECURITY_COOKIE		0x00400000	//initializes security cookie for buffer overrun protection
 #define INJ_MM_RUN_DLL_MAIN				0x00800000	//executes DllMain
 													//this option induces INJ_MM_RESOLVE_IMPORTS
+#define INJ_MM_RUN_UNDER_LDR_LOCK		0x01000000	//runs the DllMain under the loader lock
+#define INJ_MM_SHIFT_MODULE_BASE		0x02000000	//shifts the module base by a random offset
 
-#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS)
+#define MM_DEFAULT (INJ_MM_RESOLVE_IMPORTS | INJ_MM_RESOLVE_DELAY_IMPORTS | INJ_MM_INIT_SECURITY_COOKIE | INJ_MM_EXECUTE_TLS | INJ_MM_ENABLE_EXCEPTIONS | INJ_MM_RUN_DLL_MAIN | INJ_MM_SET_PAGE_PROTECTIONS | INJ_MM_RUN_UNDER_LDR_LOCK)
+
+#define INJ_ERR_SUCCESS					0x00000000
+#define INJ_ERR_SYMBOL_INIT_NOT_DONE	0x0000001C
+#define INJ_ERR_IMPORT_HANDLER_NOT_DONE 0x00000037
 
 using f_InjectA = DWORD(__stdcall*)(INJECTIONDATAA * pData);
 using f_InjectW = DWORD(__stdcall*)(INJECTIONDATAW * pData);
@@ -218,8 +225,11 @@ using f_GetVersionA = HRESULT(__stdcall *)(char		* out, size_t cb_size);
 using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);
 
 using f_GetSymbolState = DWORD(__stdcall *)();
+using f_GetImportState = DWORD(__stdcall *)();
 
 using f_GetDownloadProgress = float(__stdcall *)(bool bWoW64);
+using f_StartDownload		= void(__stdcall *)();
+using f_InterruptDownload	= void(__stdcall *)();
 
-using f_raw_print_callback = void(__stdcall *)(const char * szText);
+using f_raw_print_callback	= void(__stdcall *)(const char * szText);
 using f_SetRawPrintCallback = DWORD(__stdcall *)(f_raw_print_callback callback);

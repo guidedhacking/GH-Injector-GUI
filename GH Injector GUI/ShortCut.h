@@ -2,4 +2,4 @@
 
 #include "pch.h"
 
-bool CreateLinkWrapper(QString linkName, QString linkArgument);
+HRESULT CreateLinkWrapper(QString linkName, QString linkArgument);

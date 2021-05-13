@@ -46,7 +46,7 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 
 	if (!FileExistsW(szDllFile))
 	{
-		printf("File doesn't exist\n");
+		g_print("File doesn't exist\n");
 
 		return ARCH::NONE;
 	}
@@ -55,7 +55,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 
 	if (File.fail())
 	{
-		printf("Opening the file failed: %X\n", (DWORD)File.rdstate());
+		g_print("Opening the file failed: %X\n", (DWORD)File.rdstate());
+
 		File.close();
 
 		return ARCH::NONE;
@@ -64,7 +65,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 	auto FileSize = File.tellg();
 	if (FileSize < 0x1000)
 	{
-		printf("Filesize is invalid\n");
+		g_print("Filesize is invalid\n");
+
 		File.close();
 
 		return ARCH::NONE;
@@ -73,7 +75,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 	pSrcData = new BYTE[static_cast<UINT_PTR>(FileSize)];
 	if (!pSrcData)
 	{
-		printf("Memory allocation failed\n");
+		g_print("Memory allocation failed\n");
+
 		File.close();
 
 		return ARCH::NONE;
@@ -85,7 +88,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 
 	if (reinterpret_cast<IMAGE_DOS_HEADER *>(pSrcData)->e_magic != IMAGE_DOS_SIGNATURE)
 	{
-		printf("Invalid DOS signature\n");
+		g_print("Invalid DOS signature\n");
+
 		delete[] pSrcData;
 
 		return ARCH::NONE;
@@ -96,7 +100,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 
 	if (pNtHeaders->Signature != IMAGE_NT_SIGNATURE)
 	{
-		printf("Invalid NT signature\n");
+		g_print("Invalid NT signature\n");
+
 		delete[] pSrcData;
 
 		return ARCH::NONE;
@@ -104,7 +109,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 
 	if (!(pFileHeader->Characteristics & IMAGE_FILE_DLL))
 	{
-		printf("Invalid PE characteristics\n");
+		g_print("Invalid PE characteristics\n");
+
 		delete[] pSrcData;
 
 		return ARCH::NONE;

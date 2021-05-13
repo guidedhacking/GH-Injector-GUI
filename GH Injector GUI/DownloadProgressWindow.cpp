@@ -2,20 +2,17 @@
 
 #include "DownloadProgressWindow.h"
 
-DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QString>(labels), QString status, int width, QWidget * parent, FramelessWindow * frameless_parent)
+DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QString>(labels), QString status, int width, QWidget * parent)
 	: QDialog(parent)
 {
-	m_pParent = frameless_parent;
 	m_pStatus = Q_NULLPTR;
 
-	if (m_pParent)
-	{
-		m_pParent->setWindowTitle(title);
-	}
-	else
-	{
-		setWindowTitle(title);
-	}
+	m_update_status		= false;
+	m_update_progress	= false;
+	m_update_done		= false;
+	
+	m_new_status	= "";
+	m_new_done		= 0;
 
 	auto * main_layout = new QVBoxLayout();
 
@@ -40,6 +37,8 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 		main_layout->addLayout(layout);
 
 		m_ProgressBarList.push_back(bar);
+
+		m_new_progress.push_back(0.0f);
 	}
 
 	if (status.length() > 0)
@@ -54,6 +53,75 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 	}
 
 	setLayout(main_layout);
+
+	m_FramelessParent = new FramelessWindow();
+	m_FramelessParent->setFixedSize(QSize(width, 20 + (int)labels.size() * 40));
+	m_FramelessParent->setDockButton(false);
+	m_FramelessParent->setMinimizeButton(false);
+	m_FramelessParent->setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
+	m_FramelessParent->setWindowTitle(title);
+	m_FramelessParent->setContent(this);
+	m_FramelessParent->setWindowModality(Qt::WindowModality::ApplicationModal);
+
+	m_FramelessParent->installEventFilter(this);
+	installEventFilter(this);
+}
+
+DownloadProgressWindow::~DownloadProgressWindow()
+{
+	if (m_FramelessParent)
+	{
+		m_FramelessParent->close();
+	}
+}
+
+void DownloadProgressWindow::show()
+{
+	m_FramelessParent->show();
+}
+
+//this is the second worst code in the history of mankind but I really don't give a fuck
+//because multithreading with QDialogs is the the worst thing in the history of mankind
+
+bool DownloadProgressWindow::eventFilter(QObject * obj, QEvent * event)
+{
+	if (event->type() == QEvent::Close && obj == m_FramelessParent)
+	{
+		if (m_CloseCallback)
+		{
+			m_CloseCallback();
+			m_CloseCallback = nullptr;
+		}
+	}
+
+	if (obj == this || obj == m_FramelessParent)
+	{
+		if (m_update_status)
+		{
+			m_update_status = false;
+			m_pStatus->setText(m_new_status);
+		}
+
+		if (m_update_progress)
+		{
+			m_update_progress = false;
+			for (int i = 0; i < m_ProgressBarList.size(); ++i)
+			{
+				m_ProgressBarList[i]->setValue(m_new_progress[i]);
+			}
+		}
+
+		if (m_update_done)
+		{
+			m_update_done = false;
+			m_CloseCallback = nullptr;
+			done(m_new_done);
+		}
+	}	
+
+	g_Console->update_external();
+
+	return QObject::eventFilter(obj, event);
 }
 
 void DownloadProgressWindow::SetProgress(int index, float value)
@@ -76,16 +144,37 @@ void DownloadProgressWindow::SetProgress(int index, float value)
 			progress = (int)value;
 		}
 
-		m_ProgressBarList[index]->setValue(progress);
+		m_new_progress[index]	= progress;
+		m_update_progress		= true;
+		this->update();
 	}
 }
 
 void DownloadProgressWindow::SetStatus(QString status)
 {
-	m_pStatus->setText(status);
+	m_new_status	= status;
+	m_update_status = true;
+	this->update();
+}
+
+void DownloadProgressWindow::SetDone(int code)
+{
+	m_new_done		= code;
+	m_update_done	= true;
+	this->update();
+}
+
+void DownloadProgressWindow::SetCloseCallback(std::function<void(void)> CloseCallback)
+{
+	m_CloseCallback = CloseCallback;
 }
 
 QString DownloadProgressWindow::GetStatus()
 {
 	return m_pStatus->text();
+}
+
+FramelessWindow * DownloadProgressWindow::GetParent()
+{
+	return m_FramelessParent;
 }

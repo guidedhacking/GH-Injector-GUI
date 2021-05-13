@@ -7,7 +7,7 @@
 #define LOAD_INJECTION_FUNCTION(mod, name) m_##name = reinterpret_cast<f_##name>(GetProcAddress(mod, #name))
 #define IS_VALID_FUNCTION_POINTER(name, v) if (m_##name == nullptr) \
 { \
-	g_print("Failed to resolve %s\n", L#name); \
+	printf("Failed to resolve %ls\n", L#name); \
 	return v; \
 } \
 
@@ -23,6 +23,8 @@ InjectionLib::InjectionLib()
 	m_GetVersionW					= nullptr;
 	m_GetSymbolState				= nullptr;
 	m_GetDownloadProgress			= nullptr;
+	m_StartDownload					= nullptr;
+	m_InterruptDownload				= nullptr;
 	m_SetRawPrintCallback			= nullptr;
 
 	memset(m_HookInfo, 0, sizeof(m_HookInfo));
@@ -41,17 +43,32 @@ InjectionLib::~InjectionLib()
 
 bool InjectionLib::Init()
 {
-	m_hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
+	m_hInjectionMod = LoadLibraryA(GH_INJ_MOD_NAMEA);
 
 	if (m_hInjectionMod == NULL)
 	{
-		g_print("Failed to load injection module: %08X\n", GetLastError());
+		//When using a shortcut g_Console isn't initialized
+		if (g_Console)
+		{
+			g_print("Failed to load injection module: %08X\n", GetLastError());
+		}
+		else
+		{
+			printf("Failed to load injection module: %08X\n", GetLastError());
+		}
 
 		return false;
 	}
 	else
 	{
-		g_print("Injection module loaded at %p\n", m_hInjectionMod);
+		if (g_Console)
+		{
+			g_print("Injection module loaded at %p\n", m_hInjectionMod);
+		}
+		else
+		{
+			printf("Injection module loaded at %p\n", m_hInjectionMod);
+		}
 	}
 
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, InjectA);
@@ -61,7 +78,10 @@ bool InjectionLib::Init()
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetVersionA);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetVersionW);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetSymbolState);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetImportState);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetDownloadProgress);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, StartDownload);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, InterruptDownload);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, SetRawPrintCallback);
 
 	return LoadingStatus();
@@ -81,7 +101,10 @@ bool InjectionLib::LoadingStatus()
 	IS_VALID_FUNCTION_POINTER(GetVersionA,					false);
 	IS_VALID_FUNCTION_POINTER(GetVersionW,					false);
 	IS_VALID_FUNCTION_POINTER(GetSymbolState,				false);
+	IS_VALID_FUNCTION_POINTER(GetImportState,				false);
 	IS_VALID_FUNCTION_POINTER(GetDownloadProgress,			false);
+	IS_VALID_FUNCTION_POINTER(StartDownload,				false);
+	IS_VALID_FUNCTION_POINTER(InterruptDownload,			false);
 	IS_VALID_FUNCTION_POINTER(SetRawPrintCallback,			false);
 
 	return true;
@@ -107,12 +130,14 @@ DWORD InjectionLib::InjectW(INJECTIONDATAW * pData)
 }
 
 bool InjectionLib::ValidateInjectionFunctions(int PID, std::vector<std::string> & hList)
-{
+{	
 	IS_VALID_FUNCTION_POINTER(ValidateInjectionFunctions, false);
-	
+
 	m_TargetPID = PID;
 
 	auto val_ret = m_ValidateInjectionFunctions(m_TargetPID, m_Err, m_Win32Err, m_HookInfo, m_HookCount, &m_CountOut);
+
+	g_Console->update_external();
 
 	if (!val_ret)
 	{
@@ -127,7 +152,9 @@ bool InjectionLib::ValidateInjectionFunctions(int PID, std::vector<std::string> 
 	{
 		if (m_HookInfo[i].ChangeCount && !m_HookInfo[i].ErrorCode)
 		{
-			hList.push_back(std::string(m_HookInfo[i].ModuleName) + "->" + std::string(m_HookInfo[i].FunctionName));
+			std::string s_ModName = m_StringConverter.to_bytes(m_HookInfo[i].ModuleName);
+
+			hList.push_back(s_ModName + "->" + std::string(m_HookInfo[i].FunctionName));
 
 			++m_Changed;
 		}
@@ -158,6 +185,8 @@ bool InjectionLib::RestoreInjectionFunctions(std::vector<int> & IndexList)
 
 	auto res_ret = m_RestoreInjectionFunctions(m_TargetPID, m_Err, m_Win32Err, to_restore, m_CountOut, &m_CountOut);
 
+	g_Console->update_external();
+
 	if (!res_ret)
 	{
 		g_print("RestoreInjectionFunctions failed:\n");
@@ -170,11 +199,18 @@ bool InjectionLib::RestoreInjectionFunctions(std::vector<int> & IndexList)
 	return true;
 }
 
-bool InjectionLib::GetSymbolState()
+DWORD InjectionLib::GetSymbolState()
 {
-	IS_VALID_FUNCTION_POINTER(GetSymbolState, false);
+	IS_VALID_FUNCTION_POINTER(GetSymbolState, ERROR_CALL_NOT_IMPLEMENTED);
 
-	return (m_GetSymbolState() == 0);
+	return m_GetSymbolState();
+}
+
+DWORD InjectionLib::GetImportState()
+{
+	IS_VALID_FUNCTION_POINTER(GetImportState, ERROR_CALL_NOT_IMPLEMENTED);
+
+	return m_GetImportState();
 }
 
 float InjectionLib::GetDownloadProgress(bool bWow64)
@@ -182,6 +218,20 @@ float InjectionLib::GetDownloadProgress(bool bWow64)
 	IS_VALID_FUNCTION_POINTER(GetDownloadProgress, 0.0f);
 
 	return m_GetDownloadProgress(bWow64);
+}
+
+void InjectionLib::StartDownload()
+{
+	IS_VALID_FUNCTION_POINTER(StartDownload, );
+
+	return m_StartDownload();
+}
+
+void InjectionLib::InterruptDownload()
+{
+	IS_VALID_FUNCTION_POINTER(InterruptDownload,);
+
+	return m_InterruptDownload();
 }
 
 std::string InjectionLib::GetVersionA()

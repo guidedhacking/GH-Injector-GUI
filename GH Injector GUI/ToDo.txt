@@ -1,5 +1,0 @@
-1. Fix auto inject again = FIXED
-2. Add dll name to result window = FIXED
-3. Fix auto update check on startup = FIXED
-4. Convert GuiMain::UpdateProcess to QTimer based thread = FIXED
-5. Make scan hook selection not string search based = FIXED

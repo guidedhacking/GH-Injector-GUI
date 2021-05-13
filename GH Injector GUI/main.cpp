@@ -8,11 +8,9 @@
 
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS /ENTRY:wmainCRTStartup")
 
-#define DEBUG_CONSOLE
-
 int wmain(int argc, wchar_t * argv[])
 {
-#ifdef DEBUG_CONSOLE
+#ifdef DEBUG_CONSOLE_TO_CMD
 	AllocConsole();
 	FILE * pFile = nullptr;
 	freopen_s(&pFile, "CONOUT$", "w", stdout);
@@ -36,7 +34,7 @@ int wmain(int argc, wchar_t * argv[])
 	std::string s_argv = converter.to_bytes(argv[0]);
 	char * sz_argv = const_cast<char*>(s_argv.c_str());
 
-	QApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
+	//QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
 	// Restart Application loop
 	int currentExitCode = 0;
@@ -56,11 +54,11 @@ int wmain(int argc, wchar_t * argv[])
 		g_print("Initializing GUI\n");
 		
 		GuiMain * MainWindow = new GuiMain();
-		MainWindow->statusBar()->setSizeGripEnabled(false);
 		MainWindow->show();
-		MainWindow->open_console_if();
 
 		g_print("GUI initialized\n");
+
+		MainWindow->initSetup();
 
 		currentExitCode = a.exec();
 

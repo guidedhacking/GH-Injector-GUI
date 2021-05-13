@@ -5,8 +5,9 @@
 DebugConsole::DebugConsole(QWidget * parent)
 	: QWidget(parent)
 {
-	m_OldSelection = "";
-	m_parent = Q_NULLPTR;
+	m_OldSelection	= "";
+	m_parent		= Q_NULLPTR;
+	m_dock_parent	= Q_NULLPTR;
 
 	QSizePolicy policy;
 	policy.setHorizontalPolicy(QSizePolicy::Policy::MinimumExpanding);
@@ -19,7 +20,7 @@ DebugConsole::DebugConsole(QWidget * parent)
 	m_Content->installEventFilter(this);
 
 	m_Layout = new QGridLayout();
-	m_Layout->setMargin(0);
+	m_Layout->setMargin(1);
 
 	QMargins m = { 0, 0, 0, 0 };
 	this->setSizePolicy(policy);
@@ -35,14 +36,24 @@ DebugConsole::DebugConsole(QWidget * parent)
 	m_FramelessParent->setWindowTitle("Debug data");
 	m_FramelessParent->setContent(this);
 	m_FramelessParent->installEventFilter(this);
-
-	onDelete = false;
+	m_FramelessParent->setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
+	m_FramelessParent->dock(false);
+	
+	m_ExternalLocked	= false;
+	m_WaitForLock		= true;
 }
 
 DebugConsole::~DebugConsole()
 {
-	delete m_Layout;
-	delete m_Content;
+	if (m_Layout)
+	{
+		delete m_Layout;
+	}
+
+	if (m_Content)
+	{
+		delete m_Content;
+	}
 }
 
 void DebugConsole::open()
@@ -60,6 +71,8 @@ void DebugConsole::close()
 {
 	hide();
 	m_FramelessParent->hide();
+
+	print_raw("Console closed\n");
 }
 
 void DebugConsole::move(const QPoint & p)
@@ -119,7 +132,11 @@ int DebugConsole::print(const char * format, ...)
 	if (result > 0)
 	{
 		print_raw(buffer);
-		m_Content->scrollToBottom();
+
+		if (m_Content)
+		{
+			m_Content->scrollToBottom();
+		}
 	}
 
 	if (buffer)
@@ -136,15 +153,25 @@ void DebugConsole::print_raw(const char * szText)
 	{
 		return;
 	}
-	
-	auto len = lstrlenA(szText);
-	
+
+	char * copy = nullptr;
+	bool use_copy = false;
+
+	size_t len = lstrlenA(szText);
+
 	if (len > 0)
 	{
 		if (szText[len - 1] == '\n')
 		{
-			//yeah, idc honestly
-			const_cast<char *>(szText)[len - 1] = '\0';
+			use_copy = true;
+
+			copy = new char[len]();
+			if (!copy)
+			{
+				return;
+			}
+
+			memcpy(copy, szText, len - 1);
 		}
 	}
 	else
@@ -152,7 +179,14 @@ void DebugConsole::print_raw(const char * szText)
 		return;
 	}
 
+	if (use_copy)
+	{
+		szText = copy;
+	}
+
+#ifdef DEBUG_CONSOLE_TO_CMD
 	printf("CONSOLE: %s\n", szText);
+#endif
 
 	QListWidgetItem * new_item = new QListWidgetItem();
 	new_item->setText(szText);
@@ -163,12 +197,94 @@ void DebugConsole::print_raw(const char * szText)
 		delete m_Content->item(0);
 	}
 
-	m_Content->scrollToBottom();
+	if (use_copy)
+	{
+		delete[] copy;
+	}
 }
 
 void DebugConsole::add_parent(QWidget * parent)
 {
 	m_parent = parent;
+}
+
+void DebugConsole::add_dock_parent(QWidget * parent)
+{
+	m_dock_parent = parent;
+
+	m_FramelessParent->dock(true, m_dock_parent);
+}
+
+void DebugConsole::dock(bool docked)
+{
+	m_FramelessParent->dock(docked, m_dock_parent);
+}
+
+HWND DebugConsole::get_parent()
+{
+	if (m_FramelessParent)
+	{
+		return reinterpret_cast<HWND>(m_FramelessParent->winId());
+	}
+
+	return NULL;
+}
+
+void DebugConsole::print_raw_external(const char * szText)
+{
+	if (m_ExternalLocked && !m_WaitForLock)
+	{
+		return;
+	}
+
+	while (m_ExternalLocked)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+
+	m_ExternalLocked = true;
+
+	m_ExternalDataBuffer.push_back(szText);
+
+	m_ExternalLocked = false;
+}
+
+void DebugConsole::update_external()
+{
+	if (m_ExternalLocked && !m_WaitForLock)
+	{
+		return;
+	}
+
+	while (m_ExternalLocked)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+
+	m_ExternalLocked = true;
+
+	if (!m_ExternalDataBuffer.size())
+	{
+		m_ExternalLocked = false;
+
+		return;
+	}
+
+	auto cpy = m_ExternalDataBuffer;
+
+	m_ExternalDataBuffer.clear();
+
+	m_ExternalLocked = false;
+
+	for (const auto & i : cpy)
+	{
+		print_raw(i.c_str());
+	}
+
+	if (m_Content)
+	{
+		m_Content->scrollToBottom();
+	}
 }
 
 void DebugConsole::ImTheTrashMan(const wchar_t * expression, const wchar_t * function, const wchar_t * file, unsigned int line, uintptr_t pReserved)
@@ -196,20 +312,20 @@ bool DebugConsole::eventFilter(QObject * obj, QEvent * event)
 
 			if (!selected.isEmpty())
 			{
-				QString data;
+				QString cb_data;
 				for (const auto & i : selected)
 				{
-					data += i->text();
-					data += "\n";
+					cb_data += i->text();
+					cb_data += "\n";
 				}
 
-				if (data != m_OldSelection)
+				if (cb_data != m_OldSelection)
 				{
-					qApp->clipboard()->setText(data);
+					qApp->clipboard()->setText(cb_data);
 
 					print("Copied to clipboard\n");
 
-					m_OldSelection = data;
+					m_OldSelection = cb_data;
 				}
 			}
 		}
@@ -231,10 +347,26 @@ bool DebugConsole::eventFilter(QObject * obj, QEvent * event)
 	return QObject::eventFilter(obj, event);
 }
 
-void g_print_to_console_raw(const char * szText)
+void __stdcall g_print_to_console_raw(const char * szText)
 {
 	if (g_Console)
 	{
 		g_Console->print_raw(szText);
+	}
+	else
+	{
+		printf(szText);
+	}
+}
+
+void __stdcall g_print_to_console_raw_external(const char * szText)
+{
+	if (g_Console)
+	{
+		g_Console->print_raw_external(szText);
+	}
+	else
+	{
+		printf(szText);
 	}
 }

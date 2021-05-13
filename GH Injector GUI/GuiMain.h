@@ -33,9 +33,12 @@ public:
 	static int const EXIT_CODE_UPDATE;
 	static int const EXIT_CODE_START_NATIVE;
 
+	static int const Height_small;
+	static int const Height_big;
+	static int const Height_change_delay;
+
 	static QPixmap GetIconFromFileW(const wchar_t * szPath, UINT size, int index = 0);
 	void show();
-	void open_console_if();
 
 private:
 	Ui::GuiMainClass ui;
@@ -63,6 +66,7 @@ private:
 	bool native;
 	bool consoleOpen;
 	bool consoleFirst;
+	bool tooltipsEnabled;
 
 	QPoint mouse_pos;
 
@@ -81,6 +85,9 @@ private:
 	QTimer * t_Delay_Inj;
 	QTimer * t_Update_Proc;
 	QTimer * t_OnUserInput;
+	QTimer * t_Update_DragDrop;
+	QTimer * t_SetUp;
+	QTimer * t_Console;
 
 	QPixmap pxm_banner;
 	QPixmap pxm_lul;
@@ -109,11 +116,12 @@ private:
 	// Settings
 	void save_settings();
 	void load_settings();
-	void settings_get_update();
-	void settings_get_console();
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
+
+public:
+	void initSetup();
 
 public slots:
 	void get_from_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
@@ -164,8 +172,14 @@ private slots:
 	void open_help();
 	void generate_shortcut();
 	void open_console();
+	void open_console_if();
 	void open_log();
 
+	// PDB
+	void setup();
+
 	// Update
+	void update();
 	void update_clicked();
+	void update_drag_drop();
 };

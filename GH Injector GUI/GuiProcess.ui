@@ -56,6 +56,18 @@
      </item>
      <item row="0" column="0" colspan="3">
       <widget class="QTreeWidget" name="tree_process">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>370</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="sortingEnabled">
         <bool>true</bool>
        </property>

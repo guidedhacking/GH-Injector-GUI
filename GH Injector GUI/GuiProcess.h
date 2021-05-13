@@ -61,7 +61,6 @@ public slots:
 	void get_from_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
 
 private slots:
-
 	void refresh_gui();
 	void refresh_process();
 	void filter_change(int i);
