@@ -6,6 +6,8 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 	: QDialog(parent)
 {
 	m_pStatus = Q_NULLPTR;
+	
+	m_running = false;
 
 	m_update_status		= false;
 	m_update_progress	= false;
@@ -56,12 +58,10 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 
 	m_FramelessParent = new FramelessWindow();
 	m_FramelessParent->setFixedSize(QSize(width, 20 + (int)labels.size() * 40));
-	m_FramelessParent->setDockButton(false);
 	m_FramelessParent->setMinimizeButton(false);
 	m_FramelessParent->setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	m_FramelessParent->setWindowTitle(title);
 	m_FramelessParent->setContent(this);
-	m_FramelessParent->setWindowModality(Qt::WindowModality::ApplicationModal);
 
 	m_FramelessParent->installEventFilter(this);
 	installEventFilter(this);
@@ -162,6 +162,22 @@ void DownloadProgressWindow::SetDone(int code)
 	m_new_done		= code;
 	m_update_done	= true;
 	this->update();
+}
+
+int DownloadProgressWindow::Execute()
+{
+	m_FramelessParent->setWindowModality(Qt::WindowModality::ApplicationModal);
+	m_running = true;
+	auto r = exec();
+	m_running = false;
+	m_FramelessParent->setWindowModality(Qt::WindowModality::NonModal);
+
+	return r;
+}
+
+bool DownloadProgressWindow::IsRunning()
+{
+	return m_running;
 }
 
 void DownloadProgressWindow::SetCloseCallback(std::function<void(void)> CloseCallback)

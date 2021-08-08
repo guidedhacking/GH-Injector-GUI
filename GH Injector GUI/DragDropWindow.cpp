@@ -3,8 +3,8 @@
 
 #include "DragDropWindow.h"
 
-const wchar_t DragDropWindow::m_szClassName[]	= L"DragnDropWindow";
-int DragDropWindow::m_ClassRefCount				= 0;
+const TCHAR DragDropWindow::m_szClassName[]	= TEXT("DragnDropWindow");
+int DragDropWindow::m_ClassRefCount			= 0;
 
 DragDropWindow::DragDropWindow()
 {
@@ -60,14 +60,14 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 
 	++m_ClassRefCount;
 	
-	m_hDropWnd = CreateWindowExW(WS_EX_ACCEPTFILES | WS_EX_TOOLWINDOW, m_szClassName, nullptr, WS_BORDER | WS_POPUP, -1000000, -1000000, m_size, m_size, NULL, NULL, hInstance, this);
+	m_hDropWnd = CreateWindowEx(WS_EX_ACCEPTFILES | WS_EX_TOOLWINDOW, m_szClassName, nullptr, WS_BORDER | WS_POPUP, -1000000, -1000000, m_size, m_size, NULL, NULL, hInstance, this);
 	if (m_hDropWnd == NULL)
 	{
 		g_print("CreateWindowExW failed: %08X\n", GetLastError());
 
 		if (m_ClassRefCount == 1)
 		{
-			UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
+			UnregisterClass(m_szClassName, hInstance);
 
 			--m_ClassRefCount;
 		}
@@ -77,7 +77,7 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 
 	SetWindowLongPtr(m_hDropWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-	m_hDropIcon = reinterpret_cast<HICON>(LoadImage(GetModuleHandle(0), MAKEINTRESOURCE(IDI_ICON2), IMAGE_ICON, m_size, m_size, NULL));
+	m_hDropIcon = reinterpret_cast<HICON>(LoadImage(hInstance, MAKEINTRESOURCE(IDI_ICON2), IMAGE_ICON, m_size, m_size, NULL));
 	if (!m_hDropIcon)
 	{
 		g_print("LoadImage failed: %08X\n", GetLastError());
@@ -86,7 +86,7 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 
 		if (m_ClassRefCount == 1)
 		{
-			UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
+			UnregisterClass(m_szClassName, hInstance);
 
 			--m_ClassRefCount;
 		}
@@ -104,7 +104,7 @@ HWND DragDropWindow::CreateDragDropWindow(HWND hParent, int Size)
 
 		if (m_ClassRefCount == 1)
 		{
-			UnregisterClass(m_szClassName, GetModuleHandle(nullptr));
+			UnregisterClass(m_szClassName, hInstance);
 
 			--m_ClassRefCount;
 		}
@@ -236,7 +236,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 
 	for (UINT i = 0; i < DropCount; ++i)
 	{
-		auto BufferSize = DragQueryFile(hDrop, i, nullptr, 0);
+		auto BufferSize = DragQueryFileW(hDrop, i, nullptr, 0);
 
 		if (!BufferSize)
 		{
@@ -256,7 +256,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 			continue;
 		}
 
-		if (!DragQueryFile(hDrop, i, Drops[i], BufferSize))
+		if (!DragQueryFileW(hDrop, i, Drops[i], BufferSize))
 		{
 			g_print("DragQueryFile failed for drop %d\n", i);
 

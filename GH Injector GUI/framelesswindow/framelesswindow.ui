@@ -186,7 +186,7 @@
          <item>
           <widget class="QToolButton" name="dockButton">
            <property name="enabled">
-            <bool>true</bool>
+            <bool>false</bool>
            </property>
            <property name="minimumSize">
             <size>
@@ -201,7 +201,7 @@
             </size>
            </property>
            <property name="toolTip">
-            <string>Undock</string>
+            <string/>
            </property>
            <property name="styleSheet">
             <string notr="true">#dockButton{

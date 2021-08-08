@@ -41,6 +41,7 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 {
 	BYTE * pSrcData	= nullptr;
 
+	IMAGE_DOS_HEADER	* pDosHeader	= nullptr;
 	IMAGE_NT_HEADERS	* pNtHeaders	= nullptr;
 	IMAGE_FILE_HEADER	* pFileHeader	= nullptr;
 
@@ -62,8 +63,10 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 		return ARCH::NONE;
 	}
 
+	auto pe_min_size = sizeof(IMAGE_DOS_HEADER) + sizeof(IMAGE_NT_HEADERS32);
+
 	auto FileSize = File.tellg();
-	if (FileSize < 0x1000)
+	if (static_cast<UINT_PTR>(FileSize) < pe_min_size)
 	{
 		g_print("Filesize is invalid\n");
 
@@ -84,9 +87,22 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 
 	File.seekg(0, std::ios::beg);
 	File.read(reinterpret_cast<char *>(pSrcData), FileSize);
+
+	if (File.fail())
+	{
+		g_print("Reading the file failed: %X\n", (DWORD)File.rdstate());
+
+		delete[] pSrcData;
+		File.close();
+
+		return ARCH::NONE;
+	}
+
 	File.close();
 
-	if (reinterpret_cast<IMAGE_DOS_HEADER *>(pSrcData)->e_magic != IMAGE_DOS_SIGNATURE)
+	pDosHeader = reinterpret_cast<IMAGE_DOS_HEADER *>(pSrcData);
+
+	if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
 	{
 		g_print("Invalid DOS signature\n");
 
@@ -95,7 +111,16 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 		return ARCH::NONE;
 	}
 
-	pNtHeaders		= reinterpret_cast<IMAGE_NT_HEADERS *>(pSrcData + reinterpret_cast<IMAGE_DOS_HEADER *>(pSrcData)->e_lfanew);
+	if (!pDosHeader->e_lfanew || pDosHeader->e_lfanew >= FileSize)
+	{
+		g_print("Invalid DOS header\n");
+
+		delete[] pSrcData;
+
+		return ARCH::NONE;
+	}
+
+	pNtHeaders		= reinterpret_cast<IMAGE_NT_HEADERS *>(pSrcData + pDosHeader->e_lfanew);
 	pFileHeader		= &pNtHeaders->FileHeader;
 
 	if (pNtHeaders->Signature != IMAGE_NT_SIGNATURE)
@@ -136,10 +161,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 
 ARCH getProcArch(const int PID)
 {
-	bool native = IsNativeProcess(PID);
-
 #ifdef _WIN64
-	if (!native)
+	if (!IsNativeProcess(PID))
 	{
 		return ARCH::X86;
 	}
@@ -579,7 +602,7 @@ bool SetDebugPrivilege(bool Enable)
 	}
 
 	// Get the LUID for the privilege. 
-	BOOL bLpv = LookupPrivilegeValue(NULL, L"SeDebugPrivilege", &tkp.Privileges[0].Luid);
+	BOOL bLpv = LookupPrivilegeValue(NULL, TEXT("SeDebugPrivilege"), &tkp.Privileges[0].Luid);
 	if (!bLpv)
 	{
 		CloseHandle(hToken);

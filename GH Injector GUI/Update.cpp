@@ -7,12 +7,10 @@ void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring versi
 
 std::wstring get_newest_version()
 {
-	DownloadProgress progress(GH_VERSION_URLW, true);
+	TCHAR szCacheFile[MAX_PATH]{ 0 };
+	auto hr = URLDownloadToCacheFile(nullptr, GH_VERSION_URL, szCacheFile, sizeof(szCacheFile) / sizeof(szCacheFile[0]), 0, nullptr);
 
-	wchar_t szCacheFile[MAX_PATH]{ 0 };
-	HRESULT hRes = URLDownloadToCacheFileW(nullptr, GH_VERSION_URLW, szCacheFile, sizeof(szCacheFile) / sizeof(szCacheFile[0]), 0, &progress);
-
-	if (hRes != S_OK)
+	if (FAILED(hr))
 	{
 		return L"0.0";
 	}
@@ -21,7 +19,7 @@ std::wstring get_newest_version()
 
 	if (!infile.good())
 	{
-		DeleteFileW(szCacheFile);
+		DeleteFile(szCacheFile);
 
 		return L"0.0";
 	}
@@ -31,7 +29,7 @@ std::wstring get_newest_version()
 
 	infile.close();
 
-	DeleteFileW(szCacheFile);
+	DeleteFile(szCacheFile);
 
 	return strVer;
 }
@@ -42,7 +40,6 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 
 	FramelessWindow parent;
 	parent.setMinimizeButton(false);
-	parent.setDockButton(false);
 	parent.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 
 	QMessageBox * box = new QMessageBox(QMessageBox::Icon::Information, "", "", QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, &parent, Qt::WindowType::FramelessWindowHint);
@@ -104,7 +101,7 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 	auto worker = std::thread(update_update_thread, UpdateWnd, newest_version, Lib);
 
 	UpdateWnd->show();
-	auto ret = UpdateWnd->exec();
+	auto ret = UpdateWnd->Execute();
 	auto err = UpdateWnd->GetStatus();
 	
 	worker.join();
@@ -123,6 +120,13 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 
 void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring version, InjectionLib * Lib)
 {
+	while (!UpdateWnd->IsRunning())
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+
+	Sleep(100);
+
 	auto path = QCoreApplication::applicationDirPath().toStdWString();
 	path += L"/";
 

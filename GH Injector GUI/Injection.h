@@ -51,8 +51,8 @@ constexpr auto GH_DOWNLOAD_PREFIXW = L"https://guidedhacking.com/gh/inj/V";
 constexpr auto GH_DOWNLOAD_SUFFIXA = "/GH Injector.zip";
 constexpr auto GH_DOWNLOAD_SUFFIXW = L"/GH Injector.zip";
 
-constexpr auto GH_VERSION_URLA = "https://guidedhacking.com/gh/inj/";
-constexpr auto GH_VERSION_URLW = L"https://guidedhacking.com/gh/inj/";
+constexpr auto GH_VERSION_URLA = "https://guidedhacking.com/gh/inj/lastestver/";
+constexpr auto GH_VERSION_URLW = L"https://guidedhacking.com/gh/inj/lastestver/";
 
 constexpr auto GH_SETTINGS_INIA = "Settings.ini";
 constexpr auto GH_SETTINGS_INIW = L"Settings.ini";
@@ -62,15 +62,15 @@ constexpr auto GH_INJ_MOD_NAMEA = GH_INJ_MOD_NAME64A;
 constexpr auto GH_INJ_MOD_NAMEW = GH_INJ_MOD_NAME64W;
 constexpr auto GH_INJ_EXE_NAMEA = GH_INJ_EXE_NAME64A;
 constexpr auto GH_INJ_EXE_NAMEW = GH_INJ_EXE_NAME64W;
-constexpr auto GH_INJ_SM_NAMEA = GH_INJ_MOD_NAME64A;
-constexpr auto GH_INJ_SM_NAMEW = GH_INJ_MOD_NAME64W;
+constexpr auto GH_INJ_SM_NAMEA	= GH_INJ_MOD_NAME64A;
+constexpr auto GH_INJ_SM_NAMEW	= GH_INJ_MOD_NAME64W;
 #else
 constexpr auto GH_INJ_MOD_NAMEA = GH_INJ_MOD_NAME86A;
 constexpr auto GH_INJ_MOD_NAMEW = GH_INJ_MOD_NAME86W;
 constexpr auto GH_INJ_EXE_NAMEA = GH_INJ_EXE_NAME86A;
 constexpr auto GH_INJ_EXE_NAMEW = GH_INJ_EXE_NAME86W;
-constexpr auto GH_INJ_SM_NAMEA = GH_INJ_MOD_NAME86A;
-constexpr auto GH_INJ_SM_NAMEW = GH_INJ_MOD_NAME86W;
+constexpr auto GH_INJ_SM_NAMEA	= GH_INJ_MOD_NAME86A;
+constexpr auto GH_INJ_SM_NAMEW	= GH_INJ_MOD_NAME86W;
 #endif
 
 #ifdef UNICODE
@@ -93,17 +93,17 @@ constexpr auto GH_INJ_EXE_NAME86	= GH_INJ_EXE_NAME86W;
 constexpr auto GH_INJ_SM_NAME64		= GH_INJ_SM_NAME64W;
 constexpr auto GH_INJ_SM_NAME86		= GH_INJ_SM_NAME86W;
 #else
-constexpr auto GH_INJ_GUI_VERSION	= GH_INJ_GUI_VERSIONA:
-constexpr auto GH_INJ_MOD_NAME		= GH_INJ_MOD_NAMEA:
-constexpr auto GH_INJ_EXE_NAME		= GH_INJ_EXE_NAMEA:
-constexpr auto GH_INJ_SM_NAME		= GH_INJ_SM_NAMEA:
-constexpr auto GH_INJ_ZIP			= GH_INJ_ZIPA:
-constexpr auto GH_INJ_LOG			= GH_INJ_LOGA:
-constexpr auto GH_HELP_URL			= GH_HELP_URLA:
-constexpr auto GH_DOWNLOAD_PREFIX	= GH_DOWNLOAD_PREFIXA:
-constexpr auto GH_DOWNLOAD_SUFFIX	= GH_DOWNLOAD_SUFFIXA:
-constexpr auto GH_VERSION_URL		= GH_VERSION_URLA:
-constexpr auto GH_SETTINGS_INI		= GH_SETTINGS_INIA:
+constexpr auto GH_INJ_GUI_VERSION	= GH_INJ_GUI_VERSIONA;
+constexpr auto GH_INJ_MOD_NAME		= GH_INJ_MOD_NAMEA;
+constexpr auto GH_INJ_EXE_NAME		= GH_INJ_EXE_NAMEA;
+constexpr auto GH_INJ_SM_NAME		= GH_INJ_SM_NAMEA;
+constexpr auto GH_INJ_ZIP			= GH_INJ_ZIPA;
+constexpr auto GH_INJ_LOG			= GH_INJ_LOGA;
+constexpr auto GH_HELP_URL			= GH_HELP_URLA;
+constexpr auto GH_DOWNLOAD_PREFIX	= GH_DOWNLOAD_PREFIXA;
+constexpr auto GH_DOWNLOAD_SUFFIX	= GH_DOWNLOAD_SUFFIXA;
+constexpr auto GH_VERSION_URL		= GH_VERSION_URLA;
+constexpr auto GH_SETTINGS_INI		= GH_SETTINGS_INIA;
 
 constexpr auto GH_INJ_MOD_NAME64	= GH_INJ_MOD_NAME64A;
 constexpr auto GH_INJ_MOD_NAME86	= GH_INJ_MOD_NAME86A;
@@ -160,7 +160,7 @@ struct INJECTIONDATAW
 	bool			GenerateErrorLog;
 };
 
-#ifdef _UNICODE
+#ifdef UNICODE
 #define INJECTIONDATA INJECTIONDATAW
 #else
 #define INJECTIONDATA INJECTIONDATAA
@@ -215,11 +215,11 @@ struct HookInfo
 #define INJ_ERR_SYMBOL_INIT_NOT_DONE	0x0000001C
 #define INJ_ERR_IMPORT_HANDLER_NOT_DONE 0x00000037
 
-using f_InjectA = DWORD(__stdcall*)(INJECTIONDATAA * pData);
-using f_InjectW = DWORD(__stdcall*)(INJECTIONDATAW * pData);
+using f_InjectA = DWORD(__stdcall *)(INJECTIONDATAA * pData);
+using f_InjectW = DWORD(__stdcall *)(INJECTIONDATAW * pData);
 
-using f_ValidateInjectionFunctions = bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut);
-using f_RestoreInjectionFunctions = bool(__stdcall*)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn, UINT Count, UINT * CountOut);
+using f_ValidateInjectionFunctions	= bool(__stdcall *)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataOut, UINT Count, UINT * CountOut);
+using f_RestoreInjectionFunctions	= bool(__stdcall *)(DWORD dwTargetProcessId, DWORD & ErrorCode, DWORD & LastWin32Error, HookInfo * HookDataIn, UINT Count, UINT * CountOut);
 
 using f_GetVersionA = HRESULT(__stdcall *)(char		* out, size_t cb_size);
 using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);

@@ -2,12 +2,10 @@
 
 #include "DebugConsole.h"
 
-DebugConsole::DebugConsole(QWidget * parent)
+DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	: QWidget(parent)
 {
 	m_OldSelection	= "";
-	m_parent		= Q_NULLPTR;
-	m_dock_parent	= Q_NULLPTR;
 
 	QSizePolicy policy;
 	policy.setHorizontalPolicy(QSizePolicy::Policy::MinimumExpanding);
@@ -37,8 +35,21 @@ DebugConsole::DebugConsole(QWidget * parent)
 	m_FramelessParent->setContent(this);
 	m_FramelessParent->installEventFilter(this);
 	m_FramelessParent->setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
-	m_FramelessParent->dock(false);
-	
+	m_FramelessParent->resize(QSize(150, 350));
+
+	if (dock_parent)
+	{
+		m_DockParent = dock_parent;
+		m_FramelessParent->setDockButton(true, false, 0);
+		m_Docker = new WindowDocker(m_DockParent, m_FramelessParent);
+		m_Docker->SetDocking(true, true, true, true);
+		m_Docker->SetResizing(true, true);
+	}
+	else
+	{
+		m_Docker = nullptr;
+	}
+
 	m_ExternalLocked	= false;
 	m_WaitForLock		= true;
 }
@@ -58,21 +69,18 @@ DebugConsole::~DebugConsole()
 
 void DebugConsole::open()
 {
-	m_FramelessParent->show();
-	show();
-
-	if (m_parent)
+	if (m_FramelessParent->isMinimized())
 	{
-		m_parent->show();
+		m_FramelessParent->setWindowState(m_FramelessParent->windowState() & ~Qt::WindowMinimized);
 	}
+
+	m_FramelessParent->show();
+	SetWindowPos((HWND)m_FramelessParent->winId(), (HWND)m_DockParent->winId(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 void DebugConsole::close()
 {
-	hide();
 	m_FramelessParent->hide();
-
-	print_raw("Console closed\n");
 }
 
 void DebugConsole::move(const QPoint & p)
@@ -80,7 +88,7 @@ void DebugConsole::move(const QPoint & p)
 	m_FramelessParent->move(p);
 }
 
-void DebugConsole::setSize(const QSize & s)
+void DebugConsole::set_size(const QSize & s)
 {
 	m_FramelessParent->resize(s);
 }
@@ -124,6 +132,10 @@ int DebugConsole::print(const char * format, ...)
 			{
 				break;
 			}
+		}
+		else if (result < 0)
+		{
+			break;
 		}
 	} while (result < 0);
 
@@ -201,33 +213,13 @@ void DebugConsole::print_raw(const char * szText)
 	{
 		delete[] copy;
 	}
+
+	m_Content->scrollToBottom();
 }
 
-void DebugConsole::add_parent(QWidget * parent)
+bool DebugConsole::is_open()
 {
-	m_parent = parent;
-}
-
-void DebugConsole::add_dock_parent(QWidget * parent)
-{
-	m_dock_parent = parent;
-
-	m_FramelessParent->dock(true, m_dock_parent);
-}
-
-void DebugConsole::dock(bool docked)
-{
-	m_FramelessParent->dock(docked, m_dock_parent);
-}
-
-HWND DebugConsole::get_parent()
-{
-	if (m_FramelessParent)
-	{
-		return reinterpret_cast<HWND>(m_FramelessParent->winId());
-	}
-
-	return NULL;
+	return (m_FramelessParent->isHidden() != true);
 }
 
 void DebugConsole::print_raw_external(const char * szText)
@@ -287,6 +279,34 @@ void DebugConsole::update_external()
 	}
 }
 
+void DebugConsole::dock(int direction)
+{
+	if (m_Docker)
+	{
+		m_Docker->Dock(direction);
+	}
+}
+
+int DebugConsole::get_dock_index()
+{
+	if (m_Docker)
+	{
+		return m_Docker->GetDockIndex();
+	}
+
+	return -1;
+}
+
+int DebugConsole::get_old_dock_index()
+{
+	if (m_Docker)
+	{
+		return m_Docker->GetOldDockIndex();
+	}
+
+	return -1;
+}
+
 void DebugConsole::ImTheTrashMan(const wchar_t * expression, const wchar_t * function, const wchar_t * file, unsigned int line, uintptr_t pReserved)
 {
 	UNREFERENCED_PARAMETER(expression);
@@ -309,37 +329,37 @@ bool DebugConsole::eventFilter(QObject * obj, QEvent * event)
 		if (keyEvent->matches(QKeySequence::Copy) || keyEvent->matches(QKeySequence::Cut))
 		{
 			auto selected = m_Content->selectedItems();
-
+			
 			if (!selected.isEmpty())
 			{
-				QString cb_data;
-				for (const auto & i : selected)
+				std::vector<QListWidgetItem *> selection_sorted;
+				for (int i = 0; i < m_Content->count(); ++i)
 				{
-					cb_data += i->text();
-					cb_data += "\n";
+					QListWidgetItem * it = m_Content->item(i);
+					if (it->isSelected())
+					{
+						selection_sorted.push_back(it);
+					}
+				}
+
+				QString cb_data;
+				for (const auto & i : selection_sorted)
+				{
+					cb_data += i->text() + "\n";
 				}
 
 				if (cb_data != m_OldSelection)
 				{
 					qApp->clipboard()->setText(cb_data);
 
-					print("Copied to clipboard\n");
-
 					m_OldSelection = cb_data;
 				}
+
+				return true;
 			}
 		}
 	}
-	if (event->type() == QEvent::Close)
-	{
-		if (m_parent)
-		{
-			m_parent->setWindowState(m_parent->windowState() & ~Qt::WindowMinimized | Qt::WindowActive);
-			m_parent->setFocus();
-			m_parent->show();
-		}
-	}
-	if (event->type() == QEvent::FocusOut)
+	else if (event->type() == QEvent::FocusOut)
 	{
 		m_OldSelection = "";
 	}

@@ -47,13 +47,12 @@ int wmain(int argc, wchar_t * argv[])
 		DarkStyle * dark = new DarkStyle;
 		QApplication::setStyle(dark);
 		QApplication::setPalette(QApplication::style()->standardPalette());
-
-		g_Console = new DebugConsole();
+		
+		GuiMain * MainWindow = new GuiMain();
 
 		g_print("GH Injector V%ls\n", GH_INJ_GUI_VERSIONW);
 		g_print("Initializing GUI\n");
-		
-		GuiMain * MainWindow = new GuiMain();
+
 		MainWindow->show();
 
 		g_print("GUI initialized\n");
@@ -63,7 +62,6 @@ int wmain(int argc, wchar_t * argv[])
 		currentExitCode = a.exec();
 
 		delete MainWindow;
-		delete g_Console;
 	} 
 	while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
 

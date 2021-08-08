@@ -17,11 +17,11 @@ GuiMain::GuiMain(QWidget * parent)
 	framelessParent = new FramelessWindow();
 	framelessParent->setTitleBar(false);
 	framelessParent->setContent(this);
-	framelessParent->setResizeHorizontal(true);
+
+	g_Console = new DebugConsole(framelessParent);
+	g_Console->open();
 
 	drag_drop = nullptr;
-
-	g_Console->add_parent(framelessParent);
 
 	current_version = GH_INJ_GUI_VERSIONW;
 	newest_version = GH_INJ_GUI_VERSIONW; 
@@ -61,13 +61,11 @@ GuiMain::GuiMain(QWidget * parent)
 	t_OnUserInput		= new QTimer(this);
 	t_Update_DragDrop	= new QTimer(this);
 	t_SetUp				= new QTimer(this);
-	t_Console			= new QTimer(this);
 
 	t_Delay_Inj->setSingleShot(true);
 	t_OnUserInput->setSingleShot(true);
 	t_Update_DragDrop->setSingleShot(true);
 	t_SetUp->setSingleShot(true);
-	t_Console->setSingleShot(true);
 
 	pss				= new Process_State_Struct();
 	ps_picker		= new Process_Struct();
@@ -80,13 +78,6 @@ GuiMain::GuiMain(QWidget * parent)
 	ui.lbl_img->setPixmap(pxm_banner);
 	
 	ui.lbl_proc_icon->setStyleSheet("background: transparent");
-
-	if (!native)
-	{
-		// Won't work if not native
-		ui.cb_hijack->setChecked(false);
-		ui.cb_hijack->setDisabled(true);
-	}
 
 	auto banner_height = pxm_banner.height();
 	ui.btn_close->setFixedHeight(banner_height / 2);
@@ -121,6 +112,8 @@ GuiMain::GuiMain(QWidget * parent)
 	onMove			= false;
 	consoleOpen		= true;
 	tooltipsEnabled = true;
+	setupDone		= false;
+
 	mouse_pos = { 0, 0 };
 
 	// Window
@@ -159,14 +152,10 @@ GuiMain::GuiMain(QWidget * parent)
 	connect(ui.btn_openlog,		SIGNAL(clicked()), this, SLOT(open_log()));
 	
 	framelessPicker.setMinimizeButton(false);
-	framelessPicker.setDockButton(false);
 	framelessPicker.setResizeHorizontal(true);
 
 	framelessScanner.setMinimizeButton(false);
-	framelessScanner.setDockButton(false);
 	framelessScanner.setResizeHorizontal(true);
-
-	g_Console->add_dock_parent(framelessParent);
 
 	gui_Picker		= new GuiProcess(&framelessPicker, &framelessPicker);
 	gui_Scanner		= new GuiScanHook(&framelessScanner, &framelessScanner, &InjLib);
@@ -207,30 +196,53 @@ GuiMain::GuiMain(QWidget * parent)
 	connect(t_Update_Proc,		SIGNAL(timeout()), this, SLOT(update_process()));
 	connect(t_Update_DragDrop,	SIGNAL(timeout()), this, SLOT(update_drag_drop()));
 	connect(t_SetUp,			SIGNAL(timeout()), this, SLOT(setup()));
-	connect(t_Console,			SIGNAL(timeout()), this, SLOT(open_console_if()));
 
 	ui.fr_adv->setVisible(false);
 	ui.cb_unlink->setEnabled(true);
 
 	load_settings();
 	load_change(0);
+	cb_main_clicked();
+	cb_page_protection_clicked();
 	create_change(0);
 	peh_change(0);
 	tooltip_change();
+
+	if (dockIndex == -1)
+	{
+		dockIndex = 0;
+	}
+
+	if (!native)
+	{
+		// Won't work if not native
+		ui.cb_hijack->setDisabled(false);
+		ui.cb_hijack->setChecked(false);
+		ui.cb_hijack->setDisabled(true);
+	}
+
+	if (QOperatingSystemVersion::current() < QOperatingSystemVersion(QOperatingSystemVersion::Windows, 10))
+	{
+		// Only exists on Win10
+		auto * cmb_model = qobject_cast<QStandardItemModel *>(ui.cmb_load->model());
+		if (cmb_model)
+		{
+			if (ui.cmb_load->currentIndex() == 3)
+			{
+				ui.cmb_load->setCurrentIndex(0);
+			}
+
+			auto * it = cmb_model->item((int)INJECTION_MODE::IM_LdrpLoadDllInternal);
+			it->setFlags(it->flags() & ~Qt::ItemIsEnabled);
+		}
+	}
+
 	update_process();
 	update_proc_icon();
 	btn_change();
 
 	ui.fr_method->setStyleSheet("QFrame { border-top: 1px solid grey; }");
 	ui.fr_adv->setStyleSheet("QFrame { border-top: 1px solid grey; }");
-
-	if (!InjLib.LoadingStatus() || InjLib.GetSymbolState() != INJ_ERR_SUCCESS || InjLib.GetImportState() != INJ_ERR_SUCCESS)
-	{
-		ui.btn_inject->setEnabled(false);
-		ui.cb_auto->setEnabled(false);
-		ui.cb_auto->setChecked(false);
-		ui.btn_hooks->setEnabled(false);
-	}
 
 	auto_inject();
 }
@@ -251,6 +263,7 @@ GuiMain::~GuiMain()
 	delete t_Auto_Inj;
 	delete t_Update_DragDrop;
 	delete t_SetUp;
+	delete g_Console;
 
 	InjLib.InterruptDownload();
 	InjLib.Unload();
@@ -461,6 +474,25 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 					t_OnUserInput->start(10000);
 				}
 			}
+
+			auto * keyEvent = static_cast<QKeyEvent *>(event);
+			if (keyEvent->key() == Qt::Key_0)
+			{
+				g_Console->dock(0);
+			}
+			else if (keyEvent->key() == Qt::Key_1)
+			{
+				g_Console->dock(1);
+			}
+			else if (keyEvent->key() == Qt::Key_2)
+			{
+				g_Console->dock(2);
+			}
+			else if (keyEvent->key() == Qt::Key_3)
+			{
+				g_Console->dock(3);
+			}
+
 		}
 		break;
 
@@ -585,6 +617,11 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 			{
 				drag_drop->SetPosition(-1, -1, false, true);
 			}
+
+			if (g_Console && (obj == this || obj == framelessParent))
+			{
+				g_Console->close();
+			}
 		}
 		break;
 
@@ -649,9 +686,8 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 
 void GuiMain::initSetup()
 {
-	t_Update_Proc->start(100);
-	t_SetUp->start(100);
-	t_Console->start(100);
+	t_Update_Proc->start(200);
+	t_SetUp->start(200);
 }
 
 void GuiMain::toggleSelected()
@@ -894,6 +930,16 @@ void GuiMain::txt_pid_change()
 
 void GuiMain::btn_change()
 {
+	if (!InjLib.LoadingStatus() || InjLib.GetSymbolState() != INJ_ERR_SUCCESS || InjLib.GetImportState() != INJ_ERR_SUCCESS)
+	{
+		ui.btn_inject->setEnabled(false);
+		ui.cb_auto->setEnabled(false);
+		ui.cb_auto->setChecked(false);
+		ui.btn_hooks->setEnabled(false);
+
+		return;
+	}
+
 	QString s_PID = ui.txt_pid->text();
 	Process_Struct pl = getProcessByPID(s_PID.toInt());
 
@@ -1034,7 +1080,7 @@ void GuiMain::auto_loop_inject()
 
 void GuiMain::reset_settings()
 {
-	if (!YesNoBox("Reset", "Are you sure you want to reset all settings?"))
+	if (!YesNoBox("Reset", "Are you sure you want to reset all settings?", framelessParent))
 	{
 		return;
 	}
@@ -1066,6 +1112,8 @@ void GuiMain::close_clicked()
 
 void GuiMain::minimize_clicked()
 {
+	
+
 	framelessParent->on_minimizeButton_clicked();
 }
 
@@ -1174,6 +1222,7 @@ void GuiMain::save_settings()
 	settings.setValue("TOOLTIPSON", tooltipsEnabled);
 	settings.setValue("IGNOREUPDATES", ignoreUpdate);
 	settings.setValue("CONSOLE", g_Console->isVisible());
+	settings.setValue("DOCKINDEX", g_Console->get_dock_index());
 
 	// Not visible
 	settings.setValue("LASTDIR", lastPathStr);
@@ -1196,7 +1245,8 @@ void GuiMain::load_settings()
 		lastPathStr = QApplication::applicationDirPath();
 		ui.cmb_proc->setEditText("Broihon.exe");
 		ui.txt_pid->setText("1337");
-		ignoreUpdate = false;
+		ignoreUpdate	= false;
+		tooltipsEnabled = false;
 
 		return;
 	}
@@ -1211,10 +1261,7 @@ void GuiMain::load_settings()
 
 		auto path = settings.value(QString::number(0)).toString();
 
-		add_file_to_list(
-			path,
-			settings.value(QString::number(1)).toBool()
-		);
+		add_file_to_list(path, settings.value(QString::number(1)).toBool());
 	}
 	settings.endArray();
 
@@ -1282,8 +1329,9 @@ void GuiMain::load_settings()
 	pss->cbSession	= settings.value("CURRENTSESSION").toBool();
 
 	// Info
-	tooltipsEnabled = settings.value("TOOLTIPSON").toBool();
+	tooltipsEnabled = !settings.value("TOOLTIPSON").toBool();
 	consoleOpen		= settings.value("CONSOLE").toBool();
+	dockIndex		= settings.value("DOCKINDEX").toInt();
 	ignoreUpdate	= settings.value("IGNOREUPDATES").toBool();
 
 	// Not visible
@@ -1485,7 +1533,7 @@ void GuiMain::add_file_to_list(QString str, bool active)
 	{
 		return;
 	}
-
+	
 	QTreeWidgetItem * item = new QTreeWidgetItem(ui.tree_files);
 
 	item->setCheckState(0, Qt::CheckState::Unchecked);
@@ -1796,6 +1844,7 @@ void GuiMain::inject_file()
 		if (res != 0)
 		{
 			sprintf_s(buffer, "Injection (%d/%d) failed:\n  Error = %08X\n", inj_count, (int)items.size(), res);
+			g_print("Check the error log for more information\n");
 		}
 		else
 		{
@@ -1891,7 +1940,7 @@ void GuiMain::tooltip_change()
 	// Files
 	ui.btn_add->setToolTipDuration(duration);
 	ui.btn_inject->setToolTipDuration(duration);
-	//ui.btn_remove->setToolTipDuration(duration);
+	ui.btn_remove->setToolTipDuration(duration);
 
 	// Info
 	ui.btn_tooltip->setToolTipDuration(duration);
@@ -1944,14 +1993,6 @@ QPixmap GuiMain::GetIconFromFileW(const wchar_t * szPath, UINT size, int index)
 void GuiMain::show()
 {
 	framelessParent->show();
-}
-
-void GuiMain::open_console_if()
-{
-	if (consoleOpen)
-	{
-		open_console();
-	}
 }
 
 void GuiMain::generate_shortcut()
@@ -2113,7 +2154,7 @@ void GuiMain::generate_shortcut()
 	if (SUCCEEDED(hr))
 	{
 		QString msg = "The shortcut was created succesfully with the following name:\n" + fileName + "\n\nOpen shortcut location?";
-		if (YesNoBox("Success", "The shortcut was created succesfully with the following name:\n" + fileName + "\n\nDo you want to open the shortcut location?"))
+		if (YesNoBox("Success", "The shortcut was created succesfully with the following name:\n" + fileName + "\n\nDo you want to open the shortcut location?", framelessParent))
 		{
 			//stolen from here:
 			//https://stackoverflow.com/questions/15300999/open-windows-explorer-directory-select-a-specific-file-in-delphi
@@ -2146,10 +2187,13 @@ void GuiMain::generate_shortcut()
 void GuiMain::open_console()
 {
 	g_Console->open();
-	g_Console->dock(true);
-	SetForegroundWindow(g_Console->get_parent());
-	
-	g_print("Console opened");
+
+	if (g_Console->get_dock_index() == -1 && dockIndex != -1)
+	{
+		int old_idx = g_Console->get_old_dock_index();
+		g_Console->dock(dockIndex);
+		dockIndex = old_idx;
+	}
 
 	consoleOpen = true;
 }
@@ -2168,13 +2212,22 @@ void GuiMain::open_log()
 
 void GuiMain::setup()
 {
+	if (!consoleOpen)
+	{
+		g_Console->close();
+	}
+	else
+	{
+		open_console();
+	}
+	
 	update();
 
 	if (InjLib.GetSymbolState() != INJ_ERR_SUCCESS || InjLib.GetImportState() != INJ_ERR_SUCCESS)
 	{
 		g_Console->update_external();
 
-		if (YesNoBox("PDB Download", "The injector requires PDB files for the ntdll.dll to work.\nThese files will be downloaded from the Microsoft Symbol Server\nand will take up about 3MB.\n\nDo you want to download the files now?"))
+		if (YesNoBox("PDB Download", "The injector requires PDB files for the ntdll.dll to work.\nThese files will be downloaded from the Microsoft Symbol Server\nand will take up about 3MB.\n\nDo you want to download the files now?", framelessParent))
 		{
 			InjLib.StartDownload();
 			ShowPDBDownload(&InjLib);
@@ -2195,6 +2248,8 @@ void GuiMain::setup()
 
 		g_print("Injector ready\n");
 	}
+
+	setupDone = true;
 }
 
 void GuiMain::update()

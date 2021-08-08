@@ -15,52 +15,68 @@ void ShowPDBDownload(InjectionLib * InjLib)
 	DownloadProgressWindow * ProgressWindow = new DownloadProgressWindow("PDB Download", labels, "Waiting for connection...", 300, Q_NULLPTR);
 
 	auto worker = std::thread(&pdb_download_update_thread, ProgressWindow, InjLib);
-
+	
 	ProgressWindow->show();
-	auto ret = ProgressWindow->exec();
-
+	auto ret = ProgressWindow->Execute();
 	worker.join();
 
 	delete ProgressWindow;
 
 	g_Console->update_external();
 
-	if (ret == -2)
+	QString error_msg = "";
+
+	if (ret > 0)
 	{
-		InjLib->InterruptDownload();
-
-		g_Console->update_external();
-
-		QString error_msg = "Download interrupted.\nThe injector cannot function without the PDB files.\nPlease restart the injector.";
-		ShowStatusbox(false, error_msg);
-	}
-	else if (ret == -1)
-	{
-		InjLib->InterruptDownload();
-
-		g_Console->update_external();
-
-		QString error_msg = "Internet connection interrupted.\nThe injector cannot function without the PDB files.\nPlease restart the injector.";
-		ShowStatusbox(false, error_msg);
-	}
-	else if (ret != 0)
-	{
-		QString error_msg = "Download/import failure. Error code: 0x";
+		error_msg = "Download/import failure. Error code: 0x";
 		QString number = QStringLiteral("%1").arg(ret, 8, 0x10, QLatin1Char('0'));
 		error_msg += number;
 		error_msg += "\nThe injector cannot function without the PDB files.\nPlease restart the injector.";
+	}
+	else if (ret < 0)
+	{
+		InjLib->InterruptDownload();
 
+		switch (ret)
+		{
+			case PEB_ERR_INTERRUPTED:
+				error_msg = "Download interrupted.\nThe injector cannot function without the PDB files.\nPlease restart the injector.";
+				break;
+
+			case PEB_ERR_CONNECTION_BLOCKED:
+				error_msg = "Connection to Microsoft Symbol Server blocked.\nThis might be caused by a firewall rule.\nThe injector cannot function without the PDB files.\nPlease restart the injector.";
+				break;
+
+			case PEB_ERR_NO_INTERNET:
+				error_msg = "Internet connection interrupted.\nThe injector cannot function without the PDB files.\nPlease restart the injector.";
+				break;
+
+			default:
+				error_msg = "Unknown error code specified.\nThe injector cannot function without the PDB files.\nPlease restart the injector.";
+		}
+	}
+
+	if (ret != PDB_ERR_SUCCESS)
+	{
+		g_Console->update_external();
 		ShowStatusbox(false, error_msg);
 	}
 }
 
 void pdb_download_update_thread(DownloadProgressWindow * ProgressWindow, InjectionLib * InjLib)
 {
+	while (!ProgressWindow->IsRunning())
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+
+	Sleep(100);
+
 	bool bClosed = false;
 
 	auto close_callback = [&]()
 	{
-		ProgressWindow->SetDone(-2);
+		ProgressWindow->SetDone(PEB_ERR_INTERRUPTED);
 
 		bClosed = true;
 	};
@@ -81,13 +97,21 @@ void pdb_download_update_thread(DownloadProgressWindow * ProgressWindow, Injecti
 		ProgressWindow->SetProgress(1, progress_1);
 #endif
 
-		if (InternetCheckConnectionA("https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
+		if (InternetCheckConnectionW(L"https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
 		{
-			if (connected)
+			if (GetLastError() == ERROR_INTERNET_CANNOT_CONNECT)
+			{
+				ProgressWindow->SetStatus("Cannot connect to Microsoft Symbol Server...");
+				connected = false;
+				ProgressWindow->SetDone(PEB_ERR_CONNECTION_BLOCKED);
+
+				return;
+			}
+			else if (connected)
 			{
 				ProgressWindow->SetStatus("Waiting for internet connection...");
 				connected = false;
-				ProgressWindow->SetDone(-1);
+				ProgressWindow->SetDone(PEB_ERR_NO_INTERNET);
 
 				return;
 			}
@@ -143,5 +167,5 @@ void pdb_download_update_thread(DownloadProgressWindow * ProgressWindow, Injecti
 		return;
 	}
 
-	ProgressWindow->SetDone(0);
+	ProgressWindow->SetDone(PDB_ERR_SUCCESS);
 }

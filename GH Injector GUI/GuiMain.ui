@@ -973,6 +973,9 @@
           </property>
           <item row="1" column="0">
            <widget class="QPushButton" name="btn_tooltip">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;You won't have to see this again.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Disable tooltips</string>
             </property>
@@ -980,8 +983,11 @@
           </item>
           <item row="0" column="1">
            <widget class="QPushButton" name="btn_inject">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;No clue what this button does to be honest.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>Inject</string>
+             <string>&amp;Inject</string>
             </property>
            </widget>
           </item>
@@ -1013,6 +1019,9 @@
                 <height>20</height>
                </size>
               </property>
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open console.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
               <property name="text">
                <string/>
               </property>
@@ -1026,6 +1035,9 @@
                 <height>40</height>
                </size>
               </property>
+              <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open log.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
               <property name="text">
                <string/>
               </property>
@@ -1035,13 +1047,19 @@
           </item>
           <item row="0" column="0">
            <widget class="QPushButton" name="btn_add">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select files from the explorer.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>Add files</string>
+             <string>&amp;Add files</string>
             </property>
            </widget>
           </item>
           <item row="0" column="2">
            <widget class="QPushButton" name="btn_remove">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove the selected files from the list.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
              <string>Remove files</string>
             </property>
@@ -1049,8 +1067,11 @@
           </item>
           <item row="1" column="1">
            <widget class="QPushButton" name="btn_shortcut">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Create a shortcut for the current injection settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>Create shortcut</string>
+             <string>&amp;Create shortcut</string>
             </property>
            </widget>
           </item>
@@ -1062,8 +1083,11 @@
               <height>40</height>
              </size>
             </property>
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open the release thread for help.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
             <property name="text">
-             <string>Help</string>
+             <string>&amp;Help</string>
             </property>
            </widget>
           </item>

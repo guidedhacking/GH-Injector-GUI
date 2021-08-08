@@ -391,7 +391,9 @@ void help()
 	printf("\t\t\t0x00200000 = INJ_MM_SET_PAGE_PROTECTIONS\n");
 	printf("\t\t\t0x00400000 = INJ_MM_INIT_SECURITY_COOKIE\n");
 	printf("\t\t\t0x00800000 = INJ_MM_RUN_DLL_MAIN\n");
-	printf("\t\tThe default is MM_DEFAULT (0x0FE00000)\n\n");
+	printf("\t\t\t0x01000000 = INJ_MM_RUN_UNDER_LDR_LOCK\n");
+	printf("\t\t\t0x02000000 = INJ_MM_SHIFT_MODULE_BASE\n");
+	printf("\t\tThe default is MM_DEFAULT (0x01FE0000)\n\n");
 
 	//additional
 	printf("Additional commands:\n\n");

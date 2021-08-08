@@ -12,20 +12,22 @@ class DebugConsole : public QWidget
 	Q_OBJECT
 
 public:
-	DebugConsole(QWidget * parent = Q_NULLPTR);
+	DebugConsole(FramelessWindow * dock_parent = Q_NULLPTR, QWidget * parent = Q_NULLPTR);
 
 	~DebugConsole();
 
 	void open();
 	void close();
+
 	void move(const QPoint & p);
-	void setSize(const QSize & s);
+	void set_size(const QSize & s);
+
 	int print(const char * format, ...);
 	void print_raw(const char * szText);
-	void add_parent(QWidget * parent);
-	void add_dock_parent(QWidget * parent);
-	void dock(bool docked);
-	HWND get_parent();
+
+	bool is_open();
+	int get_dock_index();
+	int get_old_dock_index();
 
 	//from non qt thread call this function and not the regular print_raw or bad things happen to your GUI (sometimes)
 	void print_raw_external(const char * szText);
@@ -33,17 +35,21 @@ public:
 	//call this function from the qt owner thread to update the console
 	void update_external();
 
+	void dock(int direction);
+
 private:
+	WindowDocker * m_Docker;
+
 	FramelessWindow * m_FramelessParent;
+	FramelessWindow * m_DockParent;
+
 	QListWidget * m_Content;
 	QGridLayout * m_Layout;
 
 	QString m_OldSelection;
 
-	QWidget * m_parent;
-	QWidget * m_dock_parent;
-
 	std::vector<std::string> m_ExternalDataBuffer;
+
 	bool m_ExternalLocked;
 	bool m_WaitForLock;
 

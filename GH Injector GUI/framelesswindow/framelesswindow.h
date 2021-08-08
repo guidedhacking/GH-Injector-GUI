@@ -14,8 +14,11 @@
 #ifndef FRAMELESSWINDOW_H
 #define FRAMELESSWINDOW_H
 
+class WindowDocker;
+
 #include "..\pch.h"
 #include "ui_framelesswindow.h"
+#include "..\WindowDocker.h"
 
 namespace Ui
 {
@@ -26,14 +29,17 @@ class FramelessWindow : public QWidget
 {
 	Q_OBJECT
 
+	const static int dock_range = 25;
+
 private:
 	QWidget * content;
-	QWidget * m_dock_parent;
 
 	bool resize_left;
 	bool resize_right;
 	bool resize_top;
 	bool resize_bottom;
+
+	bool m_bDockButton;
 
 public:
 	explicit FramelessWindow(QWidget * parent = Q_NULLPTR);
@@ -41,19 +47,16 @@ public:
 	void setContent(QWidget * w);
 	void setTitleBar(bool active);
 	void setMinimizeButton(bool active);
-	void setDockButton(bool active);
+	void setDockButton(bool active, bool docked, int direction);
 
 	void setResizeLeft	(bool enabled = false);
 	void setResizeRight	(bool enabled = false);
 	void setResizeTop	(bool enabled = false);
 	void setResizeBottom(bool enabled = false);
-
 	void setResizeHorizontal(bool enabled = false);
 	void setResizeVertical	(bool enabled = false);
-
 	void setResize(bool enabled = false);
-
-	void dock(bool docked = false, QWidget * dock_parent = nullptr);
+	void setBorderStyle(QString style);
 
 private:
 	bool leftBorderHit(const QPoint & pos);
@@ -74,7 +77,10 @@ public slots:
 	void on_closeButton_clicked();
 	void on_windowTitlebar_doubleClicked();
 
-	void update_docked_pos();
+signals:
+	void dockButton_clicked();
+	void windowTitlebar_clicked();
+	void windowTitlebar_released();
 
 protected:
 	virtual void changeEvent(QEvent * event);
@@ -85,16 +91,18 @@ protected:
 	virtual bool eventFilter(QObject * obj, QEvent * event);
 
 private:
+
 	Ui::FramelessWindow * ui;
+
 	QRect m_StartGeometry;
 	const quint8 CONST_DRAG_BORDER_SIZE = 15;
+
 	bool m_bMousePressed;
 	bool m_bDragTop;
 	bool m_bDragLeft;
 	bool m_bDragRight;
 	bool m_bDragBottom;
-	bool m_bDocked;
-	bool m_bUpdateDockPos;
+	bool m_bDragged;
 };
 
 #endif  // FRAMELESSWINDOW_H

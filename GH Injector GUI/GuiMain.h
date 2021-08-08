@@ -67,6 +67,9 @@ private:
 	bool consoleOpen;
 	bool consoleFirst;
 	bool tooltipsEnabled;
+	bool setupDone;
+
+	int dockIndex;
 
 	QPoint mouse_pos;
 
@@ -87,7 +90,6 @@ private:
 	QTimer * t_OnUserInput;
 	QTimer * t_Update_DragDrop;
 	QTimer * t_SetUp;
-	QTimer * t_Console;
 
 	QPixmap pxm_banner;
 	QPixmap pxm_lul;
@@ -172,7 +174,6 @@ private slots:
 	void open_help();
 	void generate_shortcut();
 	void open_console();
-	void open_console_if();
 	void open_log();
 
 	// PDB

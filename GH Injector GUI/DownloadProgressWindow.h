@@ -15,10 +15,12 @@ public:
 	~DownloadProgressWindow();
 
 private:
-	std::vector<QProgressBar*> m_ProgressBarList;
-	FramelessWindow * m_FramelessParent;
-	QLabel * m_pStatus;
-	std::function<void(void)> m_CloseCallback;
+	std::vector<QProgressBar*>	m_ProgressBarList;
+	FramelessWindow			*	m_FramelessParent;
+	QLabel					*	m_pStatus;
+	std::function<void(void)>	m_CloseCallback;
+
+	bool m_running;
 
 	bool m_update_status;
 	bool m_update_progress;
@@ -35,6 +37,9 @@ public:
 	void SetProgress(int index, float value);
 	void SetStatus(QString status);
 	void SetDone(int code);
+
+	int Execute();
+	bool IsRunning();
 
 	void SetCloseCallback(std::function<void(void)> callback);
 

@@ -21,6 +21,8 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
 	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
 
+	selected_from_list = false;
+
 	m_ProcList.clear();
 
 	connect(ui.btn_refresh, SIGNAL(clicked()),						this, SLOT(refresh_process()));
@@ -44,6 +46,7 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 
 	installEventFilter(this);
 	ui.tree_process->installEventFilter(this);
+	ui.txt_filter->installEventFilter(this);
 	
 	own_session = getProcSession(GetCurrentProcessId());
 
@@ -74,7 +77,31 @@ bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
 			QKeyEvent * keyEvent = static_cast<QKeyEvent *>(event);
 			if (keyEvent->key() == Qt::Key_Space || keyEvent->key() == Qt::Key_Enter || keyEvent->key() == Qt::Key_Return)
 			{
+				event->accept();
+
 				proc_select();
+
+				return true;
+			}
+		}
+		else if (obj == ui.txt_filter && selected_from_list)
+		{
+			QKeyEvent * keyEvent = static_cast<QKeyEvent *>(event);
+			if (keyEvent->key() == Qt::Key_Enter || keyEvent->key() == Qt::Key_Return)
+			{
+				event->accept();
+
+				proc_select();
+
+				return true;
+			}
+			else if (keyEvent->key() == Qt::Key_Up || keyEvent->key() == Qt::Key_Down)
+			{
+				event->accept();
+
+				QApplication::sendEvent(ui.tree_process, event);
+
+				return true;
 			}
 		}
 		else if (obj == this)
@@ -82,7 +109,11 @@ bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
 			QKeyEvent * keyEvent = static_cast<QKeyEvent *>(event);
 			if (keyEvent->key() == Qt::Key_Escape)
 			{
+				event->accept();
+
 				proc_select(true);
+
+				return true;
 			}
 		}
 	}
@@ -96,6 +127,10 @@ void GuiProcess::refresh_gui()
 	QString filter		= ui.txt_filter->text();
 	int proc_count		= 0;
 
+	selected_from_list = false;
+
+	QTreeWidgetItem * selected_item = Q_NULLPTR;
+
 	QTreeWidgetItemIterator it(ui.tree_process);
 	for (; *it; ++it)
 	{
@@ -103,6 +138,7 @@ void GuiProcess::refresh_gui()
 
 		if (target_arch != ARCH::NONE && arch != target_arch)
 		{
+			(*it)->setSelected(false);
 			(*it)->setHidden(true);
 
 			continue;
@@ -113,6 +149,7 @@ void GuiProcess::refresh_gui()
 			int target_session = (*it)->text(4).toInt();
 			if (target_session != own_session && own_session != -1)
 			{
+				(*it)->setSelected(false);
 				(*it)->setHidden(true);
 
 				continue;
@@ -124,6 +161,7 @@ void GuiProcess::refresh_gui()
 			bool contains = (*it)->text(2).contains(filter, Qt::CaseInsensitive);
 			if (!contains)
 			{
+				(*it)->setSelected(false);
 				(*it)->setHidden(true);
 
 				continue;
@@ -132,10 +170,42 @@ void GuiProcess::refresh_gui()
 
 		(*it)->setHidden(false);
 
+		if (!selected_from_list && (*it)->isSelected())
+		{
+			selected_from_list = true;
+			selected_item = (*it);
+		}
+
 		++proc_count;
 	}
 
 	frameless_parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
+
+	if (!selected_from_list)
+	{
+		for (it = QTreeWidgetItemIterator(ui.tree_process); *it; ++it)
+		{
+			if ((*it)->isHidden())
+			{
+				continue;
+			}
+
+			(*it)->setSelected(true);
+			selected_from_list = true;
+			selected_item = (*it);
+
+			break;
+		}
+	}
+
+	if (selected_item)
+	{
+		auto r = ui.tree_process->visualItemRect(selected_item);
+		if (r.y() + r.height() + 10 >= ui.tree_process->height())
+		{
+			ui.tree_process->scrollToItem(selected_item);
+		}
+	}
 
 	g_print("Processlist updated\n");
 }

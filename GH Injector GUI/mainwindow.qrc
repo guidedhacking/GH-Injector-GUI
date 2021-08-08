@@ -4,8 +4,6 @@
         <file>images/icon_window_maximize.png</file>
         <file>images/icon_window_minimize.png</file>
         <file>images/icon_window_restore.png</file>
-        <file>images/icon_dock.png</file>
-        <file>images/icon_undock.png</file>
         <file>darkstyle/darkstyle.qss</file>
         <file>darkstyle/icon_branch_closed.png</file>
         <file>darkstyle/icon_branch_end.png</file>
@@ -30,6 +28,14 @@
         <file>darkstyle/icon_restore.png</file>
         <file>darkstyle/icon_undock.png</file>
         <file>darkstyle/icon_vline.png</file>
+        <file>images/icon_dock_l.png</file>
+        <file>images/icon_undock_l.png</file>
+        <file>images/icon_dock_b.png</file>
+        <file>images/icon_dock_r.png</file>
+        <file>images/icon_dock_t.png</file>
+        <file>images/icon_undock_b.png</file>
+        <file>images/icon_undock_r.png</file>
+        <file>images/icon_undock_t.png</file>
     </qresource>
     <qresource prefix="/GuiMain">
         <file>gh_resource/GH Icon.ico</file>

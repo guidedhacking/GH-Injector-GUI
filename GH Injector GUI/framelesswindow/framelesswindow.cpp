@@ -24,10 +24,8 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	m_bDragLeft(false),
 	m_bDragRight(false),
 	m_bDragBottom(false),
-	m_bDocked(false),
-	m_bUpdateDockPos(false)
-{
-
+	m_bDockButton(false)
+{	
 	setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
 	// append minimize button flag in case of windows,
 	// for correct windows native handling of minimize function
@@ -43,9 +41,9 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	resize_right	= false;
 	resize_top		= false;
 	resize_bottom	= false;
+	m_bDragged		= false;
 
 	content			= Q_NULLPTR;
-	m_dock_parent	= Q_NULLPTR;
 
 	// shadow under window title text
 	QGraphicsDropShadowEffect * textShadow = new QGraphicsDropShadowEffect;
@@ -61,8 +59,7 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	windowShadow->setOffset(0.0);
 	ui->windowFrame->setGraphicsEffect(windowShadow);
 
-	QObject::connect(qApp, &QGuiApplication::applicationStateChanged, this,
-		&FramelessWindow::on_applicationStateChanged);
+	QObject::connect(qApp, &QGuiApplication::applicationStateChanged, this,	&FramelessWindow::on_applicationStateChanged);
 	setMouseTracking(true);
 
 	auto al = ui->titleText->alignment();
@@ -73,8 +70,6 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	auto txt_height = ui->titleText->sizeHint().height();
 	auto bar_height = ui->windowTitlebar->height();
 	ui->titleText->move(x, bar_height / 2 - txt_height / 2);
-
-	ui->dockButton->setIcon(QIcon(":/images/icon_dock.png"));
 
 	// important to watch mouse move from all child widgets
 	QApplication::instance()->installEventFilter(this);
@@ -136,23 +131,69 @@ void FramelessWindow::setMinimizeButton(bool active)
 	}
 }
 
-void FramelessWindow::setDockButton(bool active)
+void FramelessWindow::setDockButton(bool active, bool docked = false, int direction = 0)
 {
 	if (active)
 	{
-		ui->dockButton->setDisabled(false);
-		ui->dockButton->setHidden(false);
+		if (!m_bDockButton)
+		{
+			ui->dockButton->setDisabled(false);
+			ui->dockButton->setHidden(false);
 
-		ui->dockButton->setIcon(QIcon(":/images/icon_undock.png"));
+			m_bDockButton = true;
+		}
 
-		m_bDocked = true;
+		if (docked)
+		{
+			switch (direction)
+			{
+				case 0:
+					ui->dockButton->setIcon(QIcon(":/images/icon_undock_r.png"));
+					break;
+
+				case 1:
+					ui->dockButton->setIcon(QIcon(":/images/icon_undock_l.png"));
+					break;
+
+				case 2:
+					ui->dockButton->setIcon(QIcon(":/images/icon_undock_t.png"));
+					break;
+
+				default:
+					ui->dockButton->setIcon(QIcon(":/images/icon_undock_b.png"));
+			}
+		}
+		else
+		{
+			switch (direction)
+			{
+				case 0:
+					ui->dockButton->setIcon(QIcon(":/images/icon_dock_r.png"));
+					break;
+
+				case 1:
+					ui->dockButton->setIcon(QIcon(":/images/icon_dock_l.png"));
+					break;
+
+				case 2:
+					ui->dockButton->setIcon(QIcon(":/images/icon_dock_t.png"));
+					break;
+
+				default:
+					ui->dockButton->setIcon(QIcon(":/images/icon_dock_b.png"));
+			}
+		}
+
 	}
 	else
 	{
-		ui->dockButton->setHidden(true);
-		ui->dockButton->setDisabled(true);
+		if (m_bDockButton)
+		{
+			ui->dockButton->setHidden(true);
+			ui->dockButton->setDisabled(true);
 
-		m_bDocked = false;
+			m_bDockButton = false;
+		}
 	}
 }
 
@@ -210,28 +251,9 @@ void FramelessWindow::setResize(bool enabled)
 	updateSizePolicy();
 }
 
-void FramelessWindow::dock(bool docked, QWidget * dock_parent)
+void FramelessWindow::setBorderStyle(QString style)
 {
-	m_dock_parent = dock_parent;
-
-	if (m_dock_parent)
-	{
-		dock_parent->installEventFilter(this);
-	}
-
-	m_bDocked = docked;
-	
-	if (m_bDocked)
-	{
-		ui->dockButton->setIcon(QIcon(":/images/icon_undock.png"));
-		ui->dockButton->setToolTip("Undock");
-		update_docked_pos();
-	}
-	else
-	{
-		ui->dockButton->setIcon(QIcon(":/images/icon_dock.png"));
-		ui->dockButton->setToolTip("Dock");
-	}
+	ui->windowFrame->setStyleSheet(style);
 }
 
 void FramelessWindow::setWindowTitle(const QString & text)
@@ -378,19 +400,7 @@ void FramelessWindow::on_applicationStateChanged(Qt::ApplicationState state)
 
 void FramelessWindow::on_dockButton_clicked()
 {
-	if (m_bDocked)
-	{
-		ui->dockButton->setIcon(QIcon(":/images/icon_dock.png"));
-		ui->dockButton->setToolTip("Dock");
-		m_bDocked = false;
-	}
-	else
-	{
-		ui->dockButton->setIcon(QIcon(":/images/icon_undock.png"));
-		ui->dockButton->setToolTip("Undock");
-		update_docked_pos();
-		m_bDocked = true;
-	}
+	emit dockButton_clicked();
 }
 
 void FramelessWindow::on_minimizeButton_clicked()
@@ -400,38 +410,12 @@ void FramelessWindow::on_minimizeButton_clicked()
 
 void FramelessWindow::on_closeButton_clicked()
 {
-	close();
-
-	if (content)
-	{
-		content->close();
-	}
+	hide();
 }
 
 void FramelessWindow::on_windowTitlebar_doubleClicked()
 {
 
-}
-
-void FramelessWindow::update_docked_pos()
-{
-	if (!m_dock_parent)
-	{
-		return;
-	}
-
-	m_bUpdateDockPos = true;
-
-	auto r			= m_dock_parent->childrenRect();	
-	auto p_pos		= m_dock_parent->mapToGlobal(r.topLeft());
-	auto dy			= size().height() - childrenRect().height();
-	auto new_pos	= QPoint(p_pos.x() + r.width() - 10, p_pos.y() - dy / 2);
-	auto new_size	= QSize(size().width(), r.height() + dy);
-
-	this->move(new_pos);
-	this->resize(new_size);
-
-	m_bUpdateDockPos = false;
 }
 
 void FramelessWindow::mouseDoubleClickEvent(QMouseEvent * event)
@@ -756,7 +740,6 @@ void FramelessWindow::mouseReleaseEvent(QMouseEvent * event)
 
 bool FramelessWindow::eventFilter(QObject * obj, QEvent * event)
 {
-
 	if (event->type() == QEvent::MouseMove)
 	{
 		QMouseEvent * pMouse = dynamic_cast<QMouseEvent *>(event);
@@ -765,13 +748,13 @@ bool FramelessWindow::eventFilter(QObject * obj, QEvent * event)
 			checkBorderDragging(pMouse);
 		}
 	}
-	// press is triggered only on frame window
-	else if (event->type() == QEvent::MouseButtonPress && obj == this)
+	else if (event->type() == QEvent::MouseButtonPress && obj == ui->windowTitlebar)
 	{
 		QMouseEvent * pMouse = dynamic_cast<QMouseEvent *>(event);
 		if (pMouse)
 		{
 			mousePressEvent(pMouse);
+			emit windowTitlebar_clicked();
 		}
 	}
 	else if (event->type() == QEvent::MouseButtonRelease)
@@ -782,20 +765,9 @@ bool FramelessWindow::eventFilter(QObject * obj, QEvent * event)
 			if (pMouse)
 			{
 				mouseReleaseEvent(pMouse);
+				emit windowTitlebar_released();
 			}
 		}
-	}
-	else if (event->type() == QEvent::Move && obj == m_dock_parent && m_bDocked)
-	{		
-		update_docked_pos();
-	}
-	else if (event->type() == QEvent::Resize && obj == m_dock_parent && m_bDocked)
-	{
-		update_docked_pos();
-	}
-	else if (event->type() == QEvent::Move && obj == this && m_bDocked && !m_bUpdateDockPos && !m_bDragRight)
-	{
-		on_dockButton_clicked();
 	}
 
 	return QWidget::eventFilter(obj, event);

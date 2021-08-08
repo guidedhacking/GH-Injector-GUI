@@ -64,6 +64,9 @@
     <ClCompile Include="StatusBox.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="WindowDocker.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DownloadProgress.h">
@@ -143,6 +146,9 @@
       <Filter>Headerdateien</Filter>
     </QtMoc>
     <QtMoc Include="DebugConsole.h">
+      <Filter>Headerdateien</Filter>
+    </QtMoc>
+    <QtMoc Include="WindowDocker.h">
       <Filter>Headerdateien</Filter>
     </QtMoc>
   </ItemGroup>

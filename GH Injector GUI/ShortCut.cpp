@@ -5,7 +5,7 @@
 HRESULT CreateLink(LPCWSTR lpszPathObj, LPCWSTR lpszPathLink, LPCWSTR lpszDesc, LPCWSTR args)
 {
 	HRESULT hres;
-	IShellLink * psl;
+	IShellLinkW * psl;
 
 	CoInitialize(NULL);
 	// Get a pointer to the IShellLink interface. It is assumed that CoInitialize

@@ -11,7 +11,7 @@ class DragDropWindow
 	HDC		m_hDeviceContext;
 	HICON	m_hDropIcon;
 
-	const static wchar_t m_szClassName[];
+	const static TCHAR m_szClassName[];
 	static int m_ClassRefCount;
 
 	std::function<void(const QString &)> m_Callback;

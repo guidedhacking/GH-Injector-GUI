@@ -15,8 +15,8 @@ Q_GUI_EXPORT QPixmap qt_pixmapFromWinHICON(HICON icon);
 struct Process_State_Struct
 {
 	QString			txtFilter;
-	int				cmbArch;
-	bool			cbSession;
+	int				cmbArch		= 0;
+	bool			cbSession	= false;
 };
 
 class TreeWidgetItem : public QTreeWidgetItem 
@@ -47,6 +47,7 @@ private:
 	SORT_SENSE					sort_sense;
 	int							own_session;
 	std::vector<Process_Struct*> m_ProcList;
+	bool						selected_from_list;
 
 	QPixmap pxm_error;
 	QPixmap pxm_generic;
