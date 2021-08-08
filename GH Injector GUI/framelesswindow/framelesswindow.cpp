@@ -410,6 +410,8 @@ void FramelessWindow::on_minimizeButton_clicked()
 
 void FramelessWindow::on_closeButton_clicked()
 {
+	emit closeButton_clicked();
+
 	hide();
 }
 

@@ -78,6 +78,7 @@ public slots:
 	void on_windowTitlebar_doubleClicked();
 
 signals:
+	void closeButton_clicked();
 	void dockButton_clicked();
 	void windowTitlebar_clicked();
 	void windowTitlebar_released();

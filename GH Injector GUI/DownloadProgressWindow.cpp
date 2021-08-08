@@ -63,6 +63,8 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 	m_FramelessParent->setWindowTitle(title);
 	m_FramelessParent->setContent(this);
 
+	connect(m_FramelessParent, SIGNAL(closeButton_clicked()), this, SLOT(on_close_button_clicked()));
+
 	m_FramelessParent->installEventFilter(this);
 	installEventFilter(this);
 }
@@ -72,6 +74,19 @@ DownloadProgressWindow::~DownloadProgressWindow()
 	if (m_FramelessParent)
 	{
 		m_FramelessParent->close();
+	}
+}
+
+void DownloadProgressWindow::on_close_button_clicked()
+{
+	if (m_CloseCallback)
+	{
+		m_CloseCallback();
+		m_CloseCallback = nullptr;
+	}
+	else
+	{
+		close();
 	}
 }
 

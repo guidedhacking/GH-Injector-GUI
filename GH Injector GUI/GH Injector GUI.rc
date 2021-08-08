@@ -80,11 +80,11 @@ BEGIN
         BLOCK "000904b0"
         BEGIN
             VALUE "CompanyName", "Guided Hacking"
-            VALUE "FileDescription", "GUI for the GH Injector"
-            VALUE "FileVersion", "4.3.0.4"
+            VALUE "FileDescription", "GUI of the GH Injector"
+            VALUE "FileVersion", "4.4.0.0"
             VALUE "LegalCopyright", "Broihon (C) 1987 - 2035"
             VALUE "ProductName", "GH Injector GUI"
-            VALUE "ProductVersion", "4.3.0.4"
+            VALUE "ProductVersion", "4.4.0.0"
         END
     END
     BLOCK "VarFileInfo"

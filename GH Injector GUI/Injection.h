@@ -15,8 +15,8 @@
 
 #include "pch.h"
 
-constexpr auto GH_INJ_GUI_VERSIONA = "4.3";
-constexpr auto GH_INJ_GUI_VERSIONW = L"4.3";
+constexpr auto GH_INJ_GUI_VERSIONA = "4.4";
+constexpr auto GH_INJ_GUI_VERSIONW = L"4.4";
 
 constexpr auto GH_INJ_EXE_NAME64A = "GH Injector - x64.exe";
 constexpr auto GH_INJ_EXE_NAME64W = L"GH Injector - x64.exe";

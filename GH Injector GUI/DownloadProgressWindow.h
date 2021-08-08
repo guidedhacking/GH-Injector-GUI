@@ -30,6 +30,9 @@ private:
 	std::vector<float>	m_new_progress;
 	int					m_new_done;
 
+private slots:
+	void on_close_button_clicked();
+
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
 
