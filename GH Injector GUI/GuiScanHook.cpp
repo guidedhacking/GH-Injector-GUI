@@ -18,7 +18,11 @@ GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, In
 	connect(ui.btn_scan, SIGNAL(clicked()), this, SLOT(scan_clicked()));
 	connect(ui.btn_unhook, SIGNAL(clicked()), this, SLOT(unhook_clicked()));
 
-	model = new QStringListModel(this);
+	model = new(std::nothrow) QStringListModel(this);
+	if (model == Q_NULLPTR)
+	{
+		THROW("Failed to create string list model for hook scanner.");
+	}
 
 	List << "Select a" << "process first";
 

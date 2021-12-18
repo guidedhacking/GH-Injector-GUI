@@ -71,6 +71,7 @@ public:
 	void SetDefaultSize(QSize VerticalSize, QSize HorizontalSize);
 
 	bool IsDocked();
+	void Dock();
 	void Dock(int direction);
 
 	int GetDockIndex();

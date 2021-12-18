@@ -2,23 +2,56 @@
 
 #include "PDB Download.h"
 
-void pdb_download_update_thread(DownloadProgressWindow * hProgressWindow, InjectionLib * InjLib);
+struct CallbackData
+{
+	InjectionLib * pInjLib = nullptr;
+	std::vector<std::pair<int, bool>> info;
+
+	bool connected			= false;
+	bool download_finished	= false;
+	bool import_finished	= false;
+};
+
+void __stdcall pdb_download_update_callback(DownloadProgressWindow * hProgressWindow, void * pData);
 
 void ShowPDBDownload(InjectionLib * InjLib)
 {
+	CallbackData data;
+	data.pInjLib = InjLib;
+
 	std::vector<QString> labels;
+
 	labels.push_back("ntdll.pdb");
+	data.info.push_back({ 0, false });
 #ifdef _WIN64
 	labels.push_back("wntdll.pdb");
+	data.info.push_back({ 0, true });
 #endif
 
-	DownloadProgressWindow * ProgressWindow = new DownloadProgressWindow("PDB Download", labels, "Waiting for connection...", 300, Q_NULLPTR);
+	auto CurrentOS = QOperatingSystemVersion::current();
+	if (CurrentOS >= QOperatingSystemVersion::Windows7 && CurrentOS < QOperatingSystemVersion::Windows8) //no == operator provided
+	{
+		labels.push_back("kernel32.pdb");
+		data.info.push_back({ 1, false });
+#ifdef _WIN64
+		labels.push_back("wkernel32.pdb");
+		data.info.push_back({ 1, true });
+#endif
+	}
 
-	auto worker = std::thread(&pdb_download_update_thread, ProgressWindow, InjLib);
-	
+	DownloadProgressWindow * ProgressWindow = new(std::nothrow) DownloadProgressWindow("PDB Download", labels, "Waiting for internet connection...", 300, Q_NULLPTR);
+	if (ProgressWindow == Q_NULLPTR)
+	{
+		THROW("Failed to create download progress window.");
+	}
+
+	ProgressWindow->SetCallbackFrequency(25);
+	ProgressWindow->SetCallbackArg(&data);
+	ProgressWindow->SetCallback(pdb_download_update_callback);
+	ProgressWindow->SetCloseValue(PEB_ERR_INTERRUPTED);
+
 	ProgressWindow->show();
 	auto ret = ProgressWindow->Execute();
-	worker.join();
 
 	delete ProgressWindow;
 
@@ -59,113 +92,102 @@ void ShowPDBDownload(InjectionLib * InjLib)
 	if (ret != PDB_ERR_SUCCESS)
 	{
 		g_Console->update_external();
+
 		ShowStatusbox(false, error_msg);
 	}
 }
 
-void pdb_download_update_thread(DownloadProgressWindow * ProgressWindow, InjectionLib * InjLib)
+void __stdcall pdb_download_update_callback(DownloadProgressWindow * hProgressWindow, void * pData)
 {
-	while (!ProgressWindow->IsRunning())
+	if (!hProgressWindow || !pData)
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		THROW("Invalid data passed to update callback\n");
+
+		return;
 	}
 
-	Sleep(100);
+	auto * data = reinterpret_cast<CallbackData *>(pData);
 
-	bool bClosed = false;
+	auto lib = data->pInjLib;
 
-	auto close_callback = [&]()
+	if (!data->download_finished)
 	{
-		ProgressWindow->SetDone(PEB_ERR_INTERRUPTED);
-
-		bClosed = true;
-	};
-
-	ProgressWindow->SetCloseCallback(close_callback);
-
-	ProgressWindow->SetStatus("Waiting for internet connection...");
-
-	bool connected = false;
-
-	while (InjLib->GetSymbolState() == INJ_ERR_SYMBOL_INIT_NOT_DONE)
-	{
-		float progress_0 = InjLib->GetDownloadProgress(false);
-		ProgressWindow->SetProgress(0, progress_0);
-
-#ifdef _WIN64
-		float progress_1 = InjLib->GetDownloadProgress(true);
-		ProgressWindow->SetProgress(1, progress_1);
-#endif
-
-		if (InternetCheckConnectionW(L"https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
+		if (lib->GetSymbolState() == INJ_ERR_SYMBOL_INIT_NOT_DONE)
 		{
-			if (GetLastError() == ERROR_INTERNET_CANNOT_CONNECT)
+			for (UINT i = 0; i < data->info.size(); ++i)
 			{
-				ProgressWindow->SetStatus("Cannot connect to Microsoft Symbol Server...");
-				connected = false;
-				ProgressWindow->SetDone(PEB_ERR_CONNECTION_BLOCKED);
-
-				return;
+				float progress = lib->GetDownloadProgressEx(data->info[i].first, data->info[i].second);
+				hProgressWindow->SetProgress(i, progress);
 			}
-			else if (connected)
-			{
-				ProgressWindow->SetStatus("Waiting for internet connection...");
-				connected = false;
-				ProgressWindow->SetDone(PEB_ERR_NO_INTERNET);
 
-				return;
+			if (InternetCheckConnectionW(L"https://msdl.microsoft.com", FLAG_ICC_FORCE_CONNECTION, NULL) == FALSE)
+			{
+				if (GetLastError() == ERROR_INTERNET_CANNOT_CONNECT)
+				{
+					data->connected = false;
+
+					hProgressWindow->SetStatus("Cannot connect to Microsoft Symbol Server...");
+					hProgressWindow->SetDone(PEB_ERR_CONNECTION_BLOCKED);
+				}
+				else if (data->connected)
+				{
+					data->connected = false;
+
+					hProgressWindow->SetStatus("Waiting for internet connection...");
+					hProgressWindow->SetDone(PEB_ERR_NO_INTERNET);
+				}
+			}
+			else
+			{
+				if (!data->connected)
+				{
+					data->connected = true;
+
+					hProgressWindow->SetStatus("Downloading PDB files from the Microsoft Symbol Server...");
+				}
 			}
 		}
 		else
 		{
-			if (!connected)
+			auto symbol_state = lib->GetSymbolState();
+			if (symbol_state != INJ_ERR_SUCCESS)
 			{
-				ProgressWindow->SetStatus("Downloading PDB files from the Microsoft Symbol Server...");
-				connected = true;
+				hProgressWindow->SetDone((int)symbol_state);
 			}
+			else
+			{
+				for (UINT i = 0; i < data->info.size(); ++i)
+				{
+					hProgressWindow->SetProgress(i, 1.0f);
+				}
+
+				hProgressWindow->SetStatus("Download finished, resolving imports...");
+
+				data->download_finished = true;
+			}	
 		}
-
-		if (bClosed)
-		{
-			return;
-		}
-		
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	};
-
-	auto symbol_state = InjLib->GetSymbolState();
-	if (symbol_state != INJ_ERR_SUCCESS)
-	{	
-		ProgressWindow->SetDone((int)symbol_state);
-
-		return;
 	}
-
-	ProgressWindow->SetProgress(0, 1);
-
-#ifdef _WIN64
-	ProgressWindow->SetProgress(1, 1);
-#endif
-
-	ProgressWindow->SetStatus("Download finished, resolving imports...");
-
-	while (InjLib->GetImportState() == INJ_ERR_IMPORT_HANDLER_NOT_DONE)
+	else if (!data->import_finished)
 	{
-		if (bClosed)
+		if (lib->GetImportState() != INJ_ERR_IMPORT_HANDLER_NOT_DONE)
 		{
-			return;
-		}
+			auto import_state = lib->GetImportState();
+			if (import_state != INJ_ERR_SUCCESS)
+			{
+				hProgressWindow->SetDone((int)import_state);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				return;
+			}
+			else
+			{
+				hProgressWindow->SetStatus("Imports resolved...");
+
+				data->import_finished = true;
+			}
+		}		
+	}	
+	else
+	{
+		hProgressWindow->SetDone(PDB_ERR_SUCCESS);
 	}
-
-	auto import_state = InjLib->GetImportState();
-	if (import_state != INJ_ERR_SUCCESS)
-	{		
-		ProgressWindow->SetDone((int)import_state);
-
-		return;
-	}
-
-	ProgressWindow->SetDone(PDB_ERR_SUCCESS);
 }

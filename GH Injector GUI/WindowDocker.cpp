@@ -299,14 +299,26 @@ bool WindowDocker::IsDocked()
 	return (m_DockIndex != -1);
 }
 
-void WindowDocker::Dock(int direction)
+void WindowDocker::Dock()
 {
-	direction %= 4;	
+	if (m_DockIndex == -1)
+	{
+		return;
+	}
 
+	move_to_pos(m_DockIndex);
+
+	m_Slave->setDockButton(true, true, m_DockIndex);
+}
+
+void WindowDocker::Dock(int direction)
+{	
 	if (direction < 0)
 	{
 		return;
 	}
+
+	direction %= 4;
 
 	if (!m_bDocking[direction])
 	{
@@ -371,7 +383,7 @@ bool WindowDocker::eventFilter(QObject * obj, QEvent * event)
 		{
 			if (!m_bOnMove && m_DockIndex != -1)
 			{
-				auto * moveEvent = static_cast<QMoveEvent*>(event);
+				auto * moveEvent = static_cast<QMoveEvent *>(event);
 				if (moveEvent->oldPos() != moveEvent->pos())
 				{
 					stop_dock();
@@ -379,7 +391,7 @@ bool WindowDocker::eventFilter(QObject * obj, QEvent * event)
 			}
 			else if (m_bTitlebarClicked)
 			{
-				auto * moveEvent = static_cast<QMoveEvent*>(event);
+				auto * moveEvent = static_cast<QMoveEvent *>(event);
 				if (moveEvent->oldPos() != moveEvent->pos())
 				{
 					check_snap();

@@ -26,13 +26,13 @@ int wmain(int argc, wchar_t * argv[])
 		}
 
 		Sleep(1500);
-
+		
 		return 0;
 	}
 
 	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 	std::string s_argv = converter.to_bytes(argv[0]);
-	char * sz_argv = const_cast<char*>(s_argv.c_str());
+	char * sz_argv = const_cast<char *>(s_argv.c_str());
 
 	//QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
@@ -44,11 +44,20 @@ int wmain(int argc, wchar_t * argv[])
 
 		QApplication::setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 
-		DarkStyle * dark = new DarkStyle;
+		DarkStyle * dark = new(std::nothrow) DarkStyle;
+		if (dark == Q_NULLPTR)
+		{
+			THROW("Failed to create window style.");
+		}
+
 		QApplication::setStyle(dark);
-		QApplication::setPalette(QApplication::style()->standardPalette());
+		//QApplication::setPalette(QApplication::style()->standardPalette());
 		
-		GuiMain * MainWindow = new GuiMain();
+		GuiMain * MainWindow = new(std::nothrow) GuiMain();
+		if (MainWindow == Q_NULLPTR)
+		{
+			THROW("Failed to create main window.");
+		}
 
 		g_print("GH Injector V%ls\n", GH_INJ_GUI_VERSIONW);
 		g_print("Initializing GUI\n");
@@ -58,10 +67,12 @@ int wmain(int argc, wchar_t * argv[])
 		g_print("GUI initialized\n");
 
 		MainWindow->initSetup();
-
+		
 		currentExitCode = a.exec();
 
 		delete MainWindow;
+
+		printf("REBOOT\n");
 	} 
 	while (currentExitCode == GuiMain::EXIT_CODE_REBOOT);
 

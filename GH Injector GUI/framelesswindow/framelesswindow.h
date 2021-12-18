@@ -1,3 +1,5 @@
+#pragma once
+
 /*
 ###############################################################################
 #                                                                             #
@@ -11,12 +13,10 @@
 ###############################################################################
 */
 
-#ifndef FRAMELESSWINDOW_H
-#define FRAMELESSWINDOW_H
+#include "..\pch.h"
 
 class WindowDocker;
 
-#include "..\pch.h"
 #include "ui_framelesswindow.h"
 #include "..\WindowDocker.h"
 
@@ -75,7 +75,6 @@ public slots:
 	void on_dockButton_clicked();
 	void on_minimizeButton_clicked();
 	void on_closeButton_clicked();
-	void on_windowTitlebar_doubleClicked();
 
 signals:
 	void closeButton_clicked();
@@ -85,7 +84,6 @@ signals:
 
 protected:
 	virtual void changeEvent(QEvent * event);
-	virtual void mouseDoubleClickEvent(QMouseEvent * event);
 	virtual void checkBorderDragging(QMouseEvent * event);
 	virtual void mousePressEvent(QMouseEvent * event);
 	virtual void mouseReleaseEvent(QMouseEvent * event);
@@ -105,5 +103,3 @@ private:
 	bool m_bDragBottom;
 	bool m_bDragged;
 };
-
-#endif  // FRAMELESSWINDOW_H

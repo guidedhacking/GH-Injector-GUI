@@ -24,9 +24,10 @@ public:
 	std::wstring GetVersionW();
 	DWORD GetSymbolState();
 	DWORD GetImportState();
-	float GetDownloadProgress(bool bWow64);
+	float GetDownloadProgressEx(int index, bool bWow64);
 	void StartDownload();
 	void InterruptDownload();
+	bool InterruptInjection();
 	DWORD SetRawPrintCallback(f_raw_print_callback callback);
 
 private:
@@ -53,8 +54,9 @@ private:
 	DECLARE_INJECTION_FUNCTION(GetVersionW);
 	DECLARE_INJECTION_FUNCTION(GetSymbolState);
 	DECLARE_INJECTION_FUNCTION(GetImportState);
-	DECLARE_INJECTION_FUNCTION(GetDownloadProgress);
+	DECLARE_INJECTION_FUNCTION(GetDownloadProgressEx);
 	DECLARE_INJECTION_FUNCTION(StartDownload);
 	DECLARE_INJECTION_FUNCTION(InterruptDownload);
+	DECLARE_INJECTION_FUNCTION(InterruptInjection);
 	DECLARE_INJECTION_FUNCTION(SetRawPrintCallback);
 };

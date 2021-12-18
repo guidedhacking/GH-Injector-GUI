@@ -13,16 +13,25 @@ void ShowStatusbox(bool ok, const QString & msg)
 	if (ok)
 	{
 		parent.setWindowTitle("Success");
-		box = new QMessageBox(QMessageBox::Icon::Information, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
+		box = new(std::nothrow) QMessageBox(QMessageBox::Icon::Information, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
 	}
 	else
 	{
 		parent.setWindowTitle("Error");
-		box = new QMessageBox(QMessageBox::Icon::Critical, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
+		box = new(std::nothrow) QMessageBox(QMessageBox::Icon::Critical, "", msg, QMessageBox::StandardButton::Ok, &parent, Qt::WindowType::FramelessWindowHint);
 	}
 
 	if (box == Q_NULLPTR)
 	{
+		if (ok)
+		{
+			MessageBoxW(NULL, msg.toStdWString().c_str(), L"Success", MB_ICONINFORMATION);
+		}
+		else
+		{
+			MessageBoxW(NULL, msg.toStdWString().c_str(), L"Error", MB_ICONERROR);
+		}
+
 		return;
 	}
 
@@ -44,7 +53,20 @@ bool YesNoBox(const QString & title, const QString & msg, QWidget * parent)
 	QMessageBox * box = Q_NULLPTR;
 	
 	f_parent.setWindowTitle(title);
-	box = new QMessageBox(QMessageBox::Icon::Question, "", msg, QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, &f_parent, Qt::WindowType::FramelessWindowHint);
+	box = new(std::nothrow) QMessageBox(QMessageBox::Icon::Question, "", msg, QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, &f_parent, Qt::WindowType::FramelessWindowHint);
+	if (box == Q_NULLPTR)
+	{
+		HWND hwnd_parent = NULL;
+		if (parent != Q_NULLPTR)
+		{
+			hwnd_parent = reinterpret_cast<HWND>(parent->winId());
+		}
+
+		auto r = MessageBoxW(hwnd_parent, msg.toStdWString().c_str(), title.toStdWString().c_str(), MB_YESNO);
+
+		return (r == IDYES);
+	}
+
 	box->setDefaultButton(QMessageBox::StandardButton::Yes);
 	
 	if (box == Q_NULLPTR)
@@ -66,9 +88,16 @@ bool YesNoBox(const QString & title, const QString & msg, QWidget * parent)
 		f_parent.move(this_pos);
 	}
 
-	f_parent.show();	
+	HWND hwnd = reinterpret_cast<HWND>(f_parent.winId());
+
+	SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+	f_parent.setWindowModality(Qt::WindowModality::ApplicationModal);
+
+	f_parent.show();
 
 	auto r = box->exec();
+
+	SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
 	delete box;
 

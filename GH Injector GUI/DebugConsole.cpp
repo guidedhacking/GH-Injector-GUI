@@ -11,14 +11,24 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	policy.setHorizontalPolicy(QSizePolicy::Policy::MinimumExpanding);
 	policy.setVerticalPolicy(QSizePolicy::Policy::MinimumExpanding);
 
-	m_Content = new QListWidget();
+	m_Content = new(std::nothrow) QListWidget();
+	if (m_Content == Q_NULLPTR)
+	{
+		THROW("Failed to create content list widget for debug console.");
+	}
+
 	m_Content->setSelectionMode(QAbstractItemView::SelectionMode::ExtendedSelection);
 	m_Content->setSizePolicy(policy);
 	m_Content->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 	m_Content->installEventFilter(this);
 
-	m_Layout = new QGridLayout();
-	m_Layout->setMargin(1);
+	m_Layout = new(std::nothrow) QGridLayout();
+	if (m_Layout == Q_NULLPTR)
+	{
+		THROW("Failed to create content layout for debug console.");
+	}
+
+	//m_Layout->setMargin(1);
 
 	QMargins m = { 0, 0, 0, 0 };
 	this->setSizePolicy(policy);
@@ -27,7 +37,12 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	this->layout()->addWidget(m_Content);
 	this->installEventFilter(this);
 
-	m_FramelessParent = new FramelessWindow();
+	m_FramelessParent = new(std::nothrow) FramelessWindow();
+	if (m_FramelessParent == Q_NULLPTR)
+	{
+		THROW("Failed to create parent window for debug console.");
+	}
+
 	m_FramelessParent->setMinimizeButton(false);
 	m_FramelessParent->setResizeHorizontal(true);
 	m_FramelessParent->setResizeBottom(true);
@@ -41,7 +56,12 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	{
 		m_DockParent = dock_parent;
 		m_FramelessParent->setDockButton(true, false, 0);
-		m_Docker = new WindowDocker(m_DockParent, m_FramelessParent);
+		m_Docker = new(std::nothrow) WindowDocker(m_DockParent, m_FramelessParent);
+		if (m_Docker == Q_NULLPTR)
+		{
+			THROW("Failed to create window docker for debug console.");
+		}
+
 		m_Docker->SetDocking(true, true, true, true);
 		m_Docker->SetResizing(true, true);
 	}
@@ -97,9 +117,9 @@ int DebugConsole::print(const char * format, ...)
 {
 	int result = 0;
 	int size = 1024;
-	char * buffer = new char[size]();
+	char * buffer = new(std::nothrow) char[size]();
 
-	if (!buffer)
+	if (buffer == nullptr)
 	{
 		return -1;
 	}
@@ -126,9 +146,9 @@ int DebugConsole::print(const char * format, ...)
 			delete[] buffer;
 
 			size += 1024;
-			buffer = new char[size]();
+			buffer = new(std::nothrow) char[size]();
 
-			if (!buffer)
+			if (buffer == nullptr)
 			{
 				break;
 			}
@@ -177,8 +197,8 @@ void DebugConsole::print_raw(const char * szText)
 		{
 			use_copy = true;
 
-			copy = new char[len]();
-			if (!copy)
+			copy = new(std::nothrow) char[len]();
+			if (copy == nullptr)
 			{
 				return;
 			}
@@ -200,7 +220,7 @@ void DebugConsole::print_raw(const char * szText)
 	printf("CONSOLE: %s\n", szText);
 #endif
 
-	QListWidgetItem * new_item = new QListWidgetItem();
+	QListWidgetItem * new_item = new(std::nothrow) QListWidgetItem();
 	new_item->setText(szText);
 	m_Content->addItem(new_item);
 
@@ -279,10 +299,20 @@ void DebugConsole::update_external()
 	}
 }
 
+void DebugConsole::dock()
+{
+	if (m_Docker)
+	{
+		m_Docker->Dock();
+	}
+}
+
 void DebugConsole::dock(int direction)
 {
 	if (m_Docker)
 	{
+		g_print("Dock = %d\n", direction);
+
 		m_Docker->Dock(direction);
 	}
 }
@@ -299,6 +329,8 @@ int DebugConsole::get_dock_index()
 
 int DebugConsole::get_old_dock_index()
 {
+	g_print("Old index = %d\n", m_Docker->GetOldDockIndex());
+
 	if (m_Docker)
 	{
 		return m_Docker->GetOldDockIndex();

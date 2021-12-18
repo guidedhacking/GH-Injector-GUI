@@ -2,15 +2,6 @@
 
 #include "DownloadProgress.h"
 
-DownloadProgress::DownloadProgress()
-{
-	m_fProgress         = 0.0f;
-	m_sStatus           = "";
-    m_sUrl              = L"";
-    m_bRedownload       = false;
-    m_hInterruptEvent   = nullptr;
-}
-
 DownloadProgress::~DownloadProgress()
 {
     if (m_hInterruptEvent)
@@ -19,25 +10,12 @@ DownloadProgress::~DownloadProgress()
     }
 }
 
-DownloadProgress::DownloadProgress(std::wstring url, bool redownload)
+DownloadProgress::DownloadProgress(bool redownload)
 {
-    m_fProgress     = 0.0f;
-    m_sStatus       = "";
-    m_sUrl          = url;
-    m_bRedownload   = redownload;
-
-    if (m_bRedownload)
-    {
-        //yes, this is necessary because DeleteUrlCacheEntryW is shit
-        auto str_pos = m_sUrl.find('\x20', 0);
-        while (str_pos != std::string::npos)
-        {
-            m_sUrl.replace(str_pos, 1, L"%20");
-            str_pos += 3;
-
-            str_pos = m_sUrl.find('\x20', str_pos);
-        }
-    }
+    m_fProgress         = 0.0f;
+    m_sStatus           = "";
+    m_bRedownload       = redownload;
+    m_hInterruptEvent   = nullptr;
 }
 
 HRESULT __stdcall DownloadProgress::QueryInterface(const IID & riid, void ** ppvObject)
@@ -95,9 +73,17 @@ HRESULT __stdcall DownloadProgress::GetBindInfo(DWORD * grfBINDF, BINDINFO * pbi
 
     if (m_bRedownload)
     {
-        //yes, this is necessary because UrlDownloadToFile keeps ignoring literally every flag I pass to it via grfBINDF
-        DeleteUrlCacheEntryW(m_sUrl.c_str());
-    }
+        if (grfBINDF)
+        {
+            *grfBINDF = BINDF_GETNEWESTVERSION | BINDF_NEEDFILE;
+        }
+
+        if (pbindinfo)
+        {
+            pbindinfo->dwOptions        = BINDINFO_OPTIONS_WININETFLAG;
+            pbindinfo->dwOptionsFlags   = INTERNET_FLAG_PRAGMA_NOCACHE | INTERNET_FLAG_RELOAD;
+        }
+    }    
 
     return S_OK;
 }

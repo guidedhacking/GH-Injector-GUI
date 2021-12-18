@@ -2,16 +2,41 @@
 
 #include "Update.h"
 
-void update_download_progress(DownloadProgressWindow * UpdateWnd, DownloadProgress * progress, HANDLE hInterrupt);
-void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring version, InjectionLib * Lib);
+struct CallbackData_Update
+{
+	InjectionLib		* pInjLib	= nullptr;
+	DownloadProgress	* pProgress	= nullptr;
+
+	bool download_started	= false;
+	bool download_finished	= false;
+	bool cleanup_finished	= false;
+	bool unzip_started		= false;
+	bool unzip_finished		= false;
+	bool launch_finished	= false;
+
+	std::wstring path;
+	std::wstring zip_path;
+	std::wstring download_url;
+
+	std::shared_future<HRESULT> download_thread_ret;
+
+	ULONGLONG timer = 0;
+};
+
+void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, void * pData);
+HRESULT download_thread(CallbackData_Update * data);
 
 std::wstring get_newest_version()
 {
+	DownloadProgress progress(true);
+
 	TCHAR szCacheFile[MAX_PATH]{ 0 };
-	auto hr = URLDownloadToCacheFile(nullptr, GH_VERSION_URL, szCacheFile, sizeof(szCacheFile) / sizeof(szCacheFile[0]), 0, nullptr);
+	auto hr = URLDownloadToCacheFile(nullptr, GH_VERSION_URL, szCacheFile, sizeof(szCacheFile) / sizeof(szCacheFile[0]), 0, &progress);
 
 	if (FAILED(hr))
 	{
+		g_print("Failed to resolve newest version number: %08X\n", hr);
+
 		return L"0.0";
 	}
 
@@ -20,6 +45,8 @@ std::wstring get_newest_version()
 	if (!infile.good())
 	{
 		DeleteFile(szCacheFile);
+
+		g_print("Failed to read newest version number\n");
 
 		return L"0.0";
 	}
@@ -42,7 +69,11 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 	parent.setMinimizeButton(false);
 	parent.setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 
-	QMessageBox * box = new QMessageBox(QMessageBox::Icon::Information, "", "", QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, &parent, Qt::WindowType::FramelessWindowHint);
+	QMessageBox * box = new(std::nothrow) QMessageBox(QMessageBox::Icon::Information, "", "", QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, &parent, Qt::WindowType::FramelessWindowHint);
+	if (box == Q_NULLPTR)
+	{
+		THROW("Failed to create update dialog box.");
+	}
 
 	int cmp = newest_version.compare(GH_INJ_GUI_VERSIONW);
 	if (cmp > 0)
@@ -65,6 +96,10 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 	}
 	else
 	{
+		ShowStatusbox(false, "Something went wrong with the version check.");
+		parent.close();
+		delete box;
+
 		return false;
 	}
 
@@ -96,165 +131,352 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 	std::vector<QString> labels;
 	labels.push_back("");
 
-	DownloadProgressWindow * UpdateWnd = new DownloadProgressWindow(QString("Downloading V") + QString::fromStdWString(newest_version), labels, "Initializing...", 250, Q_NULLPTR);	
+	DownloadProgressWindow * UpdateWnd = new(std::nothrow) DownloadProgressWindow(QString("Downloading V") + QString::fromStdWString(newest_version), labels, "Initializing...", 250, Q_NULLPTR);	
+	if (UpdateWnd == Q_NULLPTR)
+	{
+		THROW("Failed to create update progress window.");
 
-	auto worker = std::thread(update_update_thread, UpdateWnd, newest_version, Lib);
+		return false;
+	}
+
+	auto root_path	= QCoreApplication::applicationDirPath().toStdWString() + L"/";
+	auto zip_path	= root_path + GH_INJ_ZIPW;
+
+	DeleteFileW(zip_path.c_str());
+
+	std::wstring download_url = GH_DOWNLOAD_PREFIXW;
+	download_url += newest_version;
+	download_url += GH_DOWNLOAD_SUFFIXW;
+
+	HANDLE hInterrupt = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+
+	DownloadProgress progress(true);
+	progress.SetInterruptEvent(hInterrupt);
+
+	CallbackData_Update data{ };
+	data.download_url	= download_url;
+	data.path			= root_path;
+	data.zip_path		= zip_path;
+	data.pInjLib		= Lib;
+	data.pProgress		= &progress;
+
+	data.download_thread_ret = std::async(std::launch::async, &download_thread, &data);
+
+	UpdateWnd->SetCallbackFrequency(25);
+	UpdateWnd->SetCallbackArg(&data);
+	UpdateWnd->SetCallback(update_update_callback);
+	UpdateWnd->SetCloseValue(UPDATE_ERR_INTERRUPTED);
 
 	UpdateWnd->show();
-	auto ret = UpdateWnd->Execute();
-	auto err = UpdateWnd->GetStatus();
-	
-	worker.join();
+	int ret = UpdateWnd->Execute();
 
 	delete UpdateWnd;
 
 	g_Console->update_external();
 
-	if (ret != 0)
+	QString error_msg = "";
+
+	if (ret > 0)
 	{
-		ShowStatusbox(false, err);
+		error_msg = "An unknown error occured. Please check if the new version was downloaded successfully.\nError code = ";
+		error_msg += QString::number(ret);
 	}
-
-	return (ret == 0);
-}
-
-void update_update_thread(DownloadProgressWindow * UpdateWnd, std::wstring version, InjectionLib * Lib)
-{
-	while (!UpdateWnd->IsRunning())
+	else if (ret < 0)
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
-
-	Sleep(100);
-
-	auto path = QCoreApplication::applicationDirPath().toStdWString();
-	path += L"/";
-
-	auto zip_path = path;
-	zip_path += GH_INJ_ZIPW;
-
-	DeleteFileW(zip_path.c_str());
-
-	std::wstring download_url = GH_DOWNLOAD_PREFIXW;
-	download_url += version;
-	download_url += GH_DOWNLOAD_SUFFIXW;
-
-	HANDLE hInterrupt = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-
-	DownloadProgress progress(download_url, true);
-	progress.SetInterruptEvent(hInterrupt);
-
-	auto worker = std::thread(update_download_progress, UpdateWnd, &progress, hInterrupt);
-
-	auto close_callback = [&]()
-	{
-		SetEvent(hInterrupt);
-		UpdateWnd->SetDone(-1);
-	};
-
-	UpdateWnd->SetCloseCallback(close_callback);
-
-	HRESULT hr = URLDownloadToFileW(nullptr, download_url.c_str(), zip_path.c_str(), NULL, &progress);
-	if (FAILED(hr))
-	{
-		SetEvent(hInterrupt);
-		worker.join();
-
-		CloseHandle(hInterrupt);
-
-		std::stringstream stream;
-		stream << std::hex << hr;
-		std::string new_status = "URLDownloadToFileW failed with 0x";
-		new_status += stream.str();
-		UpdateWnd->SetStatus(new_status.c_str());
-		UpdateWnd->SetDone(-1);
-
-		return;
-	}
-
-	worker.join();
-
-	CloseHandle(hInterrupt);
-
-	Lib->InterruptDownload();
-	Lib->Unload();
-
-	auto old_path = path + L"OLD.exe";
-	DeleteFileW(old_path.c_str());
-
-	if (!MoveFileW(QCoreApplication::applicationFilePath().toStdWString().c_str(), old_path.c_str()))
-	{
-		std::stringstream stream;
-		stream << std::hex << GetLastError();
-		std::string new_status = "MoveFileA failed with 0x%08X";
-		new_status += stream.str();
-		UpdateWnd->SetStatus(new_status.c_str());
-		UpdateWnd->SetDone(-1);
-
-		return;
-	}
-
-	UpdateWnd->SetStatus("Removing old files...");
-
-	DeleteFile(GH_INJ_MOD_NAME86);
-	DeleteFile(GH_INJ_MOD_NAME64);
-	DeleteFile(GH_INJ_SM_NAME86);
-	DeleteFile(GH_INJ_SM_NAME64);
-
-#ifdef _WIN64
-	DeleteFile(GH_INJ_EXE_NAME86);
-#else
-	DeleteFile(GH_INJ_EXE_NAME64);
-#endif
-
-	UpdateWnd->SetStatus("Unzip new files...");
-
-	if (Unzip(zip_path.c_str(), path.c_str()) != 0)
-	{
-		std::string new_status = "Failed to unzip files";
-		UpdateWnd->SetStatus(new_status.c_str());
-		UpdateWnd->SetDone(-1);
-
-		return;
-	}
-
-	DeleteFileW(zip_path.c_str());
-
-	UpdateWnd->SetStatus("Launching updated version...");
-
-	auto new_path = path + L"GH Injector.exe ";
-
-	STARTUPINFOW si{ 0 };
-	PROCESS_INFORMATION pi{ 0 };
-
-	std::wstringstream stream;
-	stream << GetCurrentProcessId();
-	new_path += stream.str();
-
-	CreateProcessW(nullptr, const_cast<wchar_t*>(new_path.c_str()), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
-
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-
-	Sleep(1000);
-
-	UpdateWnd->SetDone(0);
-}
-
-void update_download_progress(DownloadProgressWindow * UpdateWnd, DownloadProgress * progress, HANDLE hInterrupt)
-{
-	while (progress->GetDownloadProgress() < 1.0f)
-	{
-		UpdateWnd->SetProgress(0, progress->GetDownloadProgress());
-		UpdateWnd->SetStatus(progress->GetStatusText().c_str());
-
-		if (WaitForSingleObject(hInterrupt, 0) == WAIT_OBJECT_0)
+		switch (ret)
 		{
-			return;
+			case UPDATE_ERR_DOWNLOAD_FAIL:
+			{
+				HRESULT hr = data.download_thread_ret.get();
+				std::stringstream stream;
+				stream << std::hex << hr;
+				error_msg = "URLDownloadToFileW failed with 0x";
+				error_msg += QString::fromStdString(stream.str());
+			}
+			break;
+
+			case UPDATE_ERR_DELETE_FAIL:
+				error_msg = "Failed to delete old files. Please close the injector and unzip the new version manually.";
+				break;
+
+			case UPDATE_ERR_RENAME_FAIL:
+				error_msg = "Failed to rename old files. Please close the injector and unzip the new version manually.";
+				break;
+
+			case UPDATE_ERR_UNZIP_FAIL:
+				error_msg = "Failed to unzip new files. Please close the injector and unzip the new version manually.";
+				break;
+
+			case UPDATE_ERR_INCOMPLETE:
+				error_msg = "Download incomplete or unzip failure. Please close the injector and unzip the new version manually.";
+				break;
+
+			case UPDATE_ERR_LAUNCH_FAIL:
+				error_msg = "Failed to launch new version. Please close the injector and launch the new version manually.";
+				break;
+
+			case UPDATE_ERR_INTERRUPTED:
+				error_msg = "Update interrupted.";
+				if (hInterrupt)
+				{
+					SetEvent(hInterrupt);
+				}
+				break;
+
+			default:
+				error_msg = "An unknown error occured. Please check if the new version was downloaded successfully.";
 		}
 
-		Sleep(25);
+		if (ret == UPDATE_ERR_DELETE_FAIL || ret == UPDATE_ERR_RENAME_FAIL || ret == UPDATE_ERR_UNZIP_FAIL || ret == UPDATE_ERR_INCOMPLETE || ret == UPDATE_ERR_LAUNCH_FAIL)
+		{
+			std::wstring open_cmd = L"/Select,";
+
+			if (ret == UPDATE_ERR_LAUNCH_FAIL)
+			{
+				QString q_root_path = QString::fromStdWString(root_path);
+				q_root_path.replace('/', '\\');
+				open_cmd += q_root_path.toStdWString();
+				open_cmd += GH_INJ_EXE_LAUNCHW;
+			}
+			else
+			{
+				QString q_zip_path = QString::fromStdWString(zip_path);
+				q_zip_path.replace('/', '\\');
+				open_cmd += q_zip_path.toStdWString();
+			}
+
+			auto shell_ret = reinterpret_cast<INT_PTR>(ShellExecuteW(NULL, nullptr, L"explorer.exe", open_cmd.c_str(), nullptr, SW_SHOW));
+			if (shell_ret <= 32)
+			{
+				g_print("Failed to open explorer:\n Error 1: %08X\n Error 2: %08X\n", shell_ret, GetLastError());
+
+				error_msg = "Failed to open file location. Please open this path and launch/unzip the new version manually:\n";
+				error_msg += QString::fromStdWString(open_cmd);
+			}
+		}
 	}
 
-	UpdateWnd->SetProgress(0, 1);
+	if (hInterrupt)
+	{
+		CloseHandle(hInterrupt);
+	}
+
+	if (ret != UPDATE_ERR_SUCCESS)
+	{
+		ShowStatusbox(false, error_msg);
+	
+		return false;
+	}
+
+	return true;
+}
+
+int epic = 0;
+
+void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, void * pData)
+{
+	if (!hProgressWindow || !pData)
+	{
+		THROW("Invalid data passed to update callback\n");
+
+		return;
+	}
+
+	auto * data = reinterpret_cast<CallbackData_Update *>(pData);
+	auto * progress = data->pProgress;
+	
+	if (!data->download_started)
+	{
+		if (data->download_thread_ret.valid())
+		{
+			data->download_started = true;
+		}
+	}
+	else if (!data->download_finished)
+	{
+		if (data->download_thread_ret.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+		{
+			hProgressWindow->SetProgress(0, progress->GetDownloadProgress());
+			hProgressWindow->SetStatus(progress->GetStatusText().c_str());
+		}
+		else
+		{
+			auto hr = data->download_thread_ret.get();
+			
+			if (SUCCEEDED(hr))
+			{
+				hProgressWindow->SetProgress(0, 1);
+
+				hProgressWindow->SetStatus("Removing old files...");
+
+				data->download_finished = true;
+			}
+			else
+			{
+				std::stringstream stream;
+				stream << std::hex << hr;
+				std::string new_status = "URLDownloadToFileW failed with 0x";
+				new_status += stream.str();
+
+				hProgressWindow->SetStatus(new_status.c_str());
+				hProgressWindow->SetDone(UPDATE_ERR_DOWNLOAD_FAIL);
+			}
+		}
+	}
+	else if (!data->cleanup_finished)
+	{
+		data->pInjLib->InterruptDownload();
+		data->pInjLib->Unload();
+
+		BOOL bRet = TRUE;
+
+		auto old_path = data->path + L"OLD.exe";
+		DeleteFileW(old_path.c_str());
+
+		if (FileExistsW(GH_INJ_EXE_LAUNCHW))
+		{
+			bRet &= DeleteFile(GH_INJ_LAUNCHER_EXE);
+		}
+
+		if (FileExistsW(GH_INJ_MOD_NAME86W))
+		{
+			bRet &= DeleteFile(GH_INJ_MOD_NAME86);
+		}
+
+		if (FileExistsW(GH_INJ_MOD_NAME64W))
+		{
+			bRet &= DeleteFile(GH_INJ_MOD_NAME64);
+		}
+
+		if (FileExistsW(GH_INJ_SM_NAME86W))
+		{
+			bRet &= DeleteFile(GH_INJ_SM_NAME86);
+		}
+
+		if (FileExistsW(GH_INJ_SM_NAME64W))
+		{
+			bRet &= DeleteFile(GH_INJ_SM_NAME64);
+		}
+
+#ifdef _WIN64
+		if (FileExistsW(GH_INJ_EXE_NAME86W))
+		{
+			bRet &= DeleteFile(GH_INJ_EXE_NAME86);
+		}
+#else
+		if (FileExistsW(GH_INJ_EXE_NAME64W))
+		{
+			bRet &= DeleteFile(GH_INJ_EXE_NAME64);
+		}
+#endif
+
+		if (!bRet)
+		{
+			std::stringstream stream;
+			stream << std::hex << GetLastError();
+			std::string new_status = "DeleteFile failed with 0x%08X";
+			new_status += stream.str();
+
+			hProgressWindow->SetStatus(new_status.c_str());
+			hProgressWindow->SetDone(UPDATE_ERR_DELETE_FAIL);
+		}
+		else if (!MoveFileW(QCoreApplication::applicationFilePath().toStdWString().c_str(), old_path.c_str()))
+		{
+			std::stringstream stream;
+			stream << std::hex << GetLastError();
+			std::string new_status = "MoveFileW failed with 0x%08X";
+			new_status += stream.str();
+
+			hProgressWindow->SetStatus(new_status.c_str());
+			hProgressWindow->SetDone(UPDATE_ERR_RENAME_FAIL);
+		}
+		else
+		{
+			hProgressWindow->SetStatus("Unzipping new files...");
+
+			data->cleanup_finished = true;
+		}
+	}
+	else if (!data->unzip_started)
+	{
+		if (Unzip(data->zip_path.c_str(), data->path.c_str()) != 0)
+		{
+			hProgressWindow->SetStatus("Failed to unzip files...");
+
+			hProgressWindow->SetDone(UPDATE_ERR_UNZIP_FAIL);
+		}
+		else
+		{
+			data->unzip_started = true;
+		}
+	}
+	else if (!data->unzip_finished)
+	{
+		if (!data->timer)
+		{
+			data->timer = GetTickCount64();
+		}
+		
+		if (GetTickCount64() > data->timer + 1000)
+		{
+			hProgressWindow->SetStatus("Failed to unzip files...");
+
+			hProgressWindow->SetDone(UPDATE_ERR_INCOMPLETE);
+		}
+		else
+		{
+			bool all_files_unzipped = true;
+
+			all_files_unzipped &= FileExistsW(GH_INJ_EXE_LAUNCHW);
+			all_files_unzipped &= FileExistsW(GH_INJ_MOD_NAME86);
+			all_files_unzipped &= FileExistsW(GH_INJ_MOD_NAME64);
+			all_files_unzipped &= FileExistsW(GH_INJ_SM_NAME86);
+			all_files_unzipped &= FileExistsW(GH_INJ_SM_NAME64);
+			all_files_unzipped &= FileExistsW(GH_INJ_EXE_NAME86);
+			all_files_unzipped &= FileExistsW(GH_INJ_EXE_NAME64);
+
+			data->unzip_finished = all_files_unzipped;
+
+			if (all_files_unzipped)
+			{
+				DeleteFileW(data->zip_path.c_str());
+
+				hProgressWindow->SetStatus("Launching updated version...");
+			}
+		}
+	}
+	else if (!data->launch_finished)
+	{
+		auto new_path = data->path + L"GH Injector.exe ";
+
+		STARTUPINFOW		si{ 0 };
+		PROCESS_INFORMATION pi{ 0 };
+
+		std::wstringstream stream;
+		stream << GetCurrentProcessId();
+		new_path += stream.str();
+
+		if (CreateProcessW(nullptr, const_cast<wchar_t *>(new_path.c_str()), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi))
+		{
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+
+			data->launch_finished = true;
+		}
+		else
+		{
+			hProgressWindow->SetStatus("Failed to launch updated version...");
+
+			hProgressWindow->SetDone(UPDATE_ERR_LAUNCH_FAIL);
+		}
+	}
+	else
+	{
+		hProgressWindow->SetDone(UPDATE_ERR_SUCCESS);
+	}
+}
+
+HRESULT download_thread(CallbackData_Update * data)
+{
+	return URLDownloadToFileW(nullptr, data->download_url.c_str(), data->zip_path.c_str(), NULL, data->pProgress);
 }

@@ -76,8 +76,8 @@ Process_Struct getProcessByNameA(const char		* szExeName);
 Process_Struct getProcessByNameW(const wchar_t	* szExeName);
 Process_Struct getProcessByPID(const int PID);
 
-bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon = false);
-bool sortProcessList(std::vector<Process_Struct*> & pl, SORT_SENSE sort);
+bool getProcessList(std::vector<Process_Struct *> & list, bool get_icon = false);
+bool sortProcessList(std::vector<Process_Struct *> & pl, SORT_SENSE sort);
 
 bool SetDebugPrivilege(bool Enable);
 bool IsNativeProcess(const int PID);

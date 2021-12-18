@@ -1,3 +1,5 @@
+#pragma once
+
 /*
 ###############################################################################
 #                                                                             #
@@ -10,9 +12,6 @@
 #                                                                             #
 ###############################################################################
 */
-
-#ifndef DARKSTYLE_HPP
-#define DARKSTYLE_HPP
 
 #include "pch.h"
 
@@ -32,5 +31,3 @@ public:
 private:
 	QStyle * styleBase(QStyle * style = Q_NULLPTR) const;
 };
-
-#endif  // DARKSTYLE_HPP

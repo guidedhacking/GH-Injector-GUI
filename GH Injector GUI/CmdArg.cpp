@@ -138,7 +138,7 @@ int CmdArg(int argc, wchar_t * argv[])
 	if (inj_method_index)
 	{
 		launch_method = std::stoi(argv[inj_method_index + 1]);
-		if (launch_method < 0 || launch_method > 4)
+		if (launch_method < 0 || launch_method > 5)
 		{
 			launch_method = 0;
 		}
@@ -166,11 +166,6 @@ int CmdArg(int argc, wchar_t * argv[])
 		Flags |= INJ_UNLINK_FROM_PEB;
 	}
 
-	if (FindArg(argc, L"-cloak", argv))
-	{
-		Flags |= INJ_THREAD_CREATE_CLOAKED;
-	}
-
 	if (FindArg(argc, L"-random", argv))
 	{
 		Flags |= INJ_SCRAMBLE_DLL_NAME;
@@ -184,6 +179,27 @@ int CmdArg(int argc, wchar_t * argv[])
 	if (FindArg(argc, L"-hijack", argv))
 	{
 		Flags |= INJ_HIJACK_HANDLE;
+	}
+
+	if (data.Method == LAUNCH_METHOD::LM_NtCreateThreadEx)
+	{
+		if (FindArg(argc, L"-cloak", argv))
+		{
+			Flags |= INJ_THREAD_CREATE_CLOAKED;
+		}
+
+		DWORD cflags = 0;
+		int cflags_index = FindArg(argc, L"-cloakflags", argv, true);
+		if (cflags_index)
+		{
+			wchar_t * szMMflags = argv[cflags_index + 1];
+			cflags = std::stol(szMMflags, nullptr, 0x10);
+
+			DWORD cflags_mask = INJ_CTF_FAKE_START_ADDRESS | INJ_CTF_HIDE_FROM_DEBUGGER | INJ_CTF_SKIP_THREAD_ATTACH | INJ_CTF_FAKE_TEB_CLIENT_ID;
+			cflags &= cflags_mask;
+		}
+
+		Flags |= cflags;
 	}
 
 	if (data.Mode == INJECTION_MODE::IM_ManualMap)
@@ -370,7 +386,14 @@ void help()
 	printf("\t\tIf set the injected module will be unlinked from the PEB.\n\n");
 
 	printf("\t-cloak\n");
-	printf("\t\tCreates the thread cloaked.\n\n");
+	printf("\t\tCreates the thread cloaked with INJ_CTF_FAKE_START_ADDRESS and INJ_CTF_HIDE_FROM_DEBUGGER. See -cloakflags for more information.\n\n");
+
+	printf("\t-cloakflags [value (hex)]\n");
+	printf("\t\tFlags that specify how the thread will be created (NtCreateThreadEx) in hexadecimal and a bitwise combination of these flags:\n");
+	printf("\t\t\t0x00001000 = INJ_CTF_FAKE_START_ADDRESS\n");
+	printf("\t\t\t0x00002000 = INJ_CTF_HIDE_FROM_DEBUGGER\n");
+	printf("\t\t\t0x00004000 = INJ_CTF_SKIP_THREAD_ATTACH\n");
+	printf("\t\t\t0x00008000 = INJ_CTF_FAKE_TEB_CLIENT_ID\n");
 
 	printf("\t-random\n");
 	printf("\t\tIf set the dll name will be scrambled before the injection.\n\n");

@@ -34,6 +34,8 @@ public:
 	static int const EXIT_CODE_START_NATIVE;
 
 	static int const Height_small;
+	static int const Height_medium_s;
+	static int const Height_medium_b;
 	static int const Height_big;
 	static int const Height_change_delay;
 
@@ -68,6 +70,8 @@ private:
 	bool consoleFirst;
 	bool tooltipsEnabled;
 	bool setupDone;
+	bool updateCheck;
+	bool hijackWarning;
 
 	int dockIndex;
 
@@ -90,6 +94,7 @@ private:
 	QTimer * t_OnUserInput;
 	QTimer * t_Update_DragDrop;
 	QTimer * t_SetUp;
+	QTimer * t_Update_Files;
 
 	QPixmap pxm_banner;
 	QPixmap pxm_lul;
@@ -100,7 +105,7 @@ private:
 
 	InjectionLib InjLib;
 
-	QRegExpValidator * rev_NumbersOnly;
+	QRegularExpressionValidator * rev_NumbersOnly;
 
 	// General
 	bool platformCheck();
@@ -114,10 +119,12 @@ private:
 	void cmb_proc_name_change();
 	void btn_change();
 	void update_proc_icon();
+	void update_height();
 
 	// Settings
 	void save_settings();
 	void load_settings();
+	void default_settings();
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
@@ -156,11 +163,14 @@ private slots:
 	void peh_change(int index);
 	void cb_main_clicked();
 	void cb_page_protection_clicked();
+	void cb_cloak_clicked();
+	void cb_hijack_clicked();
 
 	// Files
 	void add_file_dialog();
 	void remove_file();
 	void select_file();
+	void update_file_list();
 
 	// Inject
 	void delay_inject();
@@ -182,5 +192,5 @@ private slots:
 	// Update
 	void update();
 	void update_clicked();
-	void update_drag_drop();
+	void update_after_height_change();
 };

@@ -3,7 +3,6 @@
 #include "pch.h"
 
 #include "framelesswindow.h"
-#include "ui_framelesswindow.h"
 
 //#define DEBUG_CONSOLE_TO_CMD
 
@@ -35,6 +34,10 @@ public:
 	//call this function from the qt owner thread to update the console
 	void update_external();
 
+	//updates the current dock position (if already docked)
+	void dock();
+
+	//updates the dock position to the specified direction
 	void dock(int direction);
 
 private:

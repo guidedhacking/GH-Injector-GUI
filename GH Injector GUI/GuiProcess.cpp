@@ -16,10 +16,37 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	pss = nullptr;
 	sort_sense = SORT_SENSE::SS_ARCH_LO;
 
-	update_list = new QTimer();
+	update_list = new(std::nothrow) QTimer();
+	if (update_list == Q_NULLPTR)
+	{
+		emit ShowStatusbox(false, "Failed to create timer object. The process list won't refresh automatically.");
+	}
+	else
+	{
+		connect(update_list, SIGNAL(timeout()), this, SLOT(refresh_process()));
+		update_list->start(std::chrono::milliseconds(1000));
+	}
+
+	focus_filter = new(std::nothrow) QTimer();
+	if (focus_filter)
+	{
+		//Based on:
+		//https://stackoverflow.com/questions/526761/set-qlineedit-focus-in-qt/622693#622693
+		//Thanks, Ariya Hidayat & AAEM
+
+		focus_filter->setSingleShot(true);
+		focus_filter->setInterval(std::chrono::milliseconds(0));
+
+		connect(focus_filter, SIGNAL(timeout()), ui.txt_filter, SLOT(setFocus()));
+	}
 
 	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
 	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
+
+	if (pxm_generic.isNull() || pxm_error.isNull())
+	{
+		emit ShowStatusbox(false, "Failed to initialize one or multiple graphic files. This won't affect the functionality of the injector.");
+	}
 
 	selected_from_list = false;
 
@@ -32,10 +59,7 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	connect(ui.cb_session,	SIGNAL(stateChanged(int)),				this, SLOT(session_change()));
 
 	connect(ui.tree_process,			SIGNAL(doubleClicked(const QModelIndex &)),	this, SLOT(double_click_process(const QModelIndex &)));
-	connect(ui.tree_process->header(),	SIGNAL(sectionClicked(int)),				this, SLOT(custom_sort(int)));
-
-	connect(update_list, SIGNAL(timeout()), this, SLOT(refresh_process()));
-	update_list->start(1000);
+	connect(ui.tree_process->header(),	SIGNAL(sectionClicked(int)),				this, SLOT(custom_sort(int)));	
 
 	ui.tree_process->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
 	ui.tree_process->setColumnWidth(0, 50);
@@ -57,7 +81,7 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 
 GuiProcess::~GuiProcess()
 {
-	for (auto i : m_ProcList)
+	for (const auto & i : m_ProcList)
 	{
 		if (i)
 		{
@@ -65,7 +89,8 @@ GuiProcess::~GuiProcess()
 		}
 	}
 
-	delete[] update_list;
+	SAFE_DELETE(update_list);
+	SAFE_DELETE(focus_filter);
 }
 
 bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
@@ -116,6 +141,10 @@ bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
 				return true;
 			}
 		}
+	}
+	else if (event->type() == QEvent::Show && obj == this && focus_filter)
+	{
+		focus_filter->start();
 	}
 
 	return QObject::eventFilter(obj, event);
@@ -172,8 +201,10 @@ void GuiProcess::refresh_gui()
 
 		if (!selected_from_list && (*it)->isSelected())
 		{
-			selected_from_list = true;
+			ui.tree_process->setCurrentItem(*it);
+
 			selected_item = (*it);
+			selected_from_list = true;
 		}
 
 		++proc_count;
@@ -191,8 +222,10 @@ void GuiProcess::refresh_gui()
 			}
 
 			(*it)->setSelected(true);
-			selected_from_list = true;
+			ui.tree_process->setCurrentItem(*it);
+
 			selected_item = (*it);
+			selected_from_list = true;
 
 			break;
 		}
@@ -246,7 +279,7 @@ void GuiProcess::refresh_process()
 		++i;
 	}
 
-	for (int i = 0; i < m_ProcList.size(); ++i)
+	for (UINT i = 0; i < m_ProcList.size(); ++i)
 	{
 		DWORD pid = 0;
 		auto * current_item = ui.tree_process->topLevelItem(i);
@@ -258,7 +291,14 @@ void GuiProcess::refresh_process()
 
 		if (m_ProcList[i]->PID != pid)
 		{
-			TreeWidgetItem * item = new TreeWidgetItem();
+			TreeWidgetItem * item = new(std::nothrow) TreeWidgetItem();
+			if (item == Q_NULLPTR)
+			{
+				g_print("Failed to create new item for the process list\n");
+
+				continue;
+			}
+
 			item->setText(1, QString::number(m_ProcList[i]->PID));
 			item->setText(2, QString::fromStdWString(m_ProcList[i]->szName));
 			item->setText(3, QString::fromStdWString(ArchToStrW(m_ProcList[i]->Arch)));
@@ -403,7 +443,7 @@ void GuiProcess::get_from_inj(Process_State_Struct * procStateStruct, Process_St
 #ifndef _WIN64
 	ui.cmb_arch->setDisabled(true);
 	ui.cmb_arch->setCurrentIndex((int)ARCH::X86);
-#endif // WIN64
+#endif
 
 	refresh_process();
 }

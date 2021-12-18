@@ -9,7 +9,7 @@
 { \
 	printf("Failed to resolve %ls\n", L#name); \
 	return v; \
-} \
+}
 
 InjectionLib::InjectionLib()
 {
@@ -22,9 +22,10 @@ InjectionLib::InjectionLib()
 	m_GetVersionA					= nullptr;
 	m_GetVersionW					= nullptr;
 	m_GetSymbolState				= nullptr;
-	m_GetDownloadProgress			= nullptr;
+	m_GetDownloadProgressEx			= nullptr;
 	m_StartDownload					= nullptr;
 	m_InterruptDownload				= nullptr;
+	m_InterruptInjection			= nullptr;
 	m_SetRawPrintCallback			= nullptr;
 
 	memset(m_HookInfo, 0, sizeof(m_HookInfo));
@@ -38,7 +39,7 @@ InjectionLib::InjectionLib()
 
 InjectionLib::~InjectionLib()
 {
-	FreeLibrary(m_hInjectionMod);
+	Unload();
 }
 
 bool InjectionLib::Init()
@@ -79,9 +80,10 @@ bool InjectionLib::Init()
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetVersionW);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetSymbolState);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetImportState);
-	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetDownloadProgress);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetDownloadProgressEx);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, StartDownload);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, InterruptDownload);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, InterruptInjection);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, SetRawPrintCallback);
 
 	return LoadingStatus();
@@ -102,9 +104,10 @@ bool InjectionLib::LoadingStatus()
 	IS_VALID_FUNCTION_POINTER(GetVersionW,					false);
 	IS_VALID_FUNCTION_POINTER(GetSymbolState,				false);
 	IS_VALID_FUNCTION_POINTER(GetImportState,				false);
-	IS_VALID_FUNCTION_POINTER(GetDownloadProgress,			false);
+	IS_VALID_FUNCTION_POINTER(GetDownloadProgressEx,		false);
 	IS_VALID_FUNCTION_POINTER(StartDownload,				false);
 	IS_VALID_FUNCTION_POINTER(InterruptDownload,			false);
+	IS_VALID_FUNCTION_POINTER(InterruptInjection,			false);
 	IS_VALID_FUNCTION_POINTER(SetRawPrintCallback,			false);
 
 	return true;
@@ -113,6 +116,29 @@ bool InjectionLib::LoadingStatus()
 void InjectionLib::Unload()
 {
 	FreeLibrary(m_hInjectionMod);
+	
+	m_hInjectionMod = NULL;
+
+	m_InjectA						= nullptr;
+	m_InjectW						= nullptr;
+	m_ValidateInjectionFunctions	= nullptr;
+	m_RestoreInjectionFunctions		= nullptr;
+	m_GetVersionA					= nullptr;
+	m_GetVersionW					= nullptr;
+	m_GetSymbolState				= nullptr;
+	m_GetDownloadProgressEx			= nullptr;
+	m_StartDownload					= nullptr;
+	m_InterruptDownload				= nullptr;
+	m_InterruptInjection			= nullptr;
+	m_SetRawPrintCallback			= nullptr;
+
+	memset(m_HookInfo, 0, sizeof(m_HookInfo));
+
+	m_Err		= 0;
+	m_Win32Err	= 0;
+	m_CountOut	= 0;
+	m_Changed	= 0;
+	m_TargetPID = 0;
 }
 
 DWORD InjectionLib::InjectA(INJECTIONDATAA * pData)
@@ -213,11 +239,11 @@ DWORD InjectionLib::GetImportState()
 	return m_GetImportState();
 }
 
-float InjectionLib::GetDownloadProgress(bool bWow64)
+float InjectionLib::GetDownloadProgressEx(int index, bool bWow64)
 {
-	IS_VALID_FUNCTION_POINTER(GetDownloadProgress, 0.0f);
+	IS_VALID_FUNCTION_POINTER(GetDownloadProgressEx, 0.0f);
 
-	return m_GetDownloadProgress(bWow64);
+	return m_GetDownloadProgressEx(index, bWow64);
 }
 
 void InjectionLib::StartDownload()
@@ -229,9 +255,16 @@ void InjectionLib::StartDownload()
 
 void InjectionLib::InterruptDownload()
 {
-	IS_VALID_FUNCTION_POINTER(InterruptDownload,);
+	IS_VALID_FUNCTION_POINTER(InterruptDownload, );
 
 	return m_InterruptDownload();
+}
+
+bool InjectionLib::InterruptInjection()
+{
+	IS_VALID_FUNCTION_POINTER(InterruptInjection, false);
+
+	return m_InterruptInjection(100);
 }
 
 std::string InjectionLib::GetVersionA()

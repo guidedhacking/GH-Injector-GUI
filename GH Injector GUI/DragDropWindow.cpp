@@ -226,7 +226,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 		return;
 	}
 
-	wchar_t ** Drops = new wchar_t * [DropCount]();
+	wchar_t ** Drops = new(std::nothrow) wchar_t * [DropCount]();
 	if (!Drops)
 	{
 		g_print("Can't allocate memory for drops\n");
@@ -247,7 +247,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 
 		BufferSize++;
 
-		Drops[i] = new wchar_t[static_cast<size_t>(BufferSize)]();
+		Drops[i] = new(std::nothrow) wchar_t[static_cast<size_t>(BufferSize)]();
 
 		if (!Drops[i])
 		{

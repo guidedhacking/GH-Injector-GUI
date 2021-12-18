@@ -6,6 +6,7 @@
 
 #include "DebugConsole.h"
 #include "framelesswindow.h"
+#include "StatusBox.h"
 #include "Process.h"
 
 //don't want to include QWinExtras because of static build
@@ -41,13 +42,14 @@ private:
 	Ui::frm_proc ui;
 	FramelessWindow * frameless_parent;
 
-	Process_State_Struct	*	pss;
-	Process_Struct			*	ps;
-	QTimer					*	update_list;
-	SORT_SENSE					sort_sense;
-	int							own_session;
-	std::vector<Process_Struct*> m_ProcList;
-	bool						selected_from_list;
+	Process_State_Struct	*		pss;
+	Process_Struct			*		ps;
+	QTimer					*		update_list;
+	QTimer					*		focus_filter;
+	SORT_SENSE						sort_sense;
+	int								own_session;
+	std::vector<Process_Struct *>	m_ProcList;
+	bool							selected_from_list;
 
 	QPixmap pxm_error;
 	QPixmap pxm_generic;

@@ -75,8 +75,8 @@ ARCH getFileArchW(const wchar_t * szDllFile)
 		return ARCH::NONE;
 	}
 
-	pSrcData = new BYTE[static_cast<UINT_PTR>(FileSize)];
-	if (!pSrcData)
+	pSrcData = new(std::nothrow) BYTE[static_cast<UINT_PTR>(FileSize)];
+	if (pSrcData == nullptr)
 	{
 		g_print("Memory allocation failed\n");
 
@@ -169,6 +169,8 @@ ARCH getProcArch(const int PID)
 
 	return ARCH::X64;
 #else
+	UNREFERENCED_PARAMETER(PID);
+
 	return ARCH::X86;
 #endif
 }
@@ -390,7 +392,7 @@ Process_Struct getProcessByPID(const int PID)
 	return ps_item;
 }
 
-bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
+bool getProcessList(std::vector<Process_Struct *> & list, bool get_icon)
 {
 #ifndef _WIN64
 	bool native = IsNativeProcess(GetCurrentProcessId());
@@ -466,7 +468,11 @@ bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 			}
 		}
 
-		Process_Struct * ps_item = new Process_Struct();
+		Process_Struct * ps_item = new(std::nothrow) Process_Struct();
+		if (!ps_item)
+		{
+			continue;
+		}
 
 		ps_item->PID		= i.th32ProcessID;
 		ps_item->Arch		= getProcArch(i.th32ProcessID);
@@ -486,7 +492,7 @@ bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 
 	std::sort(list.begin(), list.end(), sort_list);
 
-	for (int i = 0; i < list.size(); )
+	for (UINT i = 0; i < entries.size(); )
 	{
 		if (list[i]->PID != entries[i].th32ProcessID)
 		{
@@ -500,10 +506,21 @@ bool getProcessList(std::vector<Process_Struct*> & list, bool get_icon)
 		}
 	}
 
+	auto diff = list.size() - entries.size();
+	if (diff > 0)
+	{
+		for (size_t i = 0; i < diff; ++i)
+		{
+			delete list[list.size() - 1];
+		}
+
+		list.erase(list.end() - diff, list.end());
+	}
+
 	return true;
 }
 
-bool sortProcessList(std::vector<Process_Struct*> & pl, SORT_SENSE sort)
+bool sortProcessList(std::vector<Process_Struct *> & pl, SORT_SENSE sort)
 {
 	if (sort == SORT_SENSE::SS_PID_LO)
 	{

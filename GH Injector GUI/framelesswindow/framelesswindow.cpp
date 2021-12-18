@@ -14,11 +14,10 @@
 */
 
 #include "framelesswindow.h"
-#include "ui_framelesswindow.h"
 
 FramelessWindow::FramelessWindow(QWidget * parent)
 	: QWidget(parent),
-	ui(new Ui::FramelessWindow),
+	ui(new(std::nothrow) Ui::FramelessWindow),
 	m_bMousePressed(false),
 	m_bDragTop(false),
 	m_bDragLeft(false),
@@ -46,14 +45,24 @@ FramelessWindow::FramelessWindow(QWidget * parent)
 	content			= Q_NULLPTR;
 
 	// shadow under window title text
-	QGraphicsDropShadowEffect * textShadow = new QGraphicsDropShadowEffect;
+	QGraphicsDropShadowEffect * textShadow = new(std::nothrow) QGraphicsDropShadowEffect;
+	if (textShadow == Q_NULLPTR)
+	{
+		THROW("Failed to create drop shadow effect for frameless window.");
+	}
+
 	textShadow->setBlurRadius(4.0);
 	textShadow->setColor(QColor(0, 0, 0));
 	textShadow->setOffset(0.0);
 	//ui->titleText->setGraphicsEffect(textShadow);
 
 	// window shadow
-	QGraphicsDropShadowEffect * windowShadow = new QGraphicsDropShadowEffect;
+	QGraphicsDropShadowEffect * windowShadow = new(std::nothrow) QGraphicsDropShadowEffect;
+	if (windowShadow == Q_NULLPTR)
+	{
+		THROW("Failed to create drop shadow effect for frameless window.");
+	}
+
 	windowShadow->setBlurRadius(9.0);
 	windowShadow->setColor(palette().color(QPalette::Highlight));
 	windowShadow->setOffset(0.0);
@@ -95,6 +104,7 @@ void FramelessWindow::changeEvent(QEvent * event)
 			event->ignore();
 		}
 	}
+
 	event->accept();
 }
 
@@ -272,72 +282,124 @@ void FramelessWindow::styleWindow(bool bActive, bool bNoState)
 	{
 		if (bNoState)
 		{
-			layout()->setMargin(15);
+			layout()->setContentsMargins(15, 15, 15, 15);
+
 			ui->windowTitlebar->setStyleSheet(QStringLiteral(
 				"#windowTitlebar{border: 0px none palette(shadow); "
 				"border-top-left-radius:5px; border-top-right-radius:5px; "
-				"background-color:palette(shadow); height:20px;}"));
+				"background-color:palette(shadow); height:20px;}")
+			);
+			
 			ui->windowFrame->setStyleSheet(QStringLiteral(
 				"#windowFrame{border:1px solid palette(highlight); border-radius:5px "
-				"5px 5px 5px; background-color:palette(Window);}"));
+				"5px 5px 5px; background-color:palette(Window);}")
+			);
+			
 			QGraphicsEffect * oldShadow = ui->windowFrame->graphicsEffect();
-			if (oldShadow) delete oldShadow;
-			QGraphicsDropShadowEffect * windowShadow = new QGraphicsDropShadowEffect;
-			windowShadow->setBlurRadius(9.0);
-			windowShadow->setColor(palette().color(QPalette::Highlight));
-			windowShadow->setOffset(0.0);
-			ui->windowFrame->setGraphicsEffect(windowShadow);
+			if (oldShadow)
+			{
+				delete oldShadow;
+			}
+
+			QGraphicsDropShadowEffect * windowShadow = new(std::nothrow) QGraphicsDropShadowEffect;
+			if (windowShadow)
+			{
+				windowShadow->setBlurRadius(9.0);
+				windowShadow->setColor(palette().color(QPalette::Highlight));
+				windowShadow->setOffset(0.0);
+
+				ui->windowFrame->setGraphicsEffect(windowShadow);
+			}
+			else
+			{
+				ui->windowFrame->setGraphicsEffect(nullptr);
+			}
 		}
 		else
 		{
-			layout()->setMargin(0);
+			layout()->setContentsMargins(0, 0, 0, 0);
+			
 			ui->windowTitlebar->setStyleSheet(QStringLiteral(
 				"#windowTitlebar{border: 0px none palette(shadow); "
 				"border-top-left-radius:0px; border-top-right-radius:0px; "
-				"background-color:palette(shadow); height:20px;}"));
+				"background-color:palette(shadow); height:20px;}")
+			);
+			
 			ui->windowFrame->setStyleSheet(QStringLiteral(
 				"#windowFrame{border:1px solid palette(dark); border-radius:0px 0px "
-				"0px 0px; background-color:palette(Window);}"));
+				"0px 0px; background-color:palette(Window);}")
+			);
+
 			QGraphicsEffect * oldShadow = ui->windowFrame->graphicsEffect();
-			if (oldShadow) delete oldShadow;
+			if (oldShadow)
+			{
+				delete oldShadow;
+			}
+
 			ui->windowFrame->setGraphicsEffect(nullptr);
-		}  // if (bNoState) else maximize
+		}
 	}
 	else
 	{
 		if (bNoState)
 		{
-			layout()->setMargin(15);
+			layout()->setContentsMargins(15, 15, 15, 15);
+
 			ui->windowTitlebar->setStyleSheet(QStringLiteral(
 				"#windowTitlebar{border: 0px none palette(shadow); "
 				"border-top-left-radius:5px; border-top-right-radius:5px; "
-				"background-color:palette(dark); height:20px;}"));
+				"background-color:palette(dark); height:20px;}")
+			);
+			
 			ui->windowFrame->setStyleSheet(QStringLiteral(
 				"#windowFrame{border:1px solid #000000; border-radius:5px 5px 5px "
-				"5px; background-color:palette(Window);}"));
+				"5px; background-color:palette(Window);}")
+			);
+			
 			QGraphicsEffect * oldShadow = ui->windowFrame->graphicsEffect();
-			if (oldShadow) delete oldShadow;
-			QGraphicsDropShadowEffect * windowShadow = new QGraphicsDropShadowEffect;
-			windowShadow->setBlurRadius(9.0);
-			windowShadow->setColor(palette().color(QPalette::Shadow));
-			windowShadow->setOffset(0.0);
-			ui->windowFrame->setGraphicsEffect(windowShadow);
+			if (oldShadow)
+			{
+				delete oldShadow;
+			}
+
+			QGraphicsDropShadowEffect * windowShadow = new(std::nothrow) QGraphicsDropShadowEffect;
+			if (windowShadow)
+			{
+				windowShadow->setBlurRadius(9.0);
+				windowShadow->setColor(palette().color(QPalette::Shadow));
+				windowShadow->setOffset(0.0);
+
+				ui->windowFrame->setGraphicsEffect(windowShadow);
+			}
+			else
+			{
+				ui->windowFrame->setGraphicsEffect(nullptr);
+			}
 		}
 		else
 		{
-			layout()->setMargin(0);
+			layout()->setContentsMargins(0, 0, 0, 0);
+
 			ui->windowTitlebar->setStyleSheet(QStringLiteral(
 				"#titlebarWidget{border: 0px none palette(shadow); "
 				"border-top-left-radius:0px; border-top-right-radius:0px; "
-				"background-color:palette(dark); height:20px;}"));
+				"background-color:palette(dark); height:20px;}")
+			);
+
 			ui->windowFrame->setStyleSheet(QStringLiteral(
 				"#windowFrame{border:1px solid palette(shadow); border-radius:0px "
-				"0px 0px 0px; background-color:palette(Window);}"));
+				"0px 0px 0px; background-color:palette(Window);}")
+			);
+
 			QGraphicsEffect * oldShadow = ui->windowFrame->graphicsEffect();
-			if (oldShadow) delete oldShadow;
+			if (oldShadow)
+			{
+				delete oldShadow;
+			}
+
 			ui->windowFrame->setGraphicsEffect(nullptr);
-		}  // if (bNoState) { else maximize
-	}    // if (bActive) { else no focus
+		}
+	}
 }
 
 void FramelessWindow::updateSizePolicy()
@@ -415,38 +477,26 @@ void FramelessWindow::on_closeButton_clicked()
 	hide();
 }
 
-void FramelessWindow::on_windowTitlebar_doubleClicked()
-{
-
-}
-
-void FramelessWindow::mouseDoubleClickEvent(QMouseEvent * event)
-{
-	Q_UNUSED(event);
-}
-
 void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 {
-	if (isMaximized())
-	{
-		return;
-	}
-
 	QPoint globalMousePos = event->globalPos();
 	if (m_bMousePressed)
 	{
 		QScreen * screen = QGuiApplication::primaryScreen();
+
 		// available geometry excludes taskbar
 		QRect availGeometry = screen->availableGeometry();
 		int h = availGeometry.height();
 		int w = availGeometry.width();
+
 		QList<QScreen *> screenlist = screen->virtualSiblings();
 		if (screenlist.contains(screen))
 		{
-			QSize sz = QApplication::desktop()->size();
-			h = sz.height();
+			QSize sz = screen->size();
+			h = sz.height() + 50;
 			w = sz.width();
 		}
+
 		// top right corner
 		if (m_bDragTop && m_bDragRight)
 		{
@@ -454,6 +504,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 			int neww = m_StartGeometry.width() + diff;
 			diff = globalMousePos.y() - m_StartGeometry.y();
 			int newy = m_StartGeometry.y() + diff;
+
 			if (neww > 0 && newy > 0 && newy < h - 50)
 			{
 				QRect newg = m_StartGeometry;
@@ -470,6 +521,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 			int newy = m_StartGeometry.y() + diff;
 			diff = globalMousePos.x() - m_StartGeometry.x();
 			int newx = m_StartGeometry.x() + diff;
+
 			if (newy > 0 && newx > 0)
 			{
 				QRect newg = m_StartGeometry;
@@ -485,6 +537,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 			int newh = m_StartGeometry.height() + diff;
 			diff = globalMousePos.x() - m_StartGeometry.x();
 			int newx = m_StartGeometry.x() + diff;
+
 			if (newh > 0 && newx > 0)
 			{
 				QRect newg = m_StartGeometry;
@@ -497,6 +550,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		{
 			int diff = globalMousePos.y() - m_StartGeometry.y();
 			int newh = m_StartGeometry.height() - diff / 2;
+
 			if (newh > 0 && newh < h - 50)
 			{
 				int old_height = 0;
@@ -526,6 +580,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		{
 			int diff = globalMousePos.x() - m_StartGeometry.x();
 			int newx = m_StartGeometry.x() + diff;
+
 			if (newx > 0 && newx < w - 50)
 			{
 				QRect newg = m_StartGeometry;
@@ -537,6 +592,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		{
 			int diff = globalMousePos.x() - (m_StartGeometry.x() + m_StartGeometry.width());
 			int neww = m_StartGeometry.width() + diff;
+
 			if (neww > 0)
 			{
 				QRect newg = m_StartGeometry;
@@ -549,6 +605,7 @@ void FramelessWindow::checkBorderDragging(QMouseEvent * event)
 		{
 			int diff = globalMousePos.y() - (m_StartGeometry.y() + m_StartGeometry.height());
 			int newh = m_StartGeometry.height() + diff;
+
 			if (newh > 0)
 			{
 				QRect newg = m_StartGeometry;

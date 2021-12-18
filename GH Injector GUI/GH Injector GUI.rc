@@ -63,8 +63,8 @@ IDI_ICON2               ICON                    "gh_resource\\DragDrop Icon.ico"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 4,3,0,4
- PRODUCTVERSION 4,3,0,4
+ FILEVERSION 4,5,0,0
+ PRODUCTVERSION 4,5,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -81,10 +81,10 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Guided Hacking"
             VALUE "FileDescription", "GUI of the GH Injector"
-            VALUE "FileVersion", "4.4.0.0"
+            VALUE "FileVersion", "4.5.0.0"
             VALUE "LegalCopyright", "Broihon (C) 1987 - 2035"
             VALUE "ProductName", "GH Injector GUI"
-            VALUE "ProductVersion", "4.4.0.0"
+            VALUE "ProductVersion", "4.5.0.0"
         END
     END
     BLOCK "VarFileInfo"

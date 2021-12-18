@@ -15,8 +15,11 @@
 
 #include "pch.h"
 
-constexpr auto GH_INJ_GUI_VERSIONA = "4.4";
-constexpr auto GH_INJ_GUI_VERSIONW = L"4.4";
+constexpr auto GH_INJ_GUI_VERSIONA = "4.5";
+constexpr auto GH_INJ_GUI_VERSIONW = L"4.5";
+
+constexpr auto GH_INJ_EXE_LAUNCHA = "GH Injector.exe";
+constexpr auto GH_INJ_EXE_LAUNCHW = L"GH Injector.exe";
 
 constexpr auto GH_INJ_EXE_NAME64A = "GH Injector - x64.exe";
 constexpr auto GH_INJ_EXE_NAME64W = L"GH Injector - x64.exe";
@@ -45,14 +48,14 @@ constexpr auto GH_INJ_LOGW = L"GH_Inj_Log.txt";
 constexpr auto GH_HELP_URLA = "https://guidedhacking.com/threads/guidedhacking-dll-injector.8417/";
 constexpr auto GH_HELP_URLW = L"https://guidedhacking.com/threads/guidedhacking-dll-injector.8417/";
 
-constexpr auto GH_DOWNLOAD_PREFIXA = "https://guidedhacking.com/gh/inj/V";
-constexpr auto GH_DOWNLOAD_PREFIXW = L"https://guidedhacking.com/gh/inj/V";
+constexpr auto GH_DOWNLOAD_PREFIXA = "https://guidedhacking.com/gh/inj/V"; //"http://localhost/GH/V"; epic debugging
+constexpr auto GH_DOWNLOAD_PREFIXW = L"https://guidedhacking.com/gh/inj/V"; //L"http://localhost/GH/V"; 
 
 constexpr auto GH_DOWNLOAD_SUFFIXA = "/GH Injector.zip";
 constexpr auto GH_DOWNLOAD_SUFFIXW = L"/GH Injector.zip";
 
-constexpr auto GH_VERSION_URLA = "https://guidedhacking.com/gh/inj/lastestver/";
-constexpr auto GH_VERSION_URLW = L"https://guidedhacking.com/gh/inj/lastestver/";
+constexpr auto GH_VERSION_URLA = "https://guidedhacking.com/gh/inj/latestver.txt"; //"http://localhost/GH/latestver.txt";
+constexpr auto GH_VERSION_URLW = L"https://guidedhacking.com/gh/inj/latestver.txt"; //L"http://localhost/GH/latestver.txt";
 
 constexpr auto GH_SETTINGS_INIA = "Settings.ini";
 constexpr auto GH_SETTINGS_INIW = L"Settings.ini";
@@ -76,6 +79,7 @@ constexpr auto GH_INJ_SM_NAMEW	= GH_INJ_MOD_NAME86W;
 #ifdef UNICODE
 constexpr auto GH_INJ_GUI_VERSION	= GH_INJ_GUI_VERSIONW;
 constexpr auto GH_INJ_MOD_NAME		= GH_INJ_MOD_NAMEW;
+constexpr auto GH_INJ_LAUNCHER_EXE	= GH_INJ_EXE_LAUNCHW;
 constexpr auto GH_INJ_EXE_NAME		= GH_INJ_EXE_NAMEW;
 constexpr auto GH_INJ_SM_NAME		= GH_INJ_SM_NAMEW;
 constexpr auto GH_INJ_ZIP			= GH_INJ_ZIPW;
@@ -95,6 +99,7 @@ constexpr auto GH_INJ_SM_NAME86		= GH_INJ_SM_NAME86W;
 #else
 constexpr auto GH_INJ_GUI_VERSION	= GH_INJ_GUI_VERSIONA;
 constexpr auto GH_INJ_MOD_NAME		= GH_INJ_MOD_NAMEA;
+constexpr auto GH_INJ_LAUNCHER_EXE	= GH_INJ_EXE_LAUNCHA;
 constexpr auto GH_INJ_EXE_NAME		= GH_INJ_EXE_NAMEA;
 constexpr auto GH_INJ_SM_NAME		= GH_INJ_SM_NAMEA;
 constexpr auto GH_INJ_ZIP			= GH_INJ_ZIPA;
@@ -128,7 +133,8 @@ enum class LAUNCH_METHOD
 	LM_HijackThread,
 	LM_SetWindowsHookEx,
 	LM_QueueUserAPC,
-	LM_KernelCallback
+	LM_KernelCallback,
+	LM_FakeVEH
 };
 
 //ansi version of the info structure:
@@ -187,7 +193,7 @@ struct HookInfo
 #define INJ_ERASE_HEADER				0x0001	//replaces the first 0x1000 bytes of the dll with 0's (takes priority over INJ_FAKE_HEADER if both are specified)
 #define INJ_FAKE_HEADER					0x0002	//replaces the dlls header with the header of the ntdll.dll (superseded by INJ_ERASE_HEADER if both are specified)
 #define INJ_UNLINK_FROM_PEB				0x0004	//unlinks the module from the process enviroment block (1)
-#define INJ_THREAD_CREATE_CLOAKED		0x0008	//passes certain flags to NtCreateThreadEx to make the thread creation more stealthy (2)
+#define INJ_THREAD_CREATE_CLOAKED		0x0008	//induces INJ_CTF_FAKE_START_ADDRESS | INJ_CTF_HIDE_FROM_DEBUGGER (2), see thread creation options for more flags
 #define INJ_SCRAMBLE_DLL_NAME			0x0010	//randomizes the dll name on disk before injecting it
 #define INJ_LOAD_DLL_COPY				0x0020	//loads a copy of the dll from %temp% directory
 #define INJ_HIJACK_HANDLE				0x0040	//tries to a hijack a handle from another process instead of using OpenProcess
@@ -195,6 +201,12 @@ struct HookInfo
 //Notes:
 ///(1) ignored when manual mapping
 ///(2) launch method must be NtCreateThreadEx, ignored otherwise
+
+//Thread creation options:
+#define INJ_CTF_FAKE_START_ADDRESS	0x00001000
+#define INJ_CTF_HIDE_FROM_DEBUGGER	0x00002000
+#define INJ_CTF_SKIP_THREAD_ATTACH	0x00004000
+#define INJ_CTF_FAKE_TEB_CLIENT_ID	0x00008000
 
 //Manual mapping options:
 #define INJ_MM_CLEAN_DATA_DIR			0x00010000	//removes data from the dlls PE header, ignored if INJ_MM_SET_PAGE_PROTECTIONS is set
@@ -227,9 +239,11 @@ using f_GetVersionW = HRESULT(__stdcall *)(wchar_t	* out, size_t cb_size);
 using f_GetSymbolState = DWORD(__stdcall *)();
 using f_GetImportState = DWORD(__stdcall *)();
 
-using f_GetDownloadProgress = float(__stdcall *)(bool bWoW64);
-using f_StartDownload		= void(__stdcall *)();
-using f_InterruptDownload	= void(__stdcall *)();
+using f_GetDownloadProgress		= float(__stdcall *)(bool bWoW64);
+using f_GetDownloadProgressEx	= float(__stdcall *)(int index, bool bWoW64);
+using f_StartDownload			= void(__stdcall *)();
+using f_InterruptDownload		= void(__stdcall *)();
+using f_InterruptInjection		= bool(__stdcall *)(DWORD Timeout);
 
 using f_raw_print_callback	= void(__stdcall *)(const char * szText);
 using f_SetRawPrintCallback = DWORD(__stdcall *)(f_raw_print_callback callback);

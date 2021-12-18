@@ -4,20 +4,28 @@
 
 HRESULT CreateLink(LPCWSTR lpszPathObj, LPCWSTR lpszPathLink, LPCWSTR lpszDesc, LPCWSTR args)
 {
-	HRESULT hres;
-	IShellLinkW * psl;
+	HRESULT			hres	= S_OK;
+	IShellLinkW *	psl		= nullptr;
 
-	CoInitialize(NULL);
+	hres = CoInitialize(NULL);
+	if (FAILED(hres))
+	{
+		// Has to be called for failed calls to CoInitialize too.
+		CoUninitialize(); 
+
+		return hres;
+	}
+
 	// Get a pointer to the IShellLink interface. It is assumed that CoInitialize
 	// has already been called.
 	hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID *)&psl);
 	if (SUCCEEDED(hres))
 	{
-		IPersistFile * ppf;
+		IPersistFile * ppf = nullptr;
 
 		// Set the path to the shortcut target and add the description. 
 		psl->SetPath(lpszPathObj);
-		// psl->SetDescription(lpszDesc);
+		psl->SetDescription(lpszDesc);
 
 		psl->SetArguments(args);
 		psl->SetWorkingDirectory(lpszDesc);
@@ -32,8 +40,12 @@ HRESULT CreateLink(LPCWSTR lpszPathObj, LPCWSTR lpszPathLink, LPCWSTR lpszDesc, 
 			hres = ppf->Save(lpszPathLink, TRUE);
 			ppf->Release();
 		}
+
 		psl->Release();
 	}
+
+	CoUninitialize();
+
 	return hres;
 }
 
