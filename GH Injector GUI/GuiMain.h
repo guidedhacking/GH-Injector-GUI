@@ -12,7 +12,7 @@
 #include "GuiScanHook.h"
 #include "Injection.h"
 #include "InjectionLib.h"
-#include "PDB Download.h"
+#include "PDB_Download.h"
 #include "Process.h"
 #include "ShortCut.h"
 #include "StatusBox.h"
