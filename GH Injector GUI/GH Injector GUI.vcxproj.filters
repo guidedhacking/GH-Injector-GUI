@@ -55,9 +55,6 @@
     <ClCompile Include="Update.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="PDB Download.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="DebugConsole.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -65,6 +62,9 @@
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="WindowDocker.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="PDB_Download.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -102,10 +102,10 @@
     <ClInclude Include="Update.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="PDB Download.h">
+    <ClInclude Include="StatusBox.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="StatusBox.h">
+    <ClInclude Include="PDB_Download.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
