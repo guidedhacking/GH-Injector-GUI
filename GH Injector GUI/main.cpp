@@ -33,8 +33,10 @@ int wmain(int argc, wchar_t * argv[])
 	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 	std::string s_argv = converter.to_bytes(argv[0]);
 	char * sz_argv = const_cast<char *>(s_argv.c_str());
-
+	
+	SetProcessDPIAware();
 	//QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+	//QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 
 	// Restart Application loop
 	int currentExitCode = 0;

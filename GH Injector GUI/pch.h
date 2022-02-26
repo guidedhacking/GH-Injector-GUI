@@ -12,16 +12,16 @@
 #include <iostream>
 #include <objidl.h> 
 #include <Shlobj.h>
-#include <shlguid.h>
-#include <shobjidl.h>
+#include <ShlGuid.h>
+#include <ShObjIdl.h>
 #include <sstream>
 #include <string>
 #include <thread>
 #include <TlHelp32.h>
-#include <Urlmon.h>
+#include <urlmon.h>
 #include <vector>
 #include <Windows.h>
-#include <WinInet.h>
+#include <wininet.h>
 
 #pragma warning(disable: 26812) //qt enums are not enum class
 
@@ -38,7 +38,7 @@
 
 #pragma warning(pop)
 
-#if (QT_VERSION_CHECK(5,15,2) < QT_VERSION)
+#if (QT_VERSION_CHECK(5,15,8) < QT_VERSION)
 #error Invalid Qt version. Only Qt5.15.x is supported.
 #endif
 

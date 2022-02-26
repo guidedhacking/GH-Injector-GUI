@@ -165,10 +165,7 @@ int DebugConsole::print(const char * format, ...)
 	{
 		print_raw(buffer);
 
-		if (m_Content)
-		{
-			m_Content->scrollToBottom();
-		}
+		m_Content->scrollToBottom();
 	}
 
 	if (buffer)
@@ -282,21 +279,27 @@ void DebugConsole::update_external()
 		return;
 	}
 
-	auto cpy = m_ExternalDataBuffer;
+	//initialize "new" vector object to prevent lnt-accidental-copy
+	//reference won't work because the vector needs to be cleared asap
+	//so that another thread can continue writing to it
+	//thus a copy is needed before processing the data
+	auto cpy = std::vector(m_ExternalDataBuffer);
 
 	m_ExternalDataBuffer.clear();
 
 	m_ExternalLocked = false;
+
+	if (!m_Content)
+	{
+		return;
+	}
 
 	for (const auto & i : cpy)
 	{
 		print_raw(i.c_str());
 	}
 
-	if (m_Content)
-	{
-		m_Content->scrollToBottom();
-	}
+	m_Content->scrollToBottom();
 }
 
 void DebugConsole::dock()
@@ -311,9 +314,31 @@ void DebugConsole::dock(int direction)
 {
 	if (m_Docker)
 	{
-		g_print("Dock = %d\n", direction);
+		switch (direction)
+		{
+			case 0:
+				g_print("Console docked: right\n");
+				break;
+
+			case 1:
+				g_print("Console docked: left\n");
+				break;
+
+			case 2:
+				g_print("Console docked: top\n");
+				break;
+
+			case 3:
+				g_print("Console docked: bottom\n");
+				break;
+
+			default:
+				g_print("Invalid dock index specified\n");
+		}
 
 		m_Docker->Dock(direction);
+
+		m_Content->scrollToBottom();
 	}
 }
 
@@ -329,8 +354,6 @@ int DebugConsole::get_dock_index()
 
 int DebugConsole::get_old_dock_index()
 {
-	g_print("Old index = %d\n", m_Docker->GetOldDockIndex());
-
 	if (m_Docker)
 	{
 		return m_Docker->GetOldDockIndex();

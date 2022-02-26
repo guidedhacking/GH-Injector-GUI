@@ -175,7 +175,12 @@ int WindowDocker::find_closest(int & a, int & b)
 }
 
 int WindowDocker::check_snap()
-{	
+{
+	if (m_Master->isMinimized() || m_Master->isHidden())
+	{
+		return 0;
+	}
+
 	auto s_r = m_Slave->childrenRect();
 	auto s_p = m_Slave->mapToGlobal(s_r.topLeft());
 
@@ -331,6 +336,9 @@ void WindowDocker::Dock(int direction)
 	move_to_pos(m_DockIndex);
 
 	m_Slave->setDockButton(true, true, m_DockIndex);
+
+	m_Master->setWindowState(m_Master->windowState() | Qt::WindowActive);
+	m_Master->activateWindow();
 }
 
 bool WindowDocker::eventFilter(QObject * obj, QEvent * event)
@@ -402,8 +410,8 @@ bool WindowDocker::eventFilter(QObject * obj, QEvent * event)
 		{
 			auto * resizeEvent = static_cast<QResizeEvent *>(event);
 			
-			auto old_s = resizeEvent->oldSize();
-			auto new_s = resizeEvent->size();
+			auto & old_s = resizeEvent->oldSize();
+			auto & new_s = resizeEvent->size();
 
 			if (m_DockIndex == 2 && new_s.height() != old_s.height())
 			{

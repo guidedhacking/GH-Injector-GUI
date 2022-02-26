@@ -31,8 +31,6 @@ GuiMain::GuiMain(QWidget * parent)
 		THROW("Failed to create debug console.");
 	}
 
-	g_Console->open();
-
 	drag_drop = nullptr;
 
 	current_version = GH_INJ_GUI_VERSIONW;
@@ -496,6 +494,7 @@ void GuiMain::update_proc_icon()
 	else
 	{
 		new_icon = GetIconFromFileW(ps.szPath, size);
+
 		if (new_icon.isNull())
 		{
 			new_icon = pxm_generic.scaled(size, size);
@@ -689,7 +688,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 				}
 			}
 
-			if (g_Console->is_open())
+			if (g_Console->is_open() && !framelessParent->isMinimized())
 			{
 				auto * keyEvent = static_cast<QKeyEvent *>(event);
 				if (keyEvent->modifiers() & Qt::KeyboardModifier::ControlModifier)
@@ -831,6 +830,8 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 		{
 			if (current_dpi != framelessParent->logicalDpiX() && drag_drop)
 			{
+				update_height();
+
 				drag_drop->Close();
 
 				current_dpi = framelessParent->logicalDpiX();
@@ -1390,7 +1391,10 @@ void GuiMain::update_height()
 	{
 		framelessParent->setFixedHeight(Height_big);
 	}
-	
+
+	//force window update beacause it doesn't update properly when decreasing the size after launch but all the other times???
+	framelessParent->move(framelessParent->pos());
+
 	t_Update_DragDrop->start(Height_change_delay);
 }
 
@@ -1406,7 +1410,7 @@ void GuiMain::save_settings()
 	g_print(" Saving settings\n");
 
 	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
-	//settings.setIniCodec("UTF-8");
+	settings.setIniCodec("UTF-8");
 
 	settings.beginWriteArray("FILES");
 
@@ -1515,7 +1519,7 @@ void GuiMain::load_settings()
 	}
 
 	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
-	//settings.setIniCodec("UTF-8");
+	settings.setIniCodec("UTF-8");
 
 	int fileSize = settings.beginReadArray("FILES");
 	for (int i = 0; i < fileSize; ++i)
@@ -1614,12 +1618,10 @@ void GuiMain::load_settings()
 	auto current_second_count = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 	if (current_second_count - old_second_count < 24 * 60 * 60) //ignore leap/smear second
 	{
-		g_print("Don't update check\n");
 		updateCheck = false;
 	}
 	else
 	{
-		g_print("Update check\n");
 		settings.setValue("UPDATECHECK", current_second_count);
 	}
 
@@ -2696,6 +2698,8 @@ void GuiMain::setup()
 
 void GuiMain::update()
 {
+	g_print("Checking for updates\n");
+
 	newest_version = get_newest_version();
 
 	auto cmp = newest_version.compare(current_version);
@@ -2712,6 +2716,8 @@ void GuiMain::update()
 	else
 	{
 		ui.btn_version->setToolTip("You are using the newest version of the GH Injector.");
+
+		g_print("This version is up to date\n");
 	}
 
 	if (!ignoreUpdate && cmp > 0)
