@@ -404,7 +404,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Static|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="PDB Download.cpp" />
+    <ClCompile Include="PDB_Download.cpp" />
     <ClCompile Include="Process.cpp" />
     <ClCompile Include="ShortCut.cpp" />
     <ClCompile Include="DragDropWindow.cpp" />
@@ -447,7 +447,7 @@ xcopy /y $(QTDIR)\plugins\imageformats\qjpeg.dll "$(OutDir)imageformats\"</Comma
     <ClInclude Include="DownloadProgress.h" />
     <QtMoc Include="DownloadProgressWindow.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="PDB Download.h" />
+    <ClInclude Include="PDB_Download.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="ShortCut.h" />
     <QtMoc Include="framelesswindow\windowdragger.h" />
