@@ -25,7 +25,7 @@ https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
 		1. "C:\Qt\5.15.2\msvc2019"
 		2. "C:\Qt\5.15.2\msvc2019_64"
 		3. "C:\Qt\5.15.2\qt-5.15.2-static-msvc2019-x86_64"
-	2. Toolbar -> Project -> Properties -> Qt Project Settings -> Qt Installtion -> 
+	2. Toolbar -> Project -> Properties -> Qt Project Settings -> Qt Installation -> 
 		1. x86 -> msvc2019
 		2. x64 -> msvc2019_64
 		3. x64_static -> qt-5.15.2-static-msvc2019-x86_64
@@ -39,7 +39,7 @@ https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
 ## Features:
 - Intelligent drag and drop that bypasses UIPI
 - Commandline interface
-- Shortcut generater
+- Shortcut generator
 - Auto injection
 
 ## Credits:
