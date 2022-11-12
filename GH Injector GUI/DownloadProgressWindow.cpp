@@ -5,24 +5,6 @@
 DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QString>(labels), QString status, int width, QWidget * parent)
 	: QDialog(parent)
 {
-	m_pStatus = Q_NULLPTR;
-	
-	m_running = false;
-
-	m_update_status		= false;
-	m_update_progress	= false;
-	m_update_done		= false;
-
-	m_custom_close_value = 0;
-
-	m_new_status	= "";
-	m_new_done		= 0;
-
-	m_frequency		= 100;
-	m_timer_running = false;
-	m_pCustomArg	= nullptr;
-	m_pCallback		= nullptr;
-
 	auto * main_layout = new(std::nothrow) QVBoxLayout();
 	if (main_layout == Q_NULLPTR)
 	{
@@ -65,7 +47,7 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 
 		m_ProgressBarList.push_back(bar);
 
-		m_new_progress.push_back(0.0f);
+		m_NewProgress.push_back(0.0f);
 	}
 
 	if (status.length() > 0)
@@ -102,10 +84,16 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 	m_FramelessParent->setWindowTitle(title);
 	m_FramelessParent->setContent(this);
 
-	m_tCallback = new QTimer(this);
+	m_TmrCallback = new(std::nothrow) QTimer(this);
+	if (m_TmrCallback == Q_NULLPTR)
+	{
+		THROW("Failed to create timer object for download window.");
+	}
 
 	connect(m_FramelessParent, SIGNAL(closeButton_clicked()), this, SLOT(on_close_button_clicked()));
-	connect(m_tCallback, SIGNAL(timeout()), this, SLOT(on_timer_callback()));
+	connect(m_TmrCallback, SIGNAL(timeout()), this, SLOT(on_timer_callback()));
+
+	m_TmrCallback->setInterval(100);
 
 	m_FramelessParent->installEventFilter(this);
 	installEventFilter(this);
@@ -118,12 +106,12 @@ DownloadProgressWindow::~DownloadProgressWindow()
 		m_FramelessParent->close();
 	}
 
-	SAFE_DELETE(m_tCallback);
+	SAFE_DELETE(m_TmrCallback);
 }
 
 void DownloadProgressWindow::on_close_button_clicked()
 {
-	done(m_custom_close_value);
+	done(m_CustomCloseValue);
 
 	close();
 }
@@ -138,7 +126,7 @@ void DownloadProgressWindow::show()
 
 void DownloadProgressWindow::on_timer_callback()
 {
-	if (m_pCallback && m_running)
+	if (m_pCallback && m_bRunning)
 	{
 		m_pCallback(this, m_pCustomArg);
 	}
@@ -146,42 +134,44 @@ void DownloadProgressWindow::on_timer_callback()
 
 bool DownloadProgressWindow::eventFilter(QObject * obj, QEvent * event)
 {
-	if (!m_timer_running)
+	if (!m_bTimerRunning)
 	{
-		m_timer_running = true;
+		m_bTimerRunning = true;
 
-		m_tCallback->start();
+		m_TmrCallback->start();
 	}
 
 	if (event->type() == QEvent::Close && obj == m_FramelessParent)
 	{
-		m_tCallback->stop();
+		m_TmrCallback->stop();
+
+		m_bTimerRunning = false;
 	}
 
 	if (obj == this || obj == m_FramelessParent)
 	{
 		if (event->type() == QEvent::UpdateRequest)
 		{
-			if (m_update_status)
+			if (m_bUpdateStatus)
 			{
-				m_update_status = false;
-				m_pStatus->setText(m_new_status);
+				m_bUpdateStatus = false;
+				m_pStatus->setText(m_NewStatus);
 			}
 
-			if (m_update_progress)
+			if (m_bUpdateProgress)
 			{
-				m_update_progress = false;
+				m_bUpdateProgress = false;
 				for (UINT i = 0; i < m_ProgressBarList.size(); ++i)
 				{
-					m_ProgressBarList[i]->setValue(static_cast<int>(m_new_progress[i]));
+					m_ProgressBarList[i]->setValue(static_cast<int>(m_NewProgress[i]));
 				}
 			}
 		}		
 
-		if (m_update_done)
+		if (m_bUpdateDone)
 		{
-			m_update_done = false;
-			done(m_new_done);
+			m_bUpdateDone = false;
+			done(m_NewDone);
 		}
 	}	
 
@@ -206,36 +196,33 @@ void DownloadProgressWindow::SetProgress(UINT index, float value)
 		}
 		else
 		{
-			value *= 100.0f + 0.5f;
+			value = value * 100.0f + 0.5f;
 			progress = static_cast<int>(value);
 		}
 
-		m_new_progress[index]	= static_cast<float>(progress);
-		m_update_progress		= true;
+		m_NewProgress[index]	= static_cast<float>(progress);
+		m_bUpdateProgress		= true;
 		this->update();
 	}
 }
 
 void DownloadProgressWindow::SetStatus(QString status)
 {
-	m_new_status	= status;
-	m_update_status = true;
+	m_NewStatus		= status;
+	m_bUpdateStatus = true;
 	this->update();
 }
 
 void DownloadProgressWindow::SetDone(int code)
 {
-	m_new_done = code;
-	m_update_done = true;
+	m_NewDone		= code;
+	m_bUpdateDone	= true;
 	this->update();
 }
 
 void DownloadProgressWindow::SetCallbackFrequency(int frequency)
 {
-	if (m_tCallback)
-	{
-		m_tCallback->setInterval(1000 / frequency);
-	}
+	m_TmrCallback->setInterval(1000 / frequency);
 }
 
 void DownloadProgressWindow::SetCallbackArg(void * argument)
@@ -250,7 +237,7 @@ void DownloadProgressWindow::SetCallback(f_DPW_Callback callback)
 
 void DownloadProgressWindow::SetCloseValue(int value)
 {
-	m_custom_close_value = value;
+	m_CustomCloseValue = value;
 }
 
 int DownloadProgressWindow::Execute()
@@ -260,21 +247,21 @@ int DownloadProgressWindow::Execute()
 	SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 	m_FramelessParent->setWindowModality(Qt::WindowModality::ApplicationModal);
 
-	m_running = true;
+	m_bRunning = true;
 	auto r = exec();
-	m_running = false;
+	m_bRunning = false;
 	
 	SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
 	return r;
 }
 
-QString DownloadProgressWindow::GetStatus()
+QString DownloadProgressWindow::GetStatus() const
 {
 	return m_pStatus->text();
 }
 
-FramelessWindow * DownloadProgressWindow::GetParent()
+FramelessWindow * DownloadProgressWindow::GetParent() const
 {
 	return m_FramelessParent;
 }

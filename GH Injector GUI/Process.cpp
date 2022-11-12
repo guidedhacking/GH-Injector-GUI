@@ -231,27 +231,33 @@ std::wstring ArchToStrW(ARCH arch)
 	return L"";
 }
 
-int getProcSession(const int PID)
+ULONG getProcSession(const int PID)
 {
 	if (!p_NtQueryInformationProcess)
 	{
 		auto h_nt_dll = GetModuleHandleA("ntdll.dll");
 		if (!h_nt_dll)
 		{
-			return -1;
+			g_print("Failed to locate ntdll.dll:\nError = %08X\n", GetLastError());
+
+			return INVALID_SESSION_ID;
 		}
 
 		p_NtQueryInformationProcess = reinterpret_cast<f_NtQueryInformationProcess>(GetProcAddress(h_nt_dll, "NtQueryInformationProcess"));
 		if (!p_NtQueryInformationProcess)
 		{
-			return -1;
+			g_print("Failed to locate NtQueryInformationProcess:\nError = %08X\n", GetLastError());
+
+			return INVALID_SESSION_ID;
 		}
 	}
 
 	HANDLE hTargetProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, PID);
 	if (!hTargetProc)
 	{
-		return -1;
+		g_print("Failed to open process (%08X):\nError = %08X\n", PID, GetLastError());
+
+		return INVALID_SESSION_ID;
 	}
 
 	PROCESS_SESSION_INFORMATION psi{ 0 };
@@ -261,10 +267,12 @@ int getProcSession(const int PID)
 
 	if (NT_FAIL(ntRet))
 	{
-		return -1;
+		g_print("Failed to query session identifier of process %08X:Error = %08X\n", PID, (DWORD)ntRet);
+
+		return INVALID_SESSION_ID;
 	}
 
-	return (int)psi.SessionId;
+	return psi.SessionId;
 }
 
 bool getProcFullPathA(char * szfullPath, DWORD BufferSize, int PID)
@@ -522,53 +530,29 @@ bool getProcessList(std::vector<Process_Struct *> & list, bool get_icon)
 
 bool sortProcessList(std::vector<Process_Struct *> & pl, SORT_SENSE sort)
 {
-	if (sort == SORT_SENSE::SS_PID_LO)
+	switch (sort)
 	{
-		std::sort(pl.begin(), pl.end(), [](Process_Struct * lhs, Process_Struct * rhs)
-			{
-				return (lhs->PID < rhs->PID);
-			});
-	}
-	else if (sort == SORT_SENSE::SS_PID_HI)
-	{
-		std::sort(pl.begin(), pl.end(), [](Process_Struct * lhs, Process_Struct * rhs)
-			{
-				return (lhs->PID > rhs->PID);
-			});
-	}
-	else if (sort == SORT_SENSE::SS_NAME_LO)
-	{
-		std::sort(pl.begin(), pl.end(), [](Process_Struct * lhs, Process_Struct * rhs)
-			{
-				auto cmp = strcicmpW(lhs->szName, rhs->szName);
-
-				if (cmp == 0)
+		case SORT_SENSE::SS_PID_LO:
+			std::sort(pl.begin(), pl.end(), 
+				[](Process_Struct * lhs, Process_Struct * rhs)
 				{
 					return (lhs->PID < rhs->PID);
 				}
+			);
+			break;
 
-				return (cmp < 0);
-			});
-	}
-	else if (sort == SORT_SENSE::SS_NAME_HI)
-	{
-		std::sort(pl.begin(), pl.end(), [](Process_Struct * lhs, Process_Struct * rhs)
-			{
-				auto cmp = strcicmpW(lhs->szName, rhs->szName);
-
-				if (cmp == 0)
+		case SORT_SENSE::SS_PID_HI:
+			std::sort(pl.begin(), pl.end(), 
+				[](Process_Struct * lhs, Process_Struct * rhs)
 				{
 					return (lhs->PID > rhs->PID);
 				}
+			);
+			break;
 
-				return (cmp > 0);
-			});
-	}
-	else if (sort == SORT_SENSE::SS_ARCH_LO)
-	{
-		std::sort(pl.begin(), pl.end(), [](Process_Struct * lhs, Process_Struct * rhs)
-			{
-				if (lhs->Arch == rhs->Arch)
+		case SORT_SENSE::SS_NAME_LO:
+			std::sort(pl.begin(), pl.end(), 
+				[](Process_Struct * lhs, Process_Struct * rhs)
 				{
 					auto cmp = strcicmpW(lhs->szName, rhs->szName);
 
@@ -579,28 +563,66 @@ bool sortProcessList(std::vector<Process_Struct *> & pl, SORT_SENSE sort)
 
 					return (cmp < 0);
 				}
+			);
+			break;
 
-				return ((int)lhs->Arch > (int)rhs->Arch);
-			});
-	}
-	else if (sort == SORT_SENSE::SS_ARCH_HI)
-	{
-		std::sort(pl.begin(), pl.end(), [](Process_Struct * lhs, Process_Struct * rhs)
-			{
-				if (lhs->Arch == rhs->Arch)
+		case SORT_SENSE::SS_NAME_HI:
+			std::sort(pl.begin(), pl.end(), 
+				[](Process_Struct * lhs, Process_Struct * rhs)
 				{
 					auto cmp = strcicmpW(lhs->szName, rhs->szName);
 
 					if (cmp == 0)
 					{
-						return (lhs->PID < rhs->PID);
+						return (lhs->PID > rhs->PID);
 					}
 
-					return (cmp < 0);
+					return (cmp > 0);
 				}
-				
-				return ((int)lhs->Arch < (int)rhs->Arch);
-			});
+			);
+			break;
+
+		case SORT_SENSE::SS_ARCH_LO:
+			std::sort(pl.begin(), pl.end(), 
+				[](Process_Struct * lhs, Process_Struct * rhs)
+				{
+					if (lhs->Arch == rhs->Arch)
+					{
+						auto cmp = strcicmpW(lhs->szName, rhs->szName);
+
+						if (cmp == 0)
+						{
+							return (lhs->PID < rhs->PID);
+						}
+
+						return (cmp < 0);
+					}
+
+					return ((int)lhs->Arch > (int)rhs->Arch);
+				}
+			);
+			break;
+
+		case SORT_SENSE::SS_ARCH_HI:
+			std::sort(pl.begin(), pl.end(), 
+				[](Process_Struct * lhs, Process_Struct * rhs)
+				{
+					if (lhs->Arch == rhs->Arch)
+					{
+						auto cmp = strcicmpW(lhs->szName, rhs->szName);
+
+						if (cmp == 0)
+						{
+							return (lhs->PID < rhs->PID);
+						}
+
+						return (cmp < 0);
+					}
+
+					return ((int)lhs->Arch < (int)rhs->Arch);
+				}
+			);
+			break;
 	}
 
 	return true;
@@ -680,6 +702,15 @@ bool FileExistsW(const wchar_t * szFile)
 bool FileExistsA(const char * szFile)
 {
 	return (GetFileAttributesA(szFile) != INVALID_FILE_ATTRIBUTES);
+}
+
+bool FileExists(const TCHAR * szFile)
+{
+#ifdef UNICODE
+	return FileExistsW(szFile);
+#else
+	return FileExistsA(szFile);
+#endif
 }
 
 int strcicmpA(const char * a, const char * b)

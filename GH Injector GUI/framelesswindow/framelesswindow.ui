@@ -201,7 +201,7 @@
             </size>
            </property>
            <property name="toolTip">
-            <string/>
+            <string>Dock</string>
            </property>
            <property name="styleSheet">
             <string notr="true">#dockButton{

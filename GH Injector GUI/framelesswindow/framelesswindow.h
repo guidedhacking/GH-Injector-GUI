@@ -29,17 +29,29 @@ class FramelessWindow : public QWidget
 {
 	Q_OBJECT
 
+	const quint8 CONST_DRAG_BORDER_SIZE = 15;
 	const static int dock_range = 25;
 
 private:
-	QWidget * content;
+	QWidget * content = Q_NULLPTR;
 
-	bool resize_left;
-	bool resize_right;
-	bool resize_top;
-	bool resize_bottom;
+	bool m_bMousePressed = false;
 
-	bool m_bDockButton;
+	bool resize_left	= false;
+	bool resize_right	= false;
+	bool resize_top		= false;
+	bool resize_bottom	= false;
+
+	bool m_bDockButton	= false;
+	bool m_bDragTop		= false;
+	bool m_bDragLeft	= false;
+	bool m_bDragRight	= false;
+	bool m_bDragBottom	= false;
+	bool m_bDragged		= false;
+
+	Ui::FramelessWindow * ui = Q_NULLPTR;
+
+	QRect m_StartGeometry = QRect{ 0, 0, 0, 0 };
 
 public:
 	explicit FramelessWindow(QWidget * parent = Q_NULLPTR);
@@ -58,13 +70,16 @@ public:
 	void setResize(bool enabled = false);
 	void setBorderStyle(QString style);
 
+	int getFullButtonWidth() const;
+	int getFullButtonHeight() const;
+	int getButtonCount() const;
+
 private:
 	bool leftBorderHit(const QPoint & pos);
 	bool rightBorderHit(const QPoint & pos);
 	bool topBorderHit(const QPoint & pos);
 	bool bottomBorderHit(const QPoint & pos);
 	void styleWindow(bool bActive, bool bNoState);
-
 	void updateSizePolicy();
 
 public slots:
@@ -88,18 +103,4 @@ protected:
 	virtual void mousePressEvent(QMouseEvent * event);
 	virtual void mouseReleaseEvent(QMouseEvent * event);
 	virtual bool eventFilter(QObject * obj, QEvent * event);
-
-private:
-
-	Ui::FramelessWindow * ui;
-
-	QRect m_StartGeometry;
-	const quint8 CONST_DRAG_BORDER_SIZE = 15;
-
-	bool m_bMousePressed;
-	bool m_bDragTop;
-	bool m_bDragLeft;
-	bool m_bDragRight;
-	bool m_bDragBottom;
-	bool m_bDragged;
 };

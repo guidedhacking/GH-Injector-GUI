@@ -13,48 +13,18 @@
 ###############################################################################
 */
 
+//modified by me >:]
+
 #include "framelesswindow.h"
 
 FramelessWindow::FramelessWindow(QWidget * parent)
-	: QWidget(parent),
-	ui(new(std::nothrow) Ui::FramelessWindow),
-	m_bMousePressed(false),
-	m_bDragTop(false),
-	m_bDragLeft(false),
-	m_bDragRight(false),
-	m_bDragBottom(false),
-	m_bDockButton(false)
+	: QWidget(parent), ui(new Ui::FramelessWindow)
 {	
-	setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
-	// append minimize button flag in case of windows,
-	// for correct windows native handling of minimize function
-#if defined(Q_OS_WIN)
-	setWindowFlags(windowFlags() | Qt::WindowMinimizeButtonHint);
-#endif
+	setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint | Qt::WindowMinimizeButtonHint);
 	setAttribute(Qt::WA_NoSystemBackground, true);
 	setAttribute(Qt::WA_TranslucentBackground);
 
 	ui->setupUi(this);
-
-	resize_left		= false;
-	resize_right	= false;
-	resize_top		= false;
-	resize_bottom	= false;
-	m_bDragged		= false;
-
-	content			= Q_NULLPTR;
-
-	// shadow under window title text
-	QGraphicsDropShadowEffect * textShadow = new(std::nothrow) QGraphicsDropShadowEffect;
-	if (textShadow == Q_NULLPTR)
-	{
-		THROW("Failed to create drop shadow effect for frameless window.");
-	}
-
-	textShadow->setBlurRadius(4.0);
-	textShadow->setColor(QColor(0, 0, 0));
-	textShadow->setOffset(0.0);
-	//ui->titleText->setGraphicsEffect(textShadow);
 
 	// window shadow
 	QGraphicsDropShadowEffect * windowShadow = new(std::nothrow) QGraphicsDropShadowEffect;
@@ -141,7 +111,7 @@ void FramelessWindow::setMinimizeButton(bool active)
 	}
 }
 
-void FramelessWindow::setDockButton(bool active, bool docked = false, int direction = 0)
+void FramelessWindow::setDockButton(bool active, bool docked = false, int direction = DOCK_RIGHT)
 {
 	if (active)
 	{
@@ -157,43 +127,54 @@ void FramelessWindow::setDockButton(bool active, bool docked = false, int direct
 		{
 			switch (direction)
 			{
-				case 0:
+				case DOCK_RIGHT:
 					ui->dockButton->setIcon(QIcon(":/images/icon_undock_r.png"));
 					break;
 
-				case 1:
+				case DOCK_LEFT:
 					ui->dockButton->setIcon(QIcon(":/images/icon_undock_l.png"));
 					break;
 
-				case 2:
+				case DOCK_TOP:
 					ui->dockButton->setIcon(QIcon(":/images/icon_undock_t.png"));
 					break;
 
-				default:
+				case DOCK_BOTTOM:
 					ui->dockButton->setIcon(QIcon(":/images/icon_undock_b.png"));
+					break;
+
+				default:
+					return;			
 			}
+
+			ui->dockButton->setToolTip("Undock");
 		}
 		else
 		{
 			switch (direction)
 			{
-				case 0:
+				case DOCK_RIGHT:
 					ui->dockButton->setIcon(QIcon(":/images/icon_dock_r.png"));
 					break;
 
-				case 1:
+				case DOCK_LEFT:
 					ui->dockButton->setIcon(QIcon(":/images/icon_dock_l.png"));
 					break;
 
-				case 2:
+				case DOCK_TOP:
 					ui->dockButton->setIcon(QIcon(":/images/icon_dock_t.png"));
 					break;
 
-				default:
+				case DOCK_BOTTOM:
 					ui->dockButton->setIcon(QIcon(":/images/icon_dock_b.png"));
-			}
-		}
+					break;
 
+				default:
+					return;
+			}
+
+			ui->dockButton->setToolTip("Dock");
+		}
 	}
 	else
 	{
@@ -264,6 +245,70 @@ void FramelessWindow::setResize(bool enabled)
 void FramelessWindow::setBorderStyle(QString style)
 {
 	ui->windowFrame->setStyleSheet(style);
+}
+
+int FramelessWindow::getFullButtonWidth() const
+{
+	int ret = 0;
+	
+	if (ui->closeButton->isVisible())
+	{
+		ret += ui->closeButton->width();
+	}
+	
+	if (ui->minimizeButton->isVisible())
+	{
+		ret += ui->minimizeButton->width();
+	}
+	
+	if (ui->dockButton->isVisible())
+	{
+		ret += ui->dockButton->width();
+	}
+	
+	return ret;
+}
+
+int FramelessWindow::getFullButtonHeight() const
+{
+	int ret = 0;
+
+	if (ui->closeButton->isVisible())
+	{
+		ret = ui->closeButton->height();
+	}
+	else if (ui->minimizeButton->isVisible())
+	{
+		ret = ui->minimizeButton->height();
+	}
+	else if (ui->dockButton->isVisible())
+	{
+		ret = ui->dockButton->height();
+	}
+
+	return ret;
+}
+
+int FramelessWindow::getButtonCount() const
+{
+	int ret = 0;
+
+	if (ui->closeButton->isVisible())
+	{
+		++ret;
+	}
+
+	if (ui->minimizeButton->isVisible())
+	{
+		++ret;
+	}
+
+	if (ui->dockButton->isVisible())
+	{
+		++ret;
+	}
+
+	return ret;
 }
 
 void FramelessWindow::setWindowTitle(const QString & text)

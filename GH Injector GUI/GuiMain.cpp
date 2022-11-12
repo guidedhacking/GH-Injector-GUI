@@ -9,8 +9,8 @@ int const GuiMain::EXIT_CODE_START_NATIVE	= -3;
 
 int const GuiMain::Height_small			= 410;
 int const GuiMain::Height_medium_s		= 480;
-int const GuiMain::Height_medium_b		= 570;
-int const GuiMain::Height_big			= 620;
+int const GuiMain::Height_medium_b		= 593;
+int const GuiMain::Height_big			= 643;
 int const GuiMain::Height_change_delay	= 100;
 
 GuiMain::GuiMain(QWidget * parent)
@@ -43,13 +43,46 @@ GuiMain::GuiMain(QWidget * parent)
 
 	native = IsNativeProcess(GetCurrentProcessId());
 
+	if (!FileExists(GH_INJ_MOD_NAME))
+	{
+		QString failMsg = "Injection library missing:\n";
+		failMsg += GH_INJ_MOD_NAME;
+
+		emit StatusBox(false, failMsg);
+
+		exit(GuiMain::EXIT_CODE_CLOSE);
+	}
+
+	if (!FileExists(GH_INJ_SM_NAME86))
+	{
+		QString failMsg = "Injection component missing:\n";
+		failMsg += GH_INJ_SM_NAME86;
+
+		emit StatusBox(false, failMsg);
+
+		exit(GuiMain::EXIT_CODE_CLOSE);
+	}
+
+#ifdef _WIN64
+
+	if (!FileExists(GH_INJ_SM_NAME64))
+	{
+		QString failMsg = "Injection component missing:\n";
+		failMsg += GH_INJ_SM_NAME64;
+
+		emit StatusBox(false, failMsg);
+
+		exit(GuiMain::EXIT_CODE_CLOSE);
+	}
+
+#endif
+
 	if (!InjLib.Init())
 	{
-		QString failMsg = "Failed to load ";
+		QString failMsg = "Failed to load:\n";
 		failMsg += GH_INJ_MOD_NAMEA;
-		failMsg += ".";
 
-		emit ShowStatusbox(false, failMsg);
+		emit StatusBox(false, failMsg);
 
 		exit(GuiMain::EXIT_CODE_CLOSE);
 	}
@@ -60,7 +93,7 @@ GuiMain::GuiMain(QWidget * parent)
 
 	if (!SetDebugPrivilege(true))
 	{
-		emit ShowStatusbox(false, "Failed to enable debug privileges. This might affect the functionality of the injector.");
+		emit StatusBox(false, "Failed to enable debug privileges. This might affect the functionality of the injector.");
 	}
 
 	ui.setupUi(this);
@@ -102,7 +135,7 @@ GuiMain::GuiMain(QWidget * parent)
 
 	if (pxm_banner.isNull() || pxm_lul.isNull() || pxm_generic.isNull() || pxm_error.isNull())
 	{
-		emit ShowStatusbox(false, "Failed to initialize one or multiple graphic files. This won't affect the functionality of the injector.");
+		emit StatusBox(false, "Failed to initialize one or multiple graphic files. This won't affect the functionality of the injector.");
 	}
 
 	ui.lbl_img->setPixmap(pxm_banner);
@@ -133,7 +166,7 @@ GuiMain::GuiMain(QWidget * parent)
 	rev_NumbersOnly = new(std::nothrow) QRegularExpressionValidator(QRegularExpression("[0-9]+"));
 	if (rev_NumbersOnly == Q_NULLPTR)
 	{
-		emit ShowStatusbox(false, "Failed to create regular expression validator for PID input field.");
+		emit StatusBox(false, "Failed to create regular expression validator for PID input field.");
 	}
 	else
 	{
@@ -269,9 +302,9 @@ GuiMain::GuiMain(QWidget * parent)
 	peh_change(0);
 	tooltip_change();
 
-	if (dockIndex == -1)
+	if (dockIndex == DOCK_NONE)
 	{
-		dockIndex = 0;
+		dockIndex = DOCK_RIGHT;
 	}
 
 	if (!native)
@@ -280,6 +313,7 @@ GuiMain::GuiMain(QWidget * parent)
 		ui.cb_hijack->setDisabled(false);
 		ui.cb_hijack->setChecked(false);
 		ui.cb_hijack->setDisabled(true);
+		ui.cb_hijack->setToolTip("Handle hijacking is not supported when running under WOW64.");
 	}
 
 	if (QOperatingSystemVersion::current() < QOperatingSystemVersion::Windows10)
@@ -392,9 +426,12 @@ void GuiMain::update_process()
 		{
 			if (byName.PID && byName.PID != raw && raw != 1337)
 			{
+				g_print("swag\n");
 				cmb_proc_name_change();
 				btn_change();
 				update_proc_icon();
+				rb_process_set();
+
 			}
 			else if (raw && raw != 1337)
 			{
@@ -720,7 +757,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 							break;
 					}
 
-					if (new_index != -1)
+					if (new_index != DOCK_NONE)
 					{
 						dockIndex = new_index;
 						g_Console->dock(dockIndex);
@@ -971,7 +1008,7 @@ bool GuiMain::platformCheck()
 
 	if (!FileExistsW(GH_INJ_EXE_NAME64))
 	{
-		ShowStatusbox(false, "\"GH Injector - x64.exe\" is missing.\n");
+		StatusBox(false, "\"GH Injector - x64.exe\" is missing.\n");
 
 		return true;
 	}
@@ -990,7 +1027,7 @@ bool GuiMain::platformCheck()
 		QString number = QStringLiteral("%1").arg(err, 8, 0x10, QLatin1Char('0'));
 		error_msg += number;
 
-		ShowStatusbox(false, error_msg);
+		StatusBox(false, error_msg);
 
 		return true;
 	}
@@ -1606,7 +1643,7 @@ void GuiMain::load_settings()
 	// Info
 	tooltipsEnabled = !settings.value("TOOLTIPSON", true).toBool();
 	consoleOpen		= settings.value("CONSOLE", true).toBool();
-	dockIndex		= settings.value("DOCKINDEX", 0).toInt();
+	dockIndex		= settings.value("DOCKINDEX", DOCK_RIGHT).toInt();
 	ignoreUpdate	= settings.value("IGNOREUPDATES", false).toBool();
 	hijackWarning	= settings.value("HIJACKWARNING", true).toBool();
 
@@ -1616,7 +1653,7 @@ void GuiMain::load_settings()
 
 	auto old_second_count = settings.value("UPDATECHECK", 0).toLongLong();
 	auto current_second_count = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-	if (current_second_count - old_second_count < 24 * 60 * 60) //ignore leap/smear second
+	if (current_second_count - old_second_count < 86400) //ignore leap/smear second (86400 seconds = 1 day)
 	{
 		updateCheck = false;
 	}
@@ -1639,7 +1676,7 @@ void GuiMain::default_settings()
 	ui.txt_pid->setText("1337");
 	ignoreUpdate	= false;
 	tooltipsEnabled = false;
-	dockIndex		= 0;
+	dockIndex		= DOCK_RIGHT;
 	pss->cbSession	= true;
 	hijackWarning	= true;
 
@@ -1983,7 +2020,24 @@ void GuiMain::delay_inject()
 	int id = ui.txt_pid->text().toInt();
 	if (id == 1337)
 	{
-		ShellExecuteW(0, 0, L"https://www.youtube.com/watch?v=5t53TcKIlMc", 0, 0, SW_SHOW);
+		std::vector<std::wstring> epic_links;
+		epic_links.push_back(L"https://www.youtube.com/watch?v=mFyUrebJbDg");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=5t53TcKIlMc");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=AdfMVPNgNnc");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=OPaCXU4mwR8");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=-fGKrYq8_dk");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=0f3-tye6ldg");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=DOodQ14CEuo");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=ZZ5LpwO-An4");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=J-txgZrumpc");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=AcH7TUBz5-M");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=hzwf3H2bmAM");
+		epic_links.push_back(L"https://www.youtube.com/watch?v=a-5VCZyAMz0");
+
+		srand(GetTickCount64() & MAXUINT);
+		int epic_index = rand() % epic_links.size();
+		ShellExecuteW(0, 0, epic_links[epic_index].c_str(), 0, 0, SW_SHOW);
+
 		return;
 	}
 
@@ -2019,7 +2073,7 @@ void GuiMain::inject_file()
 		}
 		else
 		{
-			emit ShowStatusbox(false, "Invalid PID");
+			emit StatusBox(false, "Invalid PID");
 
 			return;
 		}
@@ -2036,7 +2090,7 @@ void GuiMain::inject_file()
 		}
 		else
 		{
-			emit ShowStatusbox(false, "Invalid process name");
+			emit StatusBox(false, "Invalid process name");
 
 			return;
 		}
@@ -2105,21 +2159,21 @@ void GuiMain::inject_file()
 
 	if (!InjLib.LoadingStatus())
 	{
-		emit ShowStatusbox(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
+		emit StatusBox(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
 
 		return;
 	}
 
 	if (InjLib.GetSymbolState() != INJ_ERR_SUCCESS)
 	{
-		emit ShowStatusbox(false, "PDB download not finished.");
+		emit StatusBox(false, "PDB download not finished.");
 
 		return;
 	}
 
 	if (InjLib.GetImportState() != INJ_ERR_SUCCESS)
 	{
-		emit ShowStatusbox(false, "Import handler not finished.");
+		emit StatusBox(false, "Import handler not finished.");
 
 		return;
 	}
@@ -2157,7 +2211,7 @@ void GuiMain::inject_file()
 
 	if (items.empty())
 	{
-		emit ShowStatusbox(false, "No file(s) selected");
+		emit StatusBox(false, "No file(s) selected");
 
 		return;
 	}
@@ -2417,7 +2471,7 @@ void GuiMain::generate_shortcut()
 		}
 		else
 		{
-			emit ShowStatusbox(false, "Invalid PID");
+			emit StatusBox(false, "Invalid PID");
 			return;
 		}
 	}
@@ -2430,7 +2484,7 @@ void GuiMain::generate_shortcut()
 
 		if (!ps_local.PID)
 		{
-			emit ShowStatusbox(false, "The specified process doesn't exist.");
+			emit StatusBox(false, "The specified process doesn't exist.");
 			return;
 		}
 
@@ -2474,7 +2528,7 @@ void GuiMain::generate_shortcut()
 
 	if (!fileFound)
 	{
-		emit ShowStatusbox(false, "No valid file selected.");
+		emit StatusBox(false, "No valid file selected.");
 
 		return;
 	}
@@ -2586,7 +2640,7 @@ void GuiMain::generate_shortcut()
 		QString number = QStringLiteral("%1").arg((DWORD)hr, 8, 0x10, QLatin1Char('0'));
 		error_msg += number;
 
-		ShowStatusbox(false, error_msg);
+		StatusBox(false, error_msg);
 	}
 }
 
@@ -2594,19 +2648,19 @@ void GuiMain::open_console()
 {
 	g_Console->open();
 
-	if (g_Console->get_dock_index() == -1)
+	if (g_Console->get_dock_index() == DOCK_NONE)
 	{
 		int old_idx = g_Console->get_old_dock_index();
 
-		if (old_idx == -1)
+		if (old_idx == DOCK_NONE)
 		{
 			old_idx = dockIndex;
 		}
 		
 		if (old_idx == -1)
 		{
-			old_idx		= 0;
-			dockIndex	= 0;
+			old_idx		= DOCK_RIGHT;
+			dockIndex	= DOCK_RIGHT;
 		}
 
 		g_Console->dock(old_idx);
@@ -2732,6 +2786,12 @@ void GuiMain::update()
 void GuiMain::update_clicked()
 {
 	save_settings();
+
+	auto cmp = newest_version.compare(current_version);
+	if (cmp == 0)
+	{
+		newest_version = get_newest_version();
+	}
 
 	if (drag_drop)
 	{

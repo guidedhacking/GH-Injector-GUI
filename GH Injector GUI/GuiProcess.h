@@ -15,7 +15,7 @@ Q_GUI_EXPORT QPixmap qt_pixmapFromWinHICON(HICON icon);
 
 struct Process_State_Struct
 {
-	QString			txtFilter;
+	QString			txtFilter	= QString("");
 	int				cmbArch		= 0;
 	bool			cbSession	= false;
 };
@@ -42,17 +42,17 @@ private:
 	Ui::frm_proc ui;
 	FramelessWindow * frameless_parent;
 
-	Process_State_Struct	*		pss;
-	Process_Struct			*		ps;
-	QTimer					*		update_list;
-	QTimer					*		focus_filter;
-	SORT_SENSE						sort_sense;
-	int								own_session;
+	Process_State_Struct	*		m_ProcessState;
+	Process_Struct			*		m_ProcessStruct;
+	QTimer					*		m_TmrUpdateList;
+	QTimer					*		m_TmrFilterFocus;
+	SORT_SENSE						m_SortSense;
+	ULONG							m_OwnSessionID;
 	std::vector<Process_Struct *>	m_ProcList;
-	bool							selected_from_list;
+	bool							m_bSelectedFromList;
 
-	QPixmap pxm_error;
-	QPixmap pxm_generic;
+	QPixmap m_pxmError;
+	QPixmap m_pxmGeneric;
 
 protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;

@@ -2,57 +2,59 @@
 
 #include "GuiScanHook.h"
 
-GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, InjectionLib * lib)
+GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, InjectionLib * InjectionLib)
 	: QWidget(parent)
 {
 	ui.setupUi(this);
 
-	InjLib = lib;
+	if (!InjectionLib)
+	{
+		THROW("Injection library pointer is NULL.");
+	}
 
-	m_PID = 0;
-
-	frameless_parent = FramelessParent;
+	m_InjectionLib		= InjectionLib;
+	m_FramelessParent	= FramelessParent;
 
 	ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
 
 	connect(ui.btn_scan, SIGNAL(clicked()), this, SLOT(scan_clicked()));
 	connect(ui.btn_unhook, SIGNAL(clicked()), this, SLOT(unhook_clicked()));
 
-	model = new(std::nothrow) QStringListModel(this);
-	if (model == Q_NULLPTR)
+	m_Model = new(std::nothrow) QStringListModel(this);
+	if (m_Model == Q_NULLPTR)
 	{
 		THROW("Failed to create string list model for hook scanner.");
 	}
 
-	List << "Select a" << "process first";
+	m_HookList << "Select a" << "process first";
 
-	model->setStringList(List);
-	ui.lv_scanhook->setModel(model);
+	m_Model->setStringList(m_HookList);
+	ui.lv_scanhook->setModel(m_Model);
 
-	if (!InjLib->LoadingStatus())
+	if (!m_InjectionLib->LoadingStatus())
 	{
-		emit ShowStatusbox(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
+		emit StatusBox(false, "The GH injection library couldn't be found or wasn't loaded correctly.");
 	}
 }
 
 GuiScanHook::~GuiScanHook()
 {
-
+	SAFE_DELETE(m_Model);
 }
 
 void GuiScanHook::setItem(const std::vector<std::string> & item)
 {
-	List.clear();
+	m_HookList.clear();
 
 	for (const auto & i : item)
 	{
-		List << QString::fromStdString(i);
+		m_HookList << QString::fromStdString(i);
 	}
 
-	model->setStringList(List);
+	m_Model->setStringList(m_HookList);
 }
 
-std::vector<int> GuiScanHook::get_selected_indices()
+std::vector<int> GuiScanHook::get_selected_indices() const
 {
 	std::vector<int> res;	
 
@@ -77,7 +79,7 @@ void GuiScanHook::scan_clicked()
 {
 	update_title("Scan for hooks");
 
-	if (!InjLib->LoadingStatus())
+	if (!m_InjectionLib->LoadingStatus())
 	{
 		setItem({ "Injection library not loaded" });
 		g_print("Injection library not loaded\n");
@@ -123,7 +125,7 @@ void GuiScanHook::scan_clicked()
 
 	std::vector<std::string> tempHookList;
 
-	bool val_ret = InjLib->ValidateInjectionFunctions(m_PID, tempHookList);
+	bool val_ret = m_InjectionLib->ValidateInjectionFunctions(m_PID, tempHookList);
 	if (!val_ret)
 	{
 		ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
@@ -154,7 +156,7 @@ void GuiScanHook::scan_clicked()
 
 void GuiScanHook::unhook_clicked()
 {
-	if (!InjLib->LoadingStatus())
+	if (!m_InjectionLib->LoadingStatus())
 	{
 		return;
 	}
@@ -170,22 +172,22 @@ void GuiScanHook::unhook_clicked()
 		return;
 	}
 
-	bool res_ret = InjLib->RestoreInjectionFunctions(selected);
+	bool res_ret = m_InjectionLib->RestoreInjectionFunctions(selected);
 	if (!res_ret)
 	{
-		ShowStatusbox(false, "Failed to restore hook(s)");
+		StatusBox(false, "Failed to restore hook(s)");
 	}
 
-	List.clear();
-	model->setStringList(List);
+	m_HookList.clear();
+	m_Model->setStringList(m_HookList);
 	scan_clicked();
 }
 
 void GuiScanHook::update_title(const QString title)
 {
-	if (frameless_parent)
+	if (m_FramelessParent)
 	{
-		frameless_parent->setWindowTitle(title);
+		m_FramelessParent->setWindowTitle(title);
 	}
 	else
 	{

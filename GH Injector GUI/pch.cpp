@@ -6,7 +6,7 @@
 #pragma comment (lib, "User32.lib")
 #pragma comment (lib, "WinInet.lib")
 
-void THROW(std::string error_msg)
+void __declspec(noreturn) THROW(std::string error_msg)
 {
 	MessageBoxA(NULL, "Error", error_msg.c_str(), NULL);
 

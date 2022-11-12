@@ -8,14 +8,7 @@ int DragDropWindow::m_ClassRefCount			= 0;
 
 DragDropWindow::DragDropWindow()
 {
-	m_hMainWnd			= NULL;
-	m_hDropWnd			= NULL;
-	m_hDeviceContext	= NULL;
-	m_hDropIcon			= NULL;
 
-	m_x		= 0;
-	m_y		= 0;
-	m_size	= 0;
 }
 
 DragDropWindow::~DragDropWindow()
@@ -159,17 +152,17 @@ void DragDropWindow::DrawIcon()
 	}
 }
 
-HWND DragDropWindow::GetHWND()
+HWND DragDropWindow::GetHWND() const
 {
 	return m_hDropWnd;
 }
 
-HWND DragDropWindow::GetParent()
+HWND DragDropWindow::GetParent() const
 {
 	return m_hMainWnd;
 }
 
-void DragDropWindow::GetPosition(int & x, int & y)
+void DragDropWindow::GetPosition(int & x, int & y) const
 {
 	x = m_x;
 	y = m_y;

@@ -13,28 +13,7 @@
 
 InjectionLib::InjectionLib()
 {
-	m_hInjectionMod = NULL;
-
-	m_InjectA						= nullptr;
-	m_InjectW						= nullptr;
-	m_ValidateInjectionFunctions	= nullptr;
-	m_RestoreInjectionFunctions		= nullptr;
-	m_GetVersionA					= nullptr;
-	m_GetVersionW					= nullptr;
-	m_GetSymbolState				= nullptr;
-	m_GetDownloadProgressEx			= nullptr;
-	m_StartDownload					= nullptr;
-	m_InterruptDownload				= nullptr;
-	m_InterruptInjection			= nullptr;
-	m_SetRawPrintCallback			= nullptr;
-
 	memset(m_HookInfo, 0, sizeof(m_HookInfo));
-
-	m_Err		= 0;
-	m_Win32Err	= 0;
-	m_CountOut	= 0;
-	m_Changed	= 0;
-	m_TargetPID = 0;
 }
 
 InjectionLib::~InjectionLib()
@@ -89,7 +68,7 @@ bool InjectionLib::Init()
 	return LoadingStatus();
 }
 
-bool InjectionLib::LoadingStatus()
+bool InjectionLib::LoadingStatus() const
 {
 	if (m_hInjectionMod == NULL)
 	{
@@ -141,14 +120,14 @@ void InjectionLib::Unload()
 	m_TargetPID = 0;
 }
 
-DWORD InjectionLib::InjectA(INJECTIONDATAA * pData)
+DWORD InjectionLib::InjectA(INJECTIONDATAA * pData) const
 {
 	IS_VALID_FUNCTION_POINTER(InjectA, (DWORD)-1);
 
 	return m_InjectA(pData);
 }
 
-DWORD InjectionLib::InjectW(INJECTIONDATAW * pData)
+DWORD InjectionLib::InjectW(INJECTIONDATAW * pData) const
 {
 	IS_VALID_FUNCTION_POINTER(InjectW, (DWORD)-1);
 
@@ -225,49 +204,49 @@ bool InjectionLib::RestoreInjectionFunctions(std::vector<int> & IndexList)
 	return true;
 }
 
-DWORD InjectionLib::GetSymbolState()
+DWORD InjectionLib::GetSymbolState() const
 {
 	IS_VALID_FUNCTION_POINTER(GetSymbolState, ERROR_CALL_NOT_IMPLEMENTED);
 
 	return m_GetSymbolState();
 }
 
-DWORD InjectionLib::GetImportState()
+DWORD InjectionLib::GetImportState() const
 {
 	IS_VALID_FUNCTION_POINTER(GetImportState, ERROR_CALL_NOT_IMPLEMENTED);
 
 	return m_GetImportState();
 }
 
-float InjectionLib::GetDownloadProgressEx(int index, bool bWow64)
+float InjectionLib::GetDownloadProgressEx(int index, bool bWow64) const
 {
 	IS_VALID_FUNCTION_POINTER(GetDownloadProgressEx, 0.0f);
 
 	return m_GetDownloadProgressEx(index, bWow64);
 }
 
-void InjectionLib::StartDownload()
+void InjectionLib::StartDownload() const
 {
 	IS_VALID_FUNCTION_POINTER(StartDownload, );
 
 	return m_StartDownload();
 }
 
-void InjectionLib::InterruptDownload()
+void InjectionLib::InterruptDownload() const
 {
 	IS_VALID_FUNCTION_POINTER(InterruptDownload, );
 
 	return m_InterruptDownload();
 }
 
-bool InjectionLib::InterruptInjection()
+bool InjectionLib::InterruptInjection() const
 {
 	IS_VALID_FUNCTION_POINTER(InterruptInjection, false);
 
 	return m_InterruptInjection(100);
 }
 
-std::string InjectionLib::GetVersionA()
+std::string InjectionLib::GetVersionA() const
 {
 	IS_VALID_FUNCTION_POINTER(GetVersionA, std::string("0.0"));
 
@@ -280,7 +259,7 @@ std::string InjectionLib::GetVersionA()
 	return std::string(szVersion);
 }
 
-std::wstring InjectionLib::GetVersionW()
+std::wstring InjectionLib::GetVersionW() const
 {
 	IS_VALID_FUNCTION_POINTER(GetVersionW, std::wstring(L"0.0"));
 
@@ -293,7 +272,7 @@ std::wstring InjectionLib::GetVersionW()
 	return std::wstring(szVersion);
 }
 
-DWORD InjectionLib::SetRawPrintCallback(f_raw_print_callback callback)
+DWORD InjectionLib::SetRawPrintCallback(f_raw_print_callback callback) const
 {
 	IS_VALID_FUNCTION_POINTER(SetRawPrintCallback, (DWORD)-1);
 

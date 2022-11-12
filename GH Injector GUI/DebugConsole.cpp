@@ -5,8 +5,6 @@
 DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	: QWidget(parent)
 {
-	m_OldSelection	= "";
-
 	QSizePolicy policy;
 	policy.setHorizontalPolicy(QSizePolicy::Policy::MinimumExpanding);
 	policy.setVerticalPolicy(QSizePolicy::Policy::MinimumExpanding);
@@ -27,8 +25,6 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	{
 		THROW("Failed to create content layout for debug console.");
 	}
-
-	//m_Layout->setMargin(1);
 
 	QMargins m = { 0, 0, 0, 0 };
 	this->setSizePolicy(policy);
@@ -55,7 +51,7 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	if (dock_parent)
 	{
 		m_DockParent = dock_parent;
-		m_FramelessParent->setDockButton(true, false, 0);
+		m_FramelessParent->setDockButton(true, false, DOCK_RIGHT);
 		m_Docker = new(std::nothrow) WindowDocker(m_DockParent, m_FramelessParent);
 		if (m_Docker == Q_NULLPTR)
 		{
@@ -69,9 +65,6 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	{
 		m_Docker = nullptr;
 	}
-
-	m_ExternalLocked	= false;
-	m_WaitForLock		= true;
 }
 
 DebugConsole::~DebugConsole()
@@ -234,9 +227,19 @@ void DebugConsole::print_raw(const char * szText)
 	m_Content->scrollToBottom();
 }
 
-bool DebugConsole::is_open()
+bool DebugConsole::is_open() const
 {
 	return (m_FramelessParent->isHidden() != true);
+}
+
+bool DebugConsole::is_docked() const
+{
+	if (!m_Docker)
+	{
+		return false;
+	}
+
+	return m_Docker->IsDocked();
 }
 
 void DebugConsole::print_raw_external(const char * szText)
@@ -316,19 +319,19 @@ void DebugConsole::dock(int direction)
 	{
 		switch (direction)
 		{
-			case 0:
+			case DOCK_RIGHT:
 				g_print("Console docked: right\n");
 				break;
 
-			case 1:
+			case DOCK_LEFT:
 				g_print("Console docked: left\n");
 				break;
 
-			case 2:
+			case DOCK_TOP:
 				g_print("Console docked: top\n");
 				break;
 
-			case 3:
+			case DOCK_BOTTOM:
 				g_print("Console docked: bottom\n");
 				break;
 
@@ -342,7 +345,7 @@ void DebugConsole::dock(int direction)
 	}
 }
 
-int DebugConsole::get_dock_index()
+int DebugConsole::get_dock_index() const
 {
 	if (m_Docker)
 	{
@@ -352,7 +355,7 @@ int DebugConsole::get_dock_index()
 	return -1;
 }
 
-int DebugConsole::get_old_dock_index()
+int DebugConsole::get_old_dock_index() const
 {
 	if (m_Docker)
 	{
@@ -417,6 +420,14 @@ bool DebugConsole::eventFilter(QObject * obj, QEvent * event)
 	else if (event->type() == QEvent::FocusOut)
 	{
 		m_OldSelection = "";
+	}
+	else if (event->type() == QEvent::FocusIn)
+	{
+		if (!m_DockParent->isMinimized() && is_docked())
+		{
+			m_DockParent->setWindowState(m_DockParent->windowState() | Qt::WindowActive);
+			m_DockParent->activateWindow();
+		}
 	}
 
 	return QObject::eventFilter(obj, event);

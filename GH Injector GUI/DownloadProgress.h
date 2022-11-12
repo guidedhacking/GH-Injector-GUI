@@ -8,42 +8,42 @@
 
 class DownloadProgress : public IBindStatusCallback 
 {
-    float           m_fProgress;
-    std::string     m_sStatus;
-    bool            m_bRedownload;
-    HANDLE          m_hInterruptEvent;
+	float           m_fProgress			= 0.0f;
+	std::string     m_sStatus			= std::string("");
+	bool            m_bRedownload		= false;
+	HANDLE          m_hInterruptEvent	= NULL;
 
 public:
 
-    DownloadProgress(bool redownload = false);
-    
-    ~DownloadProgress();
+	DownloadProgress(bool redownload = false);
 
-    HRESULT __stdcall QueryInterface(const IID & riid, void ** ppvObject);
+	~DownloadProgress();
 
-    ULONG STDMETHODCALLTYPE AddRef(void);
+	HRESULT __stdcall QueryInterface(const IID & riid, void ** ppvObject);
 
-    ULONG STDMETHODCALLTYPE Release(void);
+	ULONG STDMETHODCALLTYPE AddRef(void);
 
-    virtual HRESULT STDMETHODCALLTYPE OnStartBinding(DWORD dwReserved, IBinding * pib);
+	ULONG STDMETHODCALLTYPE Release(void);
 
-    virtual HRESULT STDMETHODCALLTYPE GetPriority(LONG * pnPriority);
+	virtual HRESULT STDMETHODCALLTYPE OnStartBinding(DWORD dwReserved, IBinding * pib);
 
-    virtual HRESULT STDMETHODCALLTYPE OnLowResource(DWORD reserved);
+	virtual HRESULT STDMETHODCALLTYPE GetPriority(LONG * pnPriority);
 
-    virtual HRESULT STDMETHODCALLTYPE OnStopBinding(HRESULT hresult, LPCWSTR szError);
+	virtual HRESULT STDMETHODCALLTYPE OnLowResource(DWORD reserved);
 
-    virtual HRESULT STDMETHODCALLTYPE GetBindInfo(DWORD * grfBINDF, BINDINFO * pbindinfo);
+	virtual HRESULT STDMETHODCALLTYPE OnStopBinding(HRESULT hresult, LPCWSTR szError);
 
-    virtual HRESULT STDMETHODCALLTYPE OnDataAvailable(DWORD grfBSCF, DWORD dwSize, FORMATETC * pformatetc, STGMEDIUM * pstgmed);
+	virtual HRESULT STDMETHODCALLTYPE GetBindInfo(DWORD * grfBINDF, BINDINFO * pbindinfo);
 
-    virtual HRESULT STDMETHODCALLTYPE OnObjectAvailable(const IID & riid, IUnknown * punk);
+	virtual HRESULT STDMETHODCALLTYPE OnDataAvailable(DWORD grfBSCF, DWORD dwSize, FORMATETC * pformatetc, STGMEDIUM * pstgmed);
 
-    HRESULT __stdcall OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText);
+	virtual HRESULT STDMETHODCALLTYPE OnObjectAvailable(const IID & riid, IUnknown * punk);
 
-    float GetDownloadProgress();
+	HRESULT __stdcall OnProgress(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR szStatusText);
 
-    std::string GetStatusText();
+	float GetDownloadProgress() const;
 
-    BOOL SetInterruptEvent(HANDLE hInterrupt);
+	std::string GetStatusText() const;
+
+	BOOL SetInterruptEvent(HANDLE hInterrupt);
 };

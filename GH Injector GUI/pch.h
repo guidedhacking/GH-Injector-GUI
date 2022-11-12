@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Windows.h>
+
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 
 #include <algorithm>
@@ -20,7 +22,6 @@
 #include <TlHelp32.h>
 #include <urlmon.h>
 #include <vector>
-#include <Windows.h>
 #include <wininet.h>
 
 #pragma warning(disable: 26812) //qt enums are not enum class
@@ -46,7 +47,7 @@
 #error Invalid Qt version. Only Qt5.15.x is supported.
 #endif
 
-void THROW(std::string error_msg);
+void __declspec(noreturn) THROW(std::string error_msg);
 
 template <typename T>
 void SAFE_DELETE(T * & t)

@@ -12,43 +12,43 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 
 	frameless_parent = FramelessParent;
 
-	ps	= nullptr;
-	pss = nullptr;
-	sort_sense = SORT_SENSE::SS_ARCH_LO;
+	m_ProcessStruct	= nullptr;
+	m_ProcessState	= nullptr;
+	m_SortSense		= SORT_SENSE::SS_ARCH_LO;
 
-	update_list = new(std::nothrow) QTimer();
-	if (update_list == Q_NULLPTR)
+	m_TmrUpdateList = new(std::nothrow) QTimer();
+	if (m_TmrUpdateList == Q_NULLPTR)
 	{
-		emit ShowStatusbox(false, "Failed to create timer object. The process list won't refresh automatically.");
+		emit StatusBox(false, "Failed to create timer object. The process list won't refresh automatically.");
 	}
 	else
 	{
-		connect(update_list, SIGNAL(timeout()), this, SLOT(refresh_process()));
-		update_list->start(std::chrono::milliseconds(1000));
+		connect(m_TmrUpdateList, SIGNAL(timeout()), this, SLOT(refresh_process()));
+		m_TmrUpdateList->start(std::chrono::milliseconds(1000));
 	}
 
-	focus_filter = new(std::nothrow) QTimer();
-	if (focus_filter)
+	m_TmrFilterFocus = new(std::nothrow) QTimer();
+	if (m_TmrFilterFocus)
 	{
 		//Based on:
 		//https://stackoverflow.com/questions/526761/set-qlineedit-focus-in-qt/622693#622693
 		//Thanks, Ariya Hidayat & AAEM
 
-		focus_filter->setSingleShot(true);
-		focus_filter->setInterval(std::chrono::milliseconds(0));
+		m_TmrFilterFocus->setSingleShot(true);
+		m_TmrFilterFocus->setInterval(std::chrono::milliseconds(0));
 
-		connect(focus_filter, SIGNAL(timeout()), ui.txt_filter, SLOT(setFocus()));
+		connect(m_TmrFilterFocus, SIGNAL(timeout()), ui.txt_filter, SLOT(setFocus()));
 	}
 
-	pxm_generic = QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
-	pxm_error	= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
+	m_pxmGeneric	= QPixmap(":/GuiMain/gh_resource/Generic Icon.png");
+	m_pxmError		= QPixmap(":/GuiMain/gh_resource/Error Icon.png");
 
-	if (pxm_generic.isNull() || pxm_error.isNull())
+	if (m_pxmGeneric.isNull() || m_pxmError.isNull())
 	{
-		emit ShowStatusbox(false, "Failed to initialize one or multiple graphic files. This won't affect the functionality of the injector.");
+		emit StatusBox(false, "Failed to initialize one or multiple graphic files. This won't affect the functionality of the injector.");
 	}
 
-	selected_from_list = false;
+	m_bSelectedFromList = false;
 
 	m_ProcList.clear();
 
@@ -72,7 +72,7 @@ GuiProcess::GuiProcess(QWidget * parent, FramelessWindow * FramelessParent)
 	ui.tree_process->installEventFilter(this);
 	ui.txt_filter->installEventFilter(this);
 	
-	own_session = getProcSession(GetCurrentProcessId());
+	m_OwnSessionID = getProcSession(GetCurrentProcessId());
 
 	QMargins margins;
 	margins.setBottom(10);
@@ -89,8 +89,8 @@ GuiProcess::~GuiProcess()
 		}
 	}
 
-	SAFE_DELETE(update_list);
-	SAFE_DELETE(focus_filter);
+	SAFE_DELETE(m_TmrUpdateList);
+	SAFE_DELETE(m_TmrFilterFocus);
 }
 
 bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
@@ -109,7 +109,7 @@ bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
 				return true;
 			}
 		}
-		else if (obj == ui.txt_filter && selected_from_list)
+		else if (obj == ui.txt_filter && m_bSelectedFromList)
 		{
 			QKeyEvent * keyEvent = static_cast<QKeyEvent *>(event);
 			if (keyEvent->key() == Qt::Key_Enter || keyEvent->key() == Qt::Key_Return)
@@ -142,9 +142,9 @@ bool GuiProcess::eventFilter(QObject * obj, QEvent * event)
 			}
 		}
 	}
-	else if (event->type() == QEvent::Show && obj == this && focus_filter)
+	else if (event->type() == QEvent::Show && obj == this && m_TmrFilterFocus)
 	{
-		focus_filter->start();
+		m_TmrFilterFocus->start();
 	}
 
 	return QObject::eventFilter(obj, event);
@@ -156,7 +156,7 @@ void GuiProcess::refresh_gui()
 	QString filter		= ui.txt_filter->text();
 	int proc_count		= 0;
 
-	selected_from_list = false;
+	m_bSelectedFromList = false;
 
 	QTreeWidgetItem * selected_item = Q_NULLPTR;
 
@@ -175,8 +175,8 @@ void GuiProcess::refresh_gui()
 
 		if (ui.cb_session->isChecked())
 		{
-			int target_session = (*it)->text(4).toInt();
-			if (target_session != own_session && own_session != -1)
+			auto target_session = (*it)->text(4).toULong();
+			if (target_session != m_OwnSessionID && m_OwnSessionID != INVALID_SESSION_ID)
 			{
 				(*it)->setSelected(false);
 				(*it)->setHidden(true);
@@ -199,12 +199,12 @@ void GuiProcess::refresh_gui()
 
 		(*it)->setHidden(false);
 
-		if (!selected_from_list && (*it)->isSelected())
+		if (!m_bSelectedFromList && (*it)->isSelected())
 		{
 			ui.tree_process->setCurrentItem(*it);
 
 			selected_item = (*it);
-			selected_from_list = true;
+			m_bSelectedFromList = true;
 		}
 
 		++proc_count;
@@ -212,7 +212,7 @@ void GuiProcess::refresh_gui()
 
 	frameless_parent->setWindowTitle("Select a process (" + QString::number(proc_count) + ')');
 
-	if (!selected_from_list)
+	if (!m_bSelectedFromList)
 	{
 		for (it = QTreeWidgetItemIterator(ui.tree_process); *it; ++it)
 		{
@@ -225,7 +225,7 @@ void GuiProcess::refresh_gui()
 			ui.tree_process->setCurrentItem(*it);
 
 			selected_item = (*it);
-			selected_from_list = true;
+			m_bSelectedFromList = true;
 
 			break;
 		}
@@ -250,9 +250,9 @@ void GuiProcess::refresh_process()
 		return;
 	}
 
-	if (sort_sense != SORT_SENSE::SS_PID_LO)
+	if (m_SortSense != SORT_SENSE::SS_PID_LO)
 	{
-		sortProcessList(m_ProcList, sort_sense);
+		sortProcessList(m_ProcList, m_SortSense);
 	}
 
 	bool update_tree = false;
@@ -315,11 +315,11 @@ void GuiProcess::refresh_process()
 			{
 				if (lstrlenW(m_ProcList[i]->szPath))
 				{
-					icon = pxm_generic;
+					icon = m_pxmGeneric;
 				}
 				else
 				{
-					icon = pxm_error;
+					icon = m_pxmError;
 				}
 			}
 
@@ -358,24 +358,24 @@ void GuiProcess::name_change(const QString & str)
 
 void GuiProcess::proc_select(bool ignore)
 {
-	pss->txtFilter	= ui.txt_filter->text();
-	pss->cmbArch	= ui.cmb_arch->currentIndex();
-	pss->cbSession	= ui.cb_session->isChecked();
+	m_ProcessState->txtFilter	= ui.txt_filter->text();
+	m_ProcessState->cmbArch		= ui.cmb_arch->currentIndex();
+	m_ProcessState->cbSession	= ui.cb_session->isChecked();
 
 	QTreeWidgetItem * item = ui.tree_process->currentItem();
 	if (item)
 	{
-		ps->PID = item->text(1).toInt();
-		ps->Arch = StrToArchW(item->text(3).toStdWString().c_str());
-		lstrcpyW(ps->szName, item->text(2).toStdWString().c_str());
+		m_ProcessStruct->PID = item->text(1).toInt();
+		m_ProcessStruct->Arch = StrToArchW(item->text(3).toStdWString().c_str());
+		lstrcpyW(m_ProcessStruct->szName, item->text(2).toStdWString().c_str());
 	}
 
 	if (ignore)
 	{
-		ps->PID = 0;
+		m_ProcessStruct->PID = 0;
 	}
 
-	emit send_to_inj(pss, ps);
+	emit send_to_inj(m_ProcessState, m_ProcessStruct);
 }
 
 void GuiProcess::custom_sort(int column)
@@ -388,15 +388,15 @@ void GuiProcess::custom_sort(int column)
 			switch (column)
 			{
 				case 1:
-					sort_sense = SORT_SENSE::SS_PID_LO;
+					m_SortSense = SORT_SENSE::SS_PID_LO;
 					break;
 
 				case 2:
-					sort_sense = SORT_SENSE::SS_NAME_LO;
+					m_SortSense = SORT_SENSE::SS_NAME_LO;
 					break;
 
 				case 3:
-					sort_sense = SORT_SENSE::SS_ARCH_LO;
+					m_SortSense = SORT_SENSE::SS_ARCH_LO;
 					break;
 			}
 			break;
@@ -405,15 +405,15 @@ void GuiProcess::custom_sort(int column)
 			switch (column)
 			{
 				case 1:
-					sort_sense = SORT_SENSE::SS_PID_HI;
+					m_SortSense = SORT_SENSE::SS_PID_HI;
 					break;
 
 				case 2:
-					sort_sense = SORT_SENSE::SS_NAME_HI;
+					m_SortSense = SORT_SENSE::SS_NAME_HI;
 					break;
 
 				case 3:
-					sort_sense = SORT_SENSE::SS_ARCH_HI;
+					m_SortSense = SORT_SENSE::SS_ARCH_HI;
 					break;
 			}
 			break;
@@ -429,14 +429,14 @@ void GuiProcess::double_click_process(const QModelIndex & index)
 
 void GuiProcess::get_from_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct)
 {
-	pss = procStateStruct;
-	ps	= procStruct;
+	m_ProcessState	= procStateStruct;
+	m_ProcessStruct = procStruct;
 
-	ui.txt_filter->setText(pss->txtFilter);
-	ui.cmb_arch->setCurrentIndex(pss->cmbArch);
-	ui.cb_session->setChecked(pss->cbSession);
+	ui.txt_filter->setText(m_ProcessState->txtFilter);
+	ui.cmb_arch->setCurrentIndex(m_ProcessState->cmbArch);
+	ui.cb_session->setChecked(m_ProcessState->cbSession);
 
-	memset(ps, 0, sizeof(Process_Struct));
+	memset(m_ProcessStruct, 0, sizeof(Process_Struct));
 
 	ui.tree_process->setFocus();
 

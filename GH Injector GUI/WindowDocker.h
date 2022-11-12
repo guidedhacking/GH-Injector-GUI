@@ -6,6 +6,14 @@ class FramelessWindow;
 
 #include "framelesswindow/framelesswindow.h"
 
+#define DOCK_NONE	-1
+#define DOCK_RIGHT	0
+#define DOCK_LEFT	1
+#define DOCK_TOP	2
+#define DOCK_BOTTOM 3
+#define DOCK_MAX	4
+//support n-sided windows in case no boring ass rectangle
+
 class WindowDocker : public QWidget
 {
 	Q_OBJECT
@@ -14,12 +22,12 @@ private:
 	const static int DockDistance = 5;
 	const static int SnapDistance = 2500; //squared
 
-	const static QString Border_Highlight[5];
+	const static QString Border_Highlight[DOCK_MAX + 1];
 
 	FramelessWindow * m_Master;
 	FramelessWindow * m_Slave;
 
-	bool m_bDocking[4];
+	bool m_bDocking[DOCK_MAX];
 
 	int m_DockIndex;
 	int m_OldDockIndex;
@@ -52,11 +60,14 @@ private:
 	void move_to_pos(int direction);
 	void stop_dock();
 
-	int find_closest(int & a, int & b);
+	int find_closest(int & a, int & b) const;
 	int check_snap();
 	void stop_snap();
+	void update_dock_button();
 
 	void to_front();
+
+	void update_data();
 
 private slots:
 	void on_dock_button_clicked();
@@ -70,12 +81,12 @@ public:
 	void SetResizing(bool vertical, bool horizontal);
 	void SetDefaultSize(QSize VerticalSize, QSize HorizontalSize);
 
-	bool IsDocked();
+	bool IsDocked() const;
 	void Dock();
 	void Dock(int direction);
 
-	int GetDockIndex();
-	int GetOldDockIndex();
+	int GetDockIndex() const;
+	int GetOldDockIndex() const;
 
 	virtual bool eventFilter(QObject * obj, QEvent * event);
 

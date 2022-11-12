@@ -93,7 +93,7 @@ void ShowPDBDownload(InjectionLib * InjLib)
 	{
 		g_Console->update_external();
 
-		ShowStatusbox(false, error_msg);
+		StatusBox(false, error_msg);
 	}
 }
 

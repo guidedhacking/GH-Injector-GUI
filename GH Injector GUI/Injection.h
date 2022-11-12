@@ -15,8 +15,8 @@
 
 #include "pch.h"
 
-constexpr auto GH_INJ_GUI_VERSIONA = "4.6";
-constexpr auto GH_INJ_GUI_VERSIONW = L"4.6";
+constexpr auto GH_INJ_GUI_VERSIONA = "4.7";
+constexpr auto GH_INJ_GUI_VERSIONW = L"4.7";
 
 constexpr auto GH_INJ_EXE_LAUNCHA = "GH Injector.exe";
 constexpr auto GH_INJ_EXE_LAUNCHW = L"GH Injector.exe";
@@ -28,10 +28,10 @@ constexpr auto GH_INJ_EXE_NAME86A = "GH Injector - x86.exe";
 constexpr auto GH_INJ_EXE_NAME86W = L"GH Injector - x86.exe";
 
 constexpr auto GH_INJ_MOD_NAME64A = "GH Injector - x64.dll";
-constexpr auto GH_INJ_MOD_NAME86W = L"GH Injector - x86.dll";
+constexpr auto GH_INJ_MOD_NAME64W = L"GH Injector - x64.dll";
 
 constexpr auto GH_INJ_MOD_NAME86A = "GH Injector - x86.dll";
-constexpr auto GH_INJ_MOD_NAME64W = L"GH Injector - x64.dll";
+constexpr auto GH_INJ_MOD_NAME86W = L"GH Injector - x86.dll";
 
 constexpr auto GH_INJ_SM_NAME64A = "GH Injector SM - x64.exe";
 constexpr auto GH_INJ_SM_NAME64W = L"GH Injector SM - x64.exe";

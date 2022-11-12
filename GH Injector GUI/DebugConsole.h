@@ -24,9 +24,10 @@ public:
 	int print(const char * format, ...);
 	void print_raw(const char * szText);
 
-	bool is_open();
-	int get_dock_index();
-	int get_old_dock_index();
+	bool is_open() const;
+	bool is_docked() const;
+	int get_dock_index() const;
+	int get_old_dock_index() const;
 
 	//from non qt thread call this function and not the regular print_raw or bad things happen to your GUI (sometimes)
 	void print_raw_external(const char * szText);
@@ -41,20 +42,20 @@ public:
 	void dock(int direction);
 
 private:
-	WindowDocker * m_Docker;
+	WindowDocker * m_Docker = nullptr;
 
-	FramelessWindow * m_FramelessParent;
-	FramelessWindow * m_DockParent;
+	FramelessWindow * m_FramelessParent = nullptr;
+	FramelessWindow * m_DockParent		= nullptr;
 
-	QListWidget * m_Content;
-	QGridLayout * m_Layout;
+	QListWidget * m_Content	= nullptr;
+	QGridLayout * m_Layout	= nullptr;
 
-	QString m_OldSelection;
+	QString m_OldSelection = QString("");
 
 	std::vector<std::string> m_ExternalDataBuffer;
 
-	bool m_ExternalLocked;
-	bool m_WaitForLock;
+	bool m_ExternalLocked	= false;
+	bool m_WaitForLock		= true;
 
 	static void ImTheTrashMan(const wchar_t * expression, const wchar_t * function, const wchar_t * file, unsigned int line, uintptr_t pReserved);
 

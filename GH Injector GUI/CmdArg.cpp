@@ -209,7 +209,7 @@ int CmdArg(int argc, wchar_t * argv[])
 		int mmflags_index = FindArg(argc, L"-mmflags", argv, true);
 		if (mmflags_index)
 		{
-			wchar_t * szMMflags = argv[mmflags_index + 1];
+			wchar_t* szMMflags = argv[mmflags_index + 1];
 			mmflags = std::stol(szMMflags, nullptr, 0x10);
 
 			DWORD mmflags_mask = MM_DEFAULT | INJ_MM_CLEAN_DATA_DIR | INJ_MM_SHIFT_MODULE_BASE;

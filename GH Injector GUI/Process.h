@@ -4,6 +4,8 @@
 #define NT_FAIL(status) (status < 0)
 #endif
 
+#define INVALID_SESSION_ID (ULONG)-1
+
 #include "pch.h"
 
 #include "DebugConsole.h"
@@ -53,9 +55,9 @@ using f_NtQueryInformationProcess = NTSTATUS(__stdcall *)
 (
 	HANDLE					hTargetProc,
 	PROCESSINFOCLASS		PIC,
-	void * pBuffer,
+	void *					pBuffer,
 	ULONG					BufferSize,
-	ULONG * SizeOut
+	ULONG *					SizeOut
 );
 
 ARCH getFileArchA(const char	* szDllFile);
@@ -68,7 +70,7 @@ ARCH StrToArchW(const wchar_t * szStr);
 std::string ArchToStrA(ARCH arch);
 std::wstring ArchToStrW(ARCH arch);
 
-int getProcSession(const int PID);
+ULONG getProcSession(const int PID);
 bool getProcFullPathA(char		* szFullPath, DWORD BufferSize, int PID);
 bool getProcFullPathW(wchar_t	* szfullPath, DWORD BufferSize, int PID);
 
@@ -84,6 +86,7 @@ bool IsNativeProcess(const int PID);
 
 bool FileExistsW(const wchar_t * szFile);
 bool FileExistsA(const char * szFile);
+bool FileExists(const TCHAR * szFile);
 
 int strcicmpA(const char * a, const char * b);
 int strcicmpW(const wchar_t * a, const wchar_t * b);

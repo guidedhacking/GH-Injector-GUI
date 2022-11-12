@@ -96,7 +96,7 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 	}
 	else
 	{
-		ShowStatusbox(false, "Something went wrong with the version check.");
+		StatusBox(false, "Something went wrong with the version check.\nYour version appears to be from the future.");
 		parent.close();
 		delete box;
 
@@ -263,7 +263,7 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 
 	if (ret != UPDATE_ERR_SUCCESS)
 	{
-		ShowStatusbox(false, error_msg);
+		StatusBox(false, error_msg);
 	
 		return false;
 	}

@@ -12,10 +12,7 @@ DownloadProgress::~DownloadProgress()
 
 DownloadProgress::DownloadProgress(bool redownload)
 {
-    m_fProgress         = 0.0f;
-    m_sStatus           = "";
-    m_bRedownload       = redownload;
-    m_hInterruptEvent   = nullptr;
+    m_bRedownload = redownload;
 }
 
 HRESULT __stdcall DownloadProgress::QueryInterface(const IID & riid, void ** ppvObject)
@@ -144,12 +141,12 @@ HRESULT __stdcall DownloadProgress::OnProgress(ULONG ulProgress, ULONG ulProgres
 	return S_OK;
 }
 
-float DownloadProgress::GetDownloadProgress()
+float DownloadProgress::GetDownloadProgress() const
 {
 	return m_fProgress;
 }
 
-std::string DownloadProgress::GetStatusText()
+std::string DownloadProgress::GetStatusText() const
 {
 	return m_sStatus;
 }
@@ -161,5 +158,12 @@ BOOL DownloadProgress::SetInterruptEvent(HANDLE hInterrupt)
         CloseHandle(m_hInterruptEvent);
     }
 
-    return DuplicateHandle(GetCurrentProcess(), hInterrupt, GetCurrentProcess(), &m_hInterruptEvent, NULL, FALSE, DUPLICATE_SAME_ACCESS);
+    if (!DuplicateHandle(GetCurrentProcess(), hInterrupt, GetCurrentProcess(), &m_hInterruptEvent, NULL, FALSE, DUPLICATE_SAME_ACCESS))
+    {
+        m_hInterruptEvent = NULL;
+
+        return false;
+    }
+
+    return true;
 }

@@ -20,26 +20,26 @@ public:
 
 private:
 	std::vector<QProgressBar *>	m_ProgressBarList;
-	FramelessWindow			 *	m_FramelessParent;
-	QLabel					 *	m_pStatus;
+	FramelessWindow			 *	m_FramelessParent	= Q_NULLPTR;
+	QLabel					 *	m_pStatus			= Q_NULLPTR;
 
-	bool m_running;
+	bool m_bRunning = false;
 
-	bool m_update_status;
-	bool m_update_progress;
-	bool m_update_done;
+	bool m_bUpdateStatus	= false;
+	bool m_bUpdateProgress	= false;
+	bool m_bUpdateDone		= false;
 
-	QString				m_new_status;
-	std::vector<float>	m_new_progress;
-	int					m_new_done;
-	int					m_custom_close_value;
+	QString				m_NewStatus = QString("");
+	std::vector<float>	m_NewProgress;
 
-	int m_frequency;
-	bool m_timer_running;
-	QTimer * m_tCallback;
+	int					m_NewDone				= 0;
+	int					m_CustomCloseValue	= 0;
 
-	void * m_pCustomArg;
-	f_DPW_Callback m_pCallback;
+	bool m_bTimerRunning	= false;
+	QTimer * m_TmrCallback	= Q_NULLPTR;
+
+	void * m_pCustomArg			= nullptr;
+	f_DPW_Callback m_pCallback	= nullptr;
 
 private slots:
 	void on_close_button_clicked();
@@ -60,10 +60,9 @@ public:
 	void SetCloseValue(int value);
 
 	int Execute();
-	bool IsRunning();
 
-	QString GetStatus();
-	FramelessWindow * GetParent();
+	QString GetStatus() const;
+	FramelessWindow * GetParent() const;
 
 public slots:
 	void show();

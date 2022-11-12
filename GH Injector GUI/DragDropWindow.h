@@ -6,19 +6,19 @@
 
 class DragDropWindow
 {
-	HWND	m_hMainWnd;
-	HWND	m_hDropWnd;
-	HDC		m_hDeviceContext;
-	HICON	m_hDropIcon;
+	HWND	m_hMainWnd			= NULL;
+	HWND	m_hDropWnd			= NULL;
+	HDC		m_hDeviceContext	= NULL;
+	HICON	m_hDropIcon			= NULL;
+
+	int m_x = 0;
+	int m_y = 0;
+	int m_size = 0;
 
 	const static TCHAR m_szClassName[];
 	static int m_ClassRefCount;
 
 	std::function<void(const QString &)> m_Callback;
-
-	int m_x;
-	int m_y;
-	int m_size;
 
 	void DrawIcon();
 
@@ -29,9 +29,9 @@ public:
 	HWND CreateDragDropWindow(HWND hParent, int Size = 30);
 	void Close();
 
-	HWND GetHWND();
-	HWND GetParent();
-	void GetPosition(int & x, int & y);
+	HWND GetHWND() const;
+	HWND GetParent() const;
+	void GetPosition(int & x, int & y) const;
 
 	void SetPosition(int x, int y, bool hide, bool active);
 

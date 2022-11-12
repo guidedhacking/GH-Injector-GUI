@@ -4,6 +4,6 @@
 
 #include "framelesswindow.h"
 
-void ShowStatusbox(bool ok, const QString & msg);
+void StatusBox(bool ok, const QString & msg);
 
 bool YesNoBox(const QString & title, const QString & msg, QWidget * parent = Q_NULLPTR);
