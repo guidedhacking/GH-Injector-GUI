@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "6+f2Y24zlgXzPIc/TQfXwhaOUW0rljaORv8yrGoA5MyKFO9M3r9zDGouVE9ZdtJY4f3JZ8uoTXmJkB6XZh5IKA==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\konra\\Documents\\Visual Studio 2022\\Projects\\GH Injector 3.4\\GH Injector GUI\\GH .NET Parser\\GH .NET Parser.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\konra\\.nuget\\packages\\system.collections.immutable\\7.0.0\\system.collections.immutable.7.0.0.nupkg.sha512",
+    "C:\\Users\\konra\\.nuget\\packages\\system.reflection.metadata\\7.0.0\\system.reflection.metadata.7.0.0.nupkg.sha512",
+    "C:\\Users\\konra\\.nuget\\packages\\system.reflection.metadataloadcontext\\7.0.0\\system.reflection.metadataloadcontext.7.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

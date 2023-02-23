@@ -427,7 +427,7 @@ bool WindowDocker::eventFilter(QObject * obj, QEvent * event)
 			}
 			else if (event->type() == QEvent::ApplicationStateChange)
 			{
-				auto* ascEvent = static_cast<QApplicationStateChangeEvent*>(event);
+				auto * ascEvent = static_cast<QApplicationStateChangeEvent *>(event);
 				if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive)
 				{
 					to_front();

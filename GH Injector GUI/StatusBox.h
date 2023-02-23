@@ -6,4 +6,4 @@
 
 void StatusBox(bool ok, const QString & msg);
 
-bool YesNoBox(const QString & title, const QString & msg, QWidget * parent = Q_NULLPTR);
+bool YesNoBox(const QString & title, const QString & msg, QWidget * parent = Q_NULLPTR, QMessageBox::Icon icon = QMessageBox::Icon::Question);

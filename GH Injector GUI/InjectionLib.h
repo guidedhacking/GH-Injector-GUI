@@ -8,8 +8,6 @@
 class InjectionLib
 {
 	static const UINT m_HookCount = 50;
-	
-	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> m_StringConverter;
 
 	HookInfo m_HookInfo[m_HookCount];
 
@@ -25,6 +23,9 @@ class InjectionLib
 
 	DECLARE_INIT_INJECTION_FUNCTION(InjectA);
 	DECLARE_INIT_INJECTION_FUNCTION(InjectW);
+	DECLARE_INIT_INJECTION_FUNCTION(DotNet_InjectA);
+	DECLARE_INIT_INJECTION_FUNCTION(DotNet_InjectW);
+	DECLARE_INIT_INJECTION_FUNCTION(Memory_Inject);
 	DECLARE_INIT_INJECTION_FUNCTION(ValidateInjectionFunctions);
 	DECLARE_INIT_INJECTION_FUNCTION(RestoreInjectionFunctions);
 	DECLARE_INIT_INJECTION_FUNCTION(GetVersionA);
@@ -48,7 +49,10 @@ public:
 
 	DWORD InjectA(INJECTIONDATAA * pData) const;
 	DWORD InjectW(INJECTIONDATAW * pData) const;
-	bool ValidateInjectionFunctions(int PID, std::vector<std::string> & hList);
+	DWORD DotNet_InjectA(DOTNET_INJECTIONDATAA * pData) const;
+	DWORD DotNet_InjectW(DOTNET_INJECTIONDATAW * pData) const;
+	DWORD Memory_Inject(MEMORY_INJECTIONDATA * pData) const;
+	bool ValidateInjectionFunctions(int PID, std::vector<std::wstring> & hList);
 	bool RestoreInjectionFunctions(std::vector<int> & hList);
 	std::string GetVersionA() const;
 	std::wstring GetVersionW() const;

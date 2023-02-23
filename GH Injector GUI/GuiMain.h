@@ -6,6 +6,7 @@
 
 #include "CmdArg.h"
 #include "DebugConsole.h"
+#include "DotNetOptions.h"
 #include "DragDropWindow.h"
 #include "framelesswindow/framelesswindow.h"
 #include "GuiProcess.h"
@@ -18,6 +19,27 @@
 #include "StatusBox.h"
 #include "Update.h"
 
+#define FILE_LIST_IDX_CHECKBOX			0
+#define FILE_LIST_IDX_NAME				1
+#define FILE_LIST_IDX_PATH				2
+#define FILE_LIST_IDX_PLATFORM			3
+#define FILE_LIST_IDX_BUTTON_OPTIONS	4
+#define FILE_LIST_IDX_FILEHANDLE		5
+#define FILE_LIST_IDX_FLAG				6
+#define FILE_LIST_IDX_DOTNET_OPTIONS	7
+#define FILE_LIST_IDX_DOTNET_ARGUMENT	8
+#define FILE_LIST_IDX_DOTNET_PARSER		9
+
+#define FILE_LIST_FLAG_NATIVE			0
+#define FILE_LIST_FLAG_DOTNET			1
+#define FILE_LIST_FLAG_DOTNET_NATIVE	2
+
+#define FILE_SETTINGS_IDX_PATH				0
+#define FILE_SETTINGS_IDX_CHECKED			1
+#define FILE_SETTINGS_IDX_FLAG				2
+#define FILE_SETTINGS_IDX_DOTNET_OPTIONS	3
+#define FILE_SETTINGS_IDX_DOTNET_ARGUMENT	4
+
 class GuiMain : public QMainWindow
 {
 	Q_OBJECT
@@ -27,19 +49,16 @@ public:
 	~GuiMain();
 
 	// Static
+	static const int EXIT_CODE_CLOSE;
+	static const int EXIT_CODE_REBOOT;
+	static const int EXIT_CODE_UPDATE;
+	static const int EXIT_CODE_START_NATIVE;
 
-	static int const EXIT_CODE_CLOSE;
-	static int const EXIT_CODE_REBOOT;
-	static int const EXIT_CODE_UPDATE;
-	static int const EXIT_CODE_START_NATIVE;
-
-	static int const Height_small;
-	static int const Height_medium_s;
-	static int const Height_medium_b;
-	static int const Height_big;
-	static int const Height_change_delay;
-
-	static QPixmap GetIconFromFileW(const wchar_t * szPath, UINT size, int index = 0);
+	static const int Height_small;
+	static const int Height_medium_s;
+	static const int Height_medium_b;
+	static const int Height_big;
+	static const int Height_change_delay;
 	void show();
 
 private:
@@ -56,16 +75,19 @@ private:
 
 	DragDropWindow * drag_drop;
 
-	QFileSystemModel model;
+	ProcessState	proc_state;
+	ProcessData		proc_data_by_picker;
+	ProcessData		proc_data_by_name;
+	ProcessData		proc_data_by_pid;
 
-	// Settings
-	Process_State_Struct	* pss;
-	Process_Struct			* ps_picker;
+	DWORD			CurrentPID;
+	ARCHITECTURE	CurrentArchitecture;
+	std::wstring	CurrentName;
+	std::wstring	CurrentPath;
 
 	bool ignoreUpdate;
 	bool onReset;
 	bool onMove;
-	bool native;
 	bool consoleOpen;
 	bool consoleFirst;
 	bool tooltipsEnabled;
@@ -84,17 +106,13 @@ private:
 	int dragdrop_size;
 	int dragdrop_offset;
 
-	DWORD old_raw_pid;
-	DWORD old_byname_pid;
-	DWORD old_bypid_pid;
-
-	QTimer * t_Auto_Inj;
-	QTimer * t_Delay_Inj;
-	QTimer * t_Update_Proc;
-	QTimer * t_OnUserInput;
-	QTimer * t_Update_DragDrop;
-	QTimer * t_SetUp;
-	QTimer * t_Update_Files;
+	QTimer t_Auto_Inj;
+	QTimer t_Delay_Inj;
+	QTimer t_Update_Proc;
+	QTimer t_OnUserInput;
+	QTimer t_Update_DragDrop;
+	QTimer t_SetUp;
+	QTimer t_Update_Files;
 
 	QPixmap pxm_banner;
 	QPixmap pxm_lul;
@@ -105,12 +123,15 @@ private:
 
 	InjectionLib InjLib;
 
-	QRegularExpressionValidator * rev_NumbersOnly;
+	QRegularExpressionValidator rev_NumbersOnly;
+	QStringListModel			mod_CmbProcNameModel;
 
 	// General
 	bool platformCheck();
 	void reboot();
-	void add_file_to_list(QString str, bool active);
+
+	QTreeWidgetItem * add_file_to_list(QString path, bool active, int flag = FILE_LIST_FLAG_NATIVE);
+	bool get_icon_from_file(const std::wstring & path, UINT size, int index, QPixmap & pixmap);
 
 	// Update GUI
 	void toggleSelected();
@@ -133,18 +154,18 @@ public:
 	void initSetup();
 
 public slots:
-	void get_from_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
+	void get_from_picker();
 	void get_from_scan_hook();
 
 signals:
-	void send_to_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
+	void send_to_picker(ProcessState * state, ProcessData * data);
 	void send_to_scan_hook(int pid);
 
 private slots:
 	// Titlebar
 	void closeEvent(QCloseEvent * event) override;
-	void close_clicked();
-	void minimize_clicked();
+	void btn_close_clicked();
+	void btn_minimize_clicked();
 
 	// Settings
 	void rb_process_set();
@@ -153,44 +174,48 @@ private slots:
 	void update_process();
 
 	// Auto, Reset
-	void auto_inject();
+	void cb_auto_inject();
 	void auto_loop_inject();
-	void reset_settings();
+	void btn_reset_settings();
 
 	// Method, Cloaking, Advanced
-	void load_change(int index);
-	void create_change(int index);
-	void peh_change(int index);
+	void cmb_load_change(int index);
+	void cmb_create_change(int index);
+	void cmb_peh_change(int index);
 	void cb_main_clicked();
 	void cb_page_protection_clicked();
 	void cb_cloak_clicked();
 	void cb_hijack_clicked();
 
 	// Files
-	void add_file_dialog();
-	void remove_file();
-	void select_file();
+	void btn_add_file_dialog();
+	void btn_remove_file();
+	void tree_select_file();
 	void update_file_list();
 
 	// Inject
-	void delay_inject();
+	void btn_delay_inject();
 	void inject_file();
 
 	// Hook
 	void btn_hook_scan_click();
 
 	// Info
-	void tooltip_change();
-	void open_help();
-	void generate_shortcut();
-	void open_console();
-	void open_log();
+	void btn_tooltip_change();
+	void btn_open_help();
+	void btn_generate_shortcut();
+	void btn_open_console();
+	void btn_open_log();
 
 	// PDB
 	void setup();
 
 	// Update
 	void update();
-	void update_clicked();
+	void btn_update_clicked();
 	void update_after_height_change();
+
+	//.NET options
+	void dot_net_options();
+	bool parse_dot_net_data(QTreeWidgetItem * item, DotNetOptionsTree *& out);
 };

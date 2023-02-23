@@ -2,4 +2,4 @@
 
 #include "..\pch.h"
 
-int Unzip(const wchar_t * szSrcPath, const wchar_t * szDstPath);
+int Unzip(const std::wstring & szSrcPath, const std::wstring & szDstPath);

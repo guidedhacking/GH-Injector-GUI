@@ -89,5 +89,4 @@ public:
 	int GetOldDockIndex() const;
 
 	virtual bool eventFilter(QObject * obj, QEvent * event);
-
 };

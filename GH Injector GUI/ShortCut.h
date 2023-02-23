@@ -1,5 +1,5 @@
 #pragma once
 
-#include "pch.h"
+#include "DebugConsole.h"
 
-HRESULT CreateLinkWrapper(QString linkName, QString linkArgument);
+HRESULT CreateLinkWrapper(const QString & linkName, const QString & linkArgument);

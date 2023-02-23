@@ -1,72 +1,86 @@
 #include "pch.h"
 
 #include "ShortCut.h"
+#include "Injection.h"
 
-HRESULT CreateLink(LPCWSTR lpszPathObj, LPCWSTR lpszPathLink, LPCWSTR lpszDesc, LPCWSTR args)
+HRESULT CreateLink(const std::wstring & TargetObject, const std::wstring & WorkingDirectory, const std::wstring & Description, const std::wstring & LinkPath, const std::wstring & Arguments)
 {
-	HRESULT			hres	= S_OK;
-	IShellLinkW *	psl		= nullptr;
+	HRESULT	hRet = S_OK;
+	IShellLinkW			*	pShellLink		= nullptr;
+	IShellLinkDataList	*	pShellLinkData	= nullptr;
+	IPersistFile		*	pLinkFile		= nullptr;
 
-	hres = CoInitialize(NULL);
-	if (FAILED(hres))
+	hRet = CoInitialize(NULL);
+	if (FAILED(hRet))
 	{
-		// Has to be called for failed calls to CoInitialize too.
 		CoUninitialize(); 
 
-		return hres;
+		g_print("CoInitialize failed: %08X\n", hRet);
+
+		return hRet;
 	}
 
-	// Get a pointer to the IShellLink interface. It is assumed that CoInitialize
-	// has already been called.
-	hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID *)&psl);
-	if (SUCCEEDED(hres))
+	hRet = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLinkW, reinterpret_cast<void **>(&pShellLink));
+	if (FAILED(hRet))
 	{
-		IPersistFile * ppf = nullptr;
+		CoUninitialize();
 
-		// Set the path to the shortcut target and add the description. 
-		psl->SetPath(lpszPathObj);
-		psl->SetDescription(lpszDesc);
+		g_print("CoCreateInstance failed: %08X\n", hRet);
 
-		psl->SetArguments(args);
-		psl->SetWorkingDirectory(lpszDesc);
+		return hRet;
+	}
 
-		// Query IShellLink for the IPersistFile interface, used for saving the 
-		// shortcut in persistent storage. 
-		hres = psl->QueryInterface(IID_IPersistFile, (LPVOID *)&ppf);
+	pShellLink->SetPath(TargetObject.c_str());
+	pShellLink->SetDescription(Description.c_str());
+	pShellLink->SetArguments(Arguments.c_str());
+	pShellLink->SetWorkingDirectory(WorkingDirectory.c_str());
 
-		if (SUCCEEDED(hres))
+	hRet = pShellLink->QueryInterface(IID_IShellLinkDataList, reinterpret_cast<void **>(&pShellLinkData));
+	if (SUCCEEDED(hRet))
+	{
+		DWORD flags = NULL;
+		pShellLinkData->GetFlags(&flags);
+		pShellLinkData->SetFlags(flags | (DWORD)SLDF_RUNAS_USER);
+
+		pShellLinkData->Release();
+	}
+
+	hRet = pShellLink->QueryInterface(IID_IPersistFile, reinterpret_cast<void **>(&pLinkFile));
+	if (FAILED(hRet))
+	{
+		pShellLink->Release();
+
+		CoUninitialize();
+		
+		g_print("IShellLinkW::QueryInterface failed: %08X\n", hRet);
+
+		return hRet;
+	}
+	else
+	{
+		hRet = pLinkFile->Save(LinkPath.c_str(), TRUE);
+		if (FAILED(hRet))
 		{
-			// Save the link by calling IPersistFile::Save. 
-			hres = ppf->Save(lpszPathLink, TRUE);
-			ppf->Release();
+			g_print("IPersistFile::Save failed: %08X\n", hRet);
 		}
 
-		psl->Release();
+		pLinkFile->Release();
 	}
+
+	pShellLink->Release();
 
 	CoUninitialize();
 
-	return hres;
+	return hRet;
 }
 
-HRESULT CreateLinkWrapper(QString linkName, QString linkArgument)
+HRESULT CreateLinkWrapper(const QString & linkName, const QString & linkArgument)
 {
-	QString desPath = QCoreApplication::applicationDirPath() + "\\";
-	QString InjectorExe = QCoreApplication::applicationFilePath();
+	std::wstring ExeTargetPath	= g_RootPath + GH_INJ_EXE_NAME;
+	std::wstring WorkingDir		= g_RootPath;
+	std::wstring LinkPathName	= g_RootPath + linkName.toStdWString() + L".lnk";
+	std::wstring LinkArgument	= linkArgument.toStdWString();
+	std::wstring Description	= L"Broihon";
 
-	desPath.replace("/", "\\");
-	InjectorExe.replace("/", "\\");
-
-	QString completeLinkName = desPath + linkName + QString(".lnk");
-
-	wchar_t str1[1024] = { 0 };
-	InjectorExe.toWCharArray(str1);
-
-	wchar_t str3[1024] = { 0 };
-	desPath.toWCharArray(str3);
-
-	wchar_t str4[1024] = { 0 };
-	linkArgument.toWCharArray(str4);
-
-	return CreateLink(str1, completeLinkName.toStdWString().c_str(), str3, str4);
+	return CreateLink(ExeTargetPath, WorkingDir, Description, LinkPathName, LinkArgument);
 }

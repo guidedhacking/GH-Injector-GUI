@@ -6,4 +6,4 @@
 #include "InjectionLib.h"
 #include "Process.h"
 
-int CmdArg(int argc, wchar_t * argv[]);
+int CmdArg(int argc, const wchar_t * const argv[], bool & silent);

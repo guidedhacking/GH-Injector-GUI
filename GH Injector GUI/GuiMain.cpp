@@ -2,16 +2,16 @@
 
 #include "GuiMain.h"
 
-int const GuiMain::EXIT_CODE_CLOSE			= 0;
-int const GuiMain::EXIT_CODE_REBOOT			= -1;
-int const GuiMain::EXIT_CODE_UPDATE			= -2;
-int const GuiMain::EXIT_CODE_START_NATIVE	= -3;
+const int GuiMain::EXIT_CODE_CLOSE			= 0;
+const int GuiMain::EXIT_CODE_REBOOT			= -1;
+const int GuiMain::EXIT_CODE_UPDATE			= -2;
+const int GuiMain::EXIT_CODE_START_NATIVE	= -3;
 
-int const GuiMain::Height_small			= 410;
-int const GuiMain::Height_medium_s		= 480;
-int const GuiMain::Height_medium_b		= 593;
-int const GuiMain::Height_big			= 643;
-int const GuiMain::Height_change_delay	= 100;
+const int GuiMain::Height_small			= 410;
+const int GuiMain::Height_medium_s		= 480;
+const int GuiMain::Height_medium_b		= 593;
+const int GuiMain::Height_big			= 643;
+const int GuiMain::Height_change_delay	= 100;
 
 GuiMain::GuiMain(QWidget * parent)
 	: QMainWindow(parent)
@@ -36,12 +36,19 @@ GuiMain::GuiMain(QWidget * parent)
 	current_version = GH_INJ_GUI_VERSIONW;
 	newest_version	= GH_INJ_GUI_VERSIONW;
 
+	auto root_path = QCoreApplication::applicationDirPath();
+	root_path.replace("/", "\\");
+	g_RootPath = root_path.toStdWString() + L"\\";
+
 	if (!platformCheck())
 	{
 		exit(GuiMain::EXIT_CODE_START_NATIVE);
 	}
-
-	native = IsNativeProcess(GetCurrentProcessId());
+	
+	if (!ProcessIdToSessionId(GetCurrentProcessId(), &g_SessionID))
+	{
+		THROW("Failed to resolve session identifier\n");
+	}
 
 	if (!FileExists(GH_INJ_MOD_NAME))
 	{
@@ -63,6 +70,16 @@ GuiMain::GuiMain(QWidget * parent)
 		exit(GuiMain::EXIT_CODE_CLOSE);
 	}
 
+	if (!FileExists(GH_INJ_DNP_NAME))
+	{
+		QString failMsg = "Injection component missing:\n";
+		failMsg += GH_INJ_DNP_NAME;
+
+		emit StatusBox(false, failMsg);
+
+		exit(GuiMain::EXIT_CODE_CLOSE);
+	}
+
 #ifdef _WIN64
 
 	if (!FileExists(GH_INJ_SM_NAME64))
@@ -75,12 +92,22 @@ GuiMain::GuiMain(QWidget * parent)
 		exit(GuiMain::EXIT_CODE_CLOSE);
 	}
 
+	if (!FileExists(GH_INJ_DNP_NAME86))
+	{
+		QString failMsg = "Injection component missing:\n";
+		failMsg += GH_INJ_DNP_NAME86;
+
+		emit StatusBox(false, failMsg);
+
+		exit(GuiMain::EXIT_CODE_CLOSE);
+	}
+
 #endif
 
 	if (!InjLib.Init())
 	{
 		QString failMsg = "Failed to load:\n";
-		failMsg += GH_INJ_MOD_NAMEA;
+		failMsg += QString::fromStdString(GH_INJ_MOD_NAMEA);
 
 		emit StatusBox(false, failMsg);
 
@@ -98,35 +125,15 @@ GuiMain::GuiMain(QWidget * parent)
 
 	ui.setupUi(this);
 
-	t_Auto_Inj			= new(std::nothrow) QTimer(this);
-	t_Delay_Inj			= new(std::nothrow) QTimer(this);
-	t_Update_Proc		= new(std::nothrow) QTimer(this);
-	t_OnUserInput		= new(std::nothrow) QTimer(this);
-	t_Update_DragDrop	= new(std::nothrow) QTimer(this);
-	t_SetUp				= new(std::nothrow) QTimer(this);
-	t_Update_Files		= new(std::nothrow) QTimer(this);
+	CurrentPID = 1;
 
-	if (t_Auto_Inj == Q_NULLPTR || t_Delay_Inj == Q_NULLPTR || t_Update_Proc == Q_NULLPTR || t_OnUserInput == Q_NULLPTR || t_Update_DragDrop == Q_NULLPTR || t_SetUp == Q_NULLPTR || t_Update_Files == Q_NULLPTR)
-	{
-		THROW("Failed to create timer object.\n");
-	}
+	t_Delay_Inj.setSingleShot(true);
+	t_OnUserInput.setSingleShot(true);
+	t_Update_DragDrop.setSingleShot(true);
+	t_SetUp.setSingleShot(true);
 
-	t_Delay_Inj->setSingleShot(true);
-	t_OnUserInput->setSingleShot(true);
-	t_Update_DragDrop->setSingleShot(true);
-	t_SetUp->setSingleShot(true);
-
-	pss	= new(std::nothrow) Process_State_Struct();
-	if (pss == nullptr)
-	{
-		THROW("Failed to create process state structure.\n");
-	}
-
-	ps_picker = new(std::nothrow) Process_Struct();
-	if (ps_picker == nullptr)
-	{
-		THROW("Failed to create process data structure.\n");
-	}
+	t_Auto_Inj.setInterval(200);
+	t_Update_Proc.setInterval(250);
 	
 	pxm_banner	= QPixmap(":/GuiMain/gh_resource/GH Banner.png");
 	pxm_lul		= QPixmap(":/GuiMain/gh_resource/LUL Icon.png");
@@ -142,6 +149,8 @@ GuiMain::GuiMain(QWidget * parent)
 	
 	ui.lbl_proc_icon->setStyleSheet("background: transparent");
 
+	ui.cmb_proc->setModel(&mod_CmbProcNameModel);
+
 	auto banner_height = pxm_banner.height();
 	ui.btn_close->setFixedHeight(banner_height / 2);
 	ui.btn_minimize->setFixedHeight(banner_height / 2);
@@ -149,10 +158,11 @@ GuiMain::GuiMain(QWidget * parent)
 	ui.btn_minimize->setFixedWidth(50);
 		
 	ui.tree_files->setSizeAdjustPolicy(QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored);
-	ui.tree_files->setColumnWidth(0, 50);
-	ui.tree_files->setColumnWidth(1, 135);
-	ui.tree_files->setColumnWidth(2, 360);
-	ui.tree_files->setColumnWidth(3, 50);
+	ui.tree_files->setColumnWidth(FILE_LIST_IDX_CHECKBOX, 50);
+	ui.tree_files->setColumnWidth(FILE_LIST_IDX_NAME, 135);
+	ui.tree_files->setColumnWidth(FILE_LIST_IDX_PATH, 272);
+	ui.tree_files->setColumnWidth(FILE_LIST_IDX_PLATFORM, 50);
+	ui.tree_files->setColumnWidth(FILE_LIST_IDX_BUTTON_OPTIONS, 30);
 
 	std::string v = "V";
 	v += GH_INJ_GUI_VERSIONA;
@@ -163,15 +173,8 @@ GuiMain::GuiMain(QWidget * parent)
 
 	QApplication::instance()->installEventFilter(this);
 	
-	rev_NumbersOnly = new(std::nothrow) QRegularExpressionValidator(QRegularExpression("[0-9]+"));
-	if (rev_NumbersOnly == Q_NULLPTR)
-	{
-		emit StatusBox(false, "Failed to create regular expression validator for PID input field.");
-	}
-	else
-	{
-		ui.txt_pid->setValidator(rev_NumbersOnly);
-	}
+	rev_NumbersOnly.setRegularExpression(QRegularExpression("[0-9]+"));
+	ui.txt_pid->setValidator(&rev_NumbersOnly);
 
 	if (this->statusBar())
 	{
@@ -188,8 +191,8 @@ GuiMain::GuiMain(QWidget * parent)
 	mouse_pos = { 0, 0 };
 
 	// Window
-	connect(ui.btn_close,		SIGNAL(clicked()), this, SLOT(close_clicked()));
-	connect(ui.btn_minimize,	SIGNAL(clicked()), this, SLOT(minimize_clicked()));
+	connect(ui.btn_close,		SIGNAL(clicked()), this, SLOT(btn_close_clicked()));
+	connect(ui.btn_minimize,	SIGNAL(clicked()), this, SLOT(btn_minimize_clicked()));
 
 	// Settings
 	connect(ui.rb_proc,		SIGNAL(clicked()), this, SLOT(rb_process_set()));
@@ -197,32 +200,32 @@ GuiMain::GuiMain(QWidget * parent)
 	connect(ui.btn_proc,	SIGNAL(clicked()), this, SLOT(btn_pick_process_click()));
 
 	// Auto, Reset, Color
-	connect(ui.cb_auto,		SIGNAL(clicked()), this, SLOT(auto_inject()));
-	connect(ui.btn_reset,	SIGNAL(clicked()), this, SLOT(reset_settings()));
+	connect(ui.cb_auto,		SIGNAL(clicked()), this, SLOT(cb_auto_inject()));
+	connect(ui.btn_reset,	SIGNAL(clicked()), this, SLOT(btn_reset_settings()));
 	connect(ui.btn_hooks,	SIGNAL(clicked()), this, SLOT(btn_hook_scan_click()));
 
 	// Method, Cloaking, Advanced
-	connect(ui.cmb_load,		SIGNAL(currentIndexChanged(int)),	this, SLOT(load_change(int)));
-	connect(ui.cmb_create,		SIGNAL(currentIndexChanged(int)),	this, SLOT(create_change(int)));
+	connect(ui.cmb_load,		SIGNAL(currentIndexChanged(int)),	this, SLOT(cmb_load_change(int)));
+	connect(ui.cmb_create,		SIGNAL(currentIndexChanged(int)),	this, SLOT(cmb_create_change(int)));
 	connect(ui.cb_main,			SIGNAL(clicked()),					this, SLOT(cb_main_clicked()));
 	connect(ui.cb_protection,	SIGNAL(clicked()),					this, SLOT(cb_page_protection_clicked()));
-	connect(ui.cmb_peh,			SIGNAL(currentIndexChanged(int)),	this, SLOT(peh_change(int)));
+	connect(ui.cmb_peh,			SIGNAL(currentIndexChanged(int)),	this, SLOT(cmb_peh_change(int)));
 	connect(ui.cb_cloak,		SIGNAL(clicked()),					this, SLOT(cb_cloak_clicked()));
 	connect(ui.cb_hijack,		SIGNAL(clicked()),					this, SLOT(cb_hijack_clicked()));
 
 	// Files
-	connect(ui.btn_add,		SIGNAL(clicked()),									this, SLOT(add_file_dialog()));
-	connect(ui.btn_inject,	SIGNAL(clicked()),									this, SLOT(delay_inject()));
-	connect(ui.btn_remove,	SIGNAL(clicked()),									this, SLOT(remove_file()));
-	connect(ui.tree_files,	SIGNAL(itemDoubleClicked(QTreeWidgetItem *, int)),	this, SLOT(select_file()));
+	connect(ui.btn_add,		SIGNAL(clicked()),									this, SLOT(btn_add_file_dialog()));
+	connect(ui.btn_inject,	SIGNAL(clicked()),									this, SLOT(btn_delay_inject()));
+	connect(ui.btn_remove,	SIGNAL(clicked()),									this, SLOT(btn_remove_file()));
+	connect(ui.tree_files,	SIGNAL(itemDoubleClicked(QTreeWidgetItem *, int)),	this, SLOT(tree_select_file()));
 
 	// Info
-	connect(ui.btn_tooltip,		SIGNAL(clicked()), this, SLOT(tooltip_change()));
-	connect(ui.btn_shortcut,	SIGNAL(clicked()), this, SLOT(generate_shortcut()));
-	connect(ui.btn_help,		SIGNAL(clicked()), this, SLOT(open_help()));
-	connect(ui.btn_version,		SIGNAL(clicked()), this, SLOT(update_clicked()));
-	connect(ui.btn_console,		SIGNAL(clicked()), this, SLOT(open_console()));
-	connect(ui.btn_openlog,		SIGNAL(clicked()), this, SLOT(open_log()));
+	connect(ui.btn_tooltip,		SIGNAL(clicked()), this, SLOT(btn_tooltip_change()));
+	connect(ui.btn_shortcut,	SIGNAL(clicked()), this, SLOT(btn_generate_shortcut()));
+	connect(ui.btn_help,		SIGNAL(clicked()), this, SLOT(btn_open_help()));
+	connect(ui.btn_version,		SIGNAL(clicked()), this, SLOT(btn_update_clicked()));
+	connect(ui.btn_console,		SIGNAL(clicked()), this, SLOT(btn_open_console()));
+	connect(ui.btn_openlog,		SIGNAL(clicked()), this, SLOT(btn_open_log()));
 	
 	framelessPicker.setMinimizeButton(false);
 	framelessPicker.setResizeHorizontal(true);
@@ -271,19 +274,19 @@ GuiMain::GuiMain(QWidget * parent)
 	drag_drop->SetCallback(Drop_Handler);
 
 	// Process Picker
-	connect(this,		SIGNAL(send_to_picker(Process_State_Struct *, Process_Struct *)),	gui_Picker, SLOT(get_from_inj(Process_State_Struct *, Process_Struct *)));
-	connect(gui_Picker, SIGNAL(send_to_inj(Process_State_Struct *, Process_Struct *)),		this,		SLOT(get_from_picker(Process_State_Struct *, Process_Struct *)));
+	connect(this,		SIGNAL(send_to_picker(ProcessState *, ProcessData *)),	gui_Picker, SLOT(get_from_inj(ProcessState *, ProcessData *)));
+	connect(gui_Picker, SIGNAL(send_to_inj()), this, SLOT(get_from_picker()));
 
 	// Scan Hook
 	connect(this,			SIGNAL(send_to_scan_hook(int)),	gui_Scanner,	SLOT(get_from_inj_to_sh(int)));
 	connect(gui_Scanner,	SIGNAL(send_to_inj_sh()),		this,			SLOT(get_from_scan_hook()));
 
-	connect(t_Auto_Inj,			SIGNAL(timeout()), this, SLOT(auto_loop_inject()));
-	connect(t_Delay_Inj,		SIGNAL(timeout()), this, SLOT(inject_file()));
-	connect(t_Update_Proc,		SIGNAL(timeout()), this, SLOT(update_process()));
-	connect(t_Update_DragDrop,	SIGNAL(timeout()), this, SLOT(update_after_height_change()));
-	connect(t_SetUp,			SIGNAL(timeout()), this, SLOT(setup()));
-	connect(t_Update_Files,		SIGNAL(timeout()), this, SLOT(update_file_list()));	
+	connect(&t_Auto_Inj,		SIGNAL(timeout()), this, SLOT(auto_loop_inject()));
+	connect(&t_Delay_Inj,		SIGNAL(timeout()), this, SLOT(inject_file()));
+	connect(&t_Update_Proc,		SIGNAL(timeout()), this, SLOT(update_process()));
+	connect(&t_Update_DragDrop,	SIGNAL(timeout()), this, SLOT(update_after_height_change()));
+	connect(&t_SetUp,			SIGNAL(timeout()), this, SLOT(setup()));
+	connect(&t_Update_Files,	SIGNAL(timeout()), this, SLOT(update_file_list()));	
 
 	ui.fr_cloak->setVisible(false);
 
@@ -292,22 +295,22 @@ GuiMain::GuiMain(QWidget * parent)
 
 	load_settings();
 
-	load_change(0);
-	create_change(0);
+	cmb_load_change(0);
+	cmb_create_change(0);
 
 	cb_main_clicked();
 	cb_page_protection_clicked();
 	cb_cloak_clicked();
 
-	peh_change(0);
-	tooltip_change();
+	cmb_peh_change(0);
+	btn_tooltip_change();
 
 	if (dockIndex == DOCK_NONE)
 	{
 		dockIndex = DOCK_RIGHT;
 	}
 
-	if (!native)
+	if (!g_IsNative)
 	{
 		// Won't work if not native
 		ui.cb_hijack->setDisabled(false);
@@ -322,9 +325,9 @@ GuiMain::GuiMain(QWidget * parent)
 		auto * cmb_model = qobject_cast<QStandardItemModel *>(ui.cmb_load->model());
 		if (cmb_model)
 		{
-			if (ui.cmb_load->currentIndex() == 3)
+			if (ui.cmb_load->currentIndex() == (int)INJECTION_MODE::IM_LdrpLoadDllInternal)
 			{
-				ui.cmb_load->setCurrentIndex(0);
+				ui.cmb_load->setCurrentIndex((int)INJECTION_MODE::IM_LdrpLoadDll);
 			}
 
 			auto * it = cmb_model->item((int)INJECTION_MODE::IM_LdrpLoadDllInternal);
@@ -338,15 +341,11 @@ GuiMain::GuiMain(QWidget * parent)
 		}
 	}
 
-	update_process();
-	update_proc_icon();
-	btn_change();
-
 	ui.fr_method->setStyleSheet("QFrame { border-top: 1px solid grey; }");
 	ui.fr_cloak->setStyleSheet("QFrame { border-top: 1px solid grey; }");
 	ui.fr_adv->setStyleSheet("QFrame { border-top: 1px solid grey; }");
 
-	auto_inject();
+	cb_auto_inject();
 }
 
 GuiMain::~GuiMain()
@@ -356,16 +355,6 @@ GuiMain::~GuiMain()
 	SAFE_DELETE(drag_drop);
 	SAFE_DELETE(gui_Scanner);
 	SAFE_DELETE(gui_Picker);
-	SAFE_DELETE(rev_NumbersOnly);
-	SAFE_DELETE(pss);
-	SAFE_DELETE(ps_picker);
-	SAFE_DELETE(t_OnUserInput);
-	SAFE_DELETE(t_Update_Proc);
-	SAFE_DELETE(t_Delay_Inj);
-	SAFE_DELETE(t_Auto_Inj);
-	SAFE_DELETE(t_Update_DragDrop);
-	SAFE_DELETE(t_SetUp);
-	SAFE_DELETE(t_Update_Files);
 	SAFE_DELETE(g_Console);
 
 	InjLib.InterruptDownload();
@@ -374,165 +363,175 @@ GuiMain::~GuiMain()
 
 void GuiMain::update_process()
 {
-	DWORD raw = ui.txt_pid->text().toULong();
-	Process_Struct byName	= getProcessByNameW(ui.cmb_proc->currentText().toStdWString().c_str());
-	Process_Struct byPID	= getProcessByPID(ui.txt_pid->text().toULong());
+	auto pid_raw	= ui.txt_pid->text().toULong();
+	auto name_raw	= ui.cmb_proc->currentText();
 
-	//avoid unnecessary updates
-	if (raw != old_raw_pid || byName.PID != old_byname_pid || byPID.PID != old_bypid_pid || (ui.cmb_proc->currentText().compare("Broihon.exe") == 0 && old_raw_pid != 1337))
+	auto by_pid = ui.rb_pid->isChecked();
+	auto by_name = ui.rb_proc->isChecked();
+
+	bool update_broihon = false;
+
+	if (pid_raw == 1337 && by_pid && CurrentPID != 1337)
 	{
-		old_raw_pid		= raw;
-		old_byname_pid	= byName.PID;
-		old_bypid_pid	= byPID.PID;
+		update_broihon = true;
 	}
-	else
+	else if (pid_raw == 1337 && by_pid && CurrentPID == 1337)
+	{
+		return;
+	}
+	else if (name_raw.compare("Broihon.exe", Qt::CaseInsensitive) == 0 && by_name && CurrentPID != 1337)
+	{
+		update_broihon = true;
+	}
+	else if (name_raw.compare("Broihon.exe", Qt::CaseInsensitive) == 0 && by_name && CurrentPID == 1337)
 	{
 		return;
 	}
 
-#ifndef _WIN64
-	if (!native)
+	if (update_broihon)
 	{
-		if (byName.PID)
-		{
-			if (IsNativeProcess(byName.PID))
-			{
-				byName.PID = 0;
-			}
-		}
+		CurrentPID = 1337;
+		CurrentName = L"Broihon.exe";
 
-		if (byPID.PID)
-		{
-			if (IsNativeProcess(byPID.PID))
-			{
-				byPID.PID = 0;
-			}
-		}
+		ui.txt_arch->setText(QString::fromUtf8("\xF0\x9F\x98\x8E") + QString::fromUtf8("\xF0\x9F\x92\xA6"));
+		ui.txt_arch->setToolTip("Doin your mom doin doin your mom\nDoin your mom doin doin your mom\nDoin doin your mom doin doin your mom\nYou know we straight with doin your mom");
+		ui.txt_pid->setToolTip("");
+		ui.cmb_proc->setToolTip("");
+		ui.cmb_proc->setEditText("Broihon.exe");
+		btn_change();
+		update_proc_icon();
+		ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(L"Praise Broihon \u2665\u2665\u2665"));
+
+		return;
 	}
-#endif
 
-	if (ui.rb_pid->isChecked())
+	proc_data_by_name.UpdateData(name_raw.toStdWString());
+	proc_data_by_pid.UpdateData(pid_raw);
+
+	DWORD by_name_pid = 0;
+	proc_data_by_name.GetProcessID(by_name_pid);
+
+	if (!proc_data_by_pid.IsValid() && by_pid)
 	{
-		if (byPID.PID)
+		if (!proc_data_by_name.IsValid() && CurrentPID)
 		{
-			if (byPID.PID != byName.PID && strcicmpW(byPID.szPath, byName.szPath))
-			{
-				txt_pid_change();
-				btn_change();
-				update_proc_icon();
-			}
-		}
-		else if (!t_OnUserInput->isActive() || raw == 1337)
-		{
-			if (byName.PID && byName.PID != raw && raw != 1337)
-			{
-				g_print("swag\n");
-				cmb_proc_name_change();
-				btn_change();
-				update_proc_icon();
-				rb_process_set();
-
-			}
-			else if (raw && raw != 1337)
-			{
-				ui.txt_pid->setText("0");
-				ui.txt_arch->setText("---");
-				ui.txt_pid->setToolTip("");
-				ui.cmb_proc->setToolTip("");
-				ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
-
-				old_raw_pid = 0;
-
-				btn_change();
-				update_proc_icon();
-			}
-			else if (raw == 1337)
-			{
-				ui.txt_arch->setText(QString::fromUtf8("\xF0\x9F\x98\x8E") + QString::fromUtf8("\xF0\x9F\x92\xA6"));
-				ui.txt_arch->setToolTip("Doin your mom doin doin your mom\nDoin your mom doin doin your mom\nDoin doin your mom doin doin your mom\nYou know we straight with doin your mom");
-				ui.txt_pid->setToolTip("");
-				ui.cmb_proc->setToolTip("");
-				ui.cmb_proc->setEditText("Broihon.exe");
-
-				old_raw_pid		= 1337;
-				old_byname_pid	= 0;
-				old_bypid_pid	= 0;
-
-				btn_change();
-				update_proc_icon();
-
-				ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(L"Praise Broihon \u2665\u2665\u2665"));
-			}
-		}
-	}
-	else if (ui.rb_proc->isChecked())
-	{
-		if (byName.PID)
-		{
-			if (byName.PID != byPID.PID && strcicmpW(byPID.szPath, byName.szPath))
-			{
-				cmb_proc_name_change();
-				btn_change();
-				update_proc_icon();
-			}
-		}
-		else if (raw != 0 && ui.cmb_proc->currentText().compare("Broihon.exe") != 0)
-		{
+			CurrentPID = 0;
 			ui.txt_pid->setText("0");
 			ui.txt_arch->setText("---");
 			ui.txt_pid->setToolTip("");
 			ui.cmb_proc->setToolTip("");
+			ui.txt_arch->setToolTip("Invalid process specified.");
 			ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
 
-			old_raw_pid = 0;
-
 			btn_change();
 			update_proc_icon();
 		}
-		else if (ui.cmb_proc->currentText().compare("Broihon.exe") == 0)
+		else if (proc_data_by_name.IsValid() && (CurrentPID == 0 || CurrentPID != by_name_pid))
 		{
-			ui.txt_arch->setText(QString::fromUtf8("\xF0\x9F\x98\x8E") + QString::fromUtf8("\xF0\x9F\x92\xA6"));
-			ui.txt_arch->setToolTip("Doin your mom doin doin your mom\nDoin your mom doin doin your mom\nDoin doin your mom doin doin your mom\nYou know we straight with doin your mom");
+			CurrentPID = by_name_pid;
+			proc_data_by_name.GetNameW(CurrentName);
+			proc_data_by_name.GetFullPathW(CurrentPath);
+			proc_data_by_name.GetArchitecture(CurrentArchitecture);
+
+			cmb_proc_name_change();
+			btn_change();
+			update_proc_icon();
+		}
+	}
+	else if (proc_data_by_pid.IsValid() && by_pid)
+	{
+		if (pid_raw != CurrentPID)
+		{
+			CurrentPID = pid_raw;
+			proc_data_by_pid.GetNameW(CurrentName);
+			proc_data_by_pid.GetFullPathW(CurrentPath);
+			proc_data_by_pid.GetArchitecture(CurrentArchitecture);
+
+			txt_pid_change();
+			btn_change();
+			update_proc_icon();
+		}
+	}
+	else if (!proc_data_by_name.IsValid())
+	{
+		if (!name_raw.endsWith(".exe", Qt::CaseInsensitive))
+		{
+			QString name_raw_exe;
+			name_raw_exe = name_raw + ".exe";
+
+			ProcessData data_local(name_raw_exe.toStdWString());
+			if (data_local.IsValid())
+			{
+				auto index = ui.cmb_proc->findText(name_raw_exe, Qt::MatchFixedString);
+				if (index == -1)
+				{
+					ui.cmb_proc->addItem(name_raw_exe);
+				}
+			}
+		}
+
+		if (CurrentPID)
+		{
+			CurrentPID = 0;
+			ui.txt_pid->setText("0");
+			ui.txt_arch->setText("---");
 			ui.txt_pid->setToolTip("");
 			ui.cmb_proc->setToolTip("");
-			ui.txt_pid->setText("1337");
-
-			old_raw_pid		= 1337;
-			old_byname_pid	= 0;
-			old_bypid_pid	= 0;
+			ui.txt_arch->setToolTip("Invalid process specified.");
+			ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
 
 			btn_change();
 			update_proc_icon();
-
-			ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(L"Praise Broihon \u2665\u2665\u2665"));
 		}
-	}	
+	}
+	else
+	{
+		if (proc_data_by_pid.IsValid())
+		{
+			std::wstring byPIDName;
+			std::wstring byNameName;
+			proc_data_by_pid.GetNameW(byPIDName);
+			proc_data_by_name.GetNameW(byNameName);
+			if (!strcicmpW(byNameName.c_str(), byPIDName.c_str()))
+			{
+				return;
+			}
+		}
+
+		DWORD new_pid = 0;
+		proc_data_by_name.GetProcessID(new_pid);
+		if (new_pid != CurrentPID)
+		{
+			CurrentPID = new_pid;
+			proc_data_by_name.GetNameW(CurrentName);
+			proc_data_by_name.GetFullPathW(CurrentPath);
+			proc_data_by_name.GetArchitecture(CurrentArchitecture);
+
+			cmb_proc_name_change();
+			btn_change();
+			update_proc_icon();
+		}
+	}
 }
 
 void GuiMain::update_proc_icon()
 {
 	int size = ui.btn_proc->height();
 	ui.lbl_proc_icon->setFixedSize(QSize(size, size));
-
-	int pid = ui.txt_pid->text().toInt();
-
-	Process_Struct ps = getProcessByPID(pid);
-
+	
 	QPixmap new_icon = QPixmap();
 
-	if (pid == 1337)
+	if (CurrentPID == 1337)
 	{
 		new_icon = pxm_lul.scaled(size, size);
 	}
-	else if (!ps.PID || !lstrlenW(ps.szPath))
+	else if (!CurrentPID)
 	{
 		new_icon = pxm_error.scaled(size, size);
 	}
 	else
 	{
-		new_icon = GetIconFromFileW(ps.szPath, size);
-
-		if (new_icon.isNull())
+		if (!get_icon_from_file(CurrentPath, size, 0, new_icon))
 		{
 			new_icon = pxm_generic.scaled(size, size);
 		}
@@ -544,15 +543,14 @@ void GuiMain::update_proc_icon()
 void GuiMain::update_file_list()
 {
 	QTreeWidgetItemIterator it(ui.tree_files);
-
-	for (; *it; ++it)
+	for (; (*it) != Q_NULLPTR; ++it)
 	{
 		bool b_ok = false;
 
 #ifdef _WIN64
-		HANDLE hFile = (HANDLE)((*it)->text(4).toULongLong(&b_ok, 0x10));
+		auto hFile = reinterpret_cast<HANDLE>((*it)->text(FILE_LIST_IDX_FILEHANDLE).toULongLong(&b_ok, 0x10));
 #else
-		HANDLE hFile = (HANDLE)((*it)->text(4).toULong(&b_ok, 0x10));
+		auto hFile = reinterpret_cast<HANDLE>((*it)->text(FILE_LIST_IDX_FILEHANDLE).toULong(&b_ok, 0x10));
 #endif
 
 		if (!hFile)
@@ -560,9 +558,9 @@ void GuiMain::update_file_list()
 			b_ok = false;
 		}
 
-		auto q_path = (*it)->text(2);
+		auto q_path = (*it)->text(FILE_LIST_IDX_PATH);
 
-		if (!FileExistsW(q_path.toStdWString().c_str()))
+		if (!FileExistsW(q_path.toStdWString()))
 		{
 			if (b_ok && hFile == INVALID_HANDLE_VALUE)
 			{
@@ -571,8 +569,9 @@ void GuiMain::update_file_list()
 
 			if (!b_ok)
 			{
-				g_print("Deleted %ls from the list (invalid handle)\n", (*it)->text(1).toStdWString().c_str());
-				delete *it;
+				g_print("Deleted %ls from the list (invalid handle)\n", (*it)->text(FILE_LIST_IDX_NAME).toStdWString().c_str());
+
+				delete (*it);
 
 				continue;
 			}
@@ -583,8 +582,9 @@ void GuiMain::update_file_list()
 			{
 				CloseHandle(hFile);
 
-				g_print("Deleted %ls from the list (invalid path)\n", (*it)->text(1).toStdWString().c_str());
-				delete *it;
+				g_print("Deleted %ls from the list (invalid path)\n", (*it)->text(FILE_LIST_IDX_NAME).toStdWString().c_str());
+
+				delete (*it);
 
 				continue;
 			}
@@ -596,30 +596,54 @@ void GuiMain::update_file_list()
 			std::wstring s_new_path(new_path_stripped);
 			if (s_new_path.find(L"$Recycle.Bin") != std::string::npos) //detect if file was moved to recycle bin
 			{
-				g_print("Deleted %ls from the list\n", (*it)->text(1).toStdWString().c_str());
-				delete *it;
+				g_print("Deleted %ls from the list\n", (*it)->text(FILE_LIST_IDX_NAME).toStdWString().c_str());
+
+				delete (*it);
 			}
 			else
 			{
 				if (s_new_path.find(L"$Extend") != std::string::npos) //file replaced, update item with original path
 				{
 					g_print("File probably replaced\n");
-#ifdef _WIN64
-					(*it)->setText(4, QString::number(reinterpret_cast<qulonglong>(INVALID_HANDLE_VALUE), 0x10));
-#else
-					(*it)->setText(4, QString::number(reinterpret_cast<unsigned long>(INVALID_HANDLE_VALUE), 0x10));
-#endif
 
-					(*it)->setData(0, Qt::CheckStateRole, Qt::CheckState::PartiallyChecked);
+					(*it)->setText(FILE_LIST_IDX_FILEHANDLE, QString::number(reinterpret_cast<UINT_PTR>(INVALID_HANDLE_VALUE), 0x10));
+					(*it)->setData(FILE_LIST_IDX_CHECKBOX, Qt::CheckStateRole, Qt::CheckState::PartiallyChecked);
 					(*it)->setDisabled(true);
 
 					continue;
 				}
 
-				delete *it;
+				bool is_dot_net = false;
+				QString dot_net_options;
+				QString dot_net_argument;
+				auto flag = (*it)->text(FILE_LIST_IDX_FLAG).toInt();
+				if (flag != FILE_LIST_FLAG_NATIVE)
+				{
+					dot_net_options = (*it)->text(FILE_LIST_IDX_DOTNET_OPTIONS);
+					dot_net_argument = (*it)->text(FILE_LIST_IDX_DOTNET_ARGUMENT);
+
+					is_dot_net = true;
+				}
+
+				delete (*it);
 
 				g_print("New path: %ls\n", new_path_stripped);
-				add_file_to_list(QString::fromWCharArray(new_path_stripped), true);
+				auto new_item = add_file_to_list(QString::fromWCharArray(new_path_stripped), true, flag);
+
+				if (is_dot_net && new_item)
+				{
+					new_item->setText(FILE_LIST_IDX_DOTNET_OPTIONS, dot_net_options);
+					new_item->setText(FILE_LIST_IDX_DOTNET_ARGUMENT, dot_net_argument);
+
+					DotNetOptionsTree * new_tree = nullptr;
+
+					if (!parse_dot_net_data(new_item, new_tree))
+					{
+						g_print("Failed to parse .NET data of:\n%ls\n", new_item->text(FILE_LIST_IDX_NAME).toStdWString().c_str());
+					}
+					
+					new_item->setText(FILE_LIST_IDX_DOTNET_PARSER, QString::number(reinterpret_cast<UINT_PTR>(new_tree), 0x10));
+				}
 			}
 		}
 		else if (b_ok && hFile == INVALID_HANDLE_VALUE)
@@ -635,23 +659,20 @@ void GuiMain::update_file_list()
 
 			File.close();
 
-			delete *it;
+			delete (*it);
 
 			add_file_to_list(q_path, true);
 		}
 	}
 	
-	ARCH arch = ARCH::NONE;
-	if (ui.rb_proc->isChecked())
+	ARCHITECTURE arch;
+	if (ui.rb_proc->isChecked() && proc_data_by_pid.IsValid())
 	{
-		QString proc = ui.cmb_proc->currentText();
-		Process_Struct pl = getProcessByNameW(proc.toStdWString().c_str());
-		arch = pl.Arch;
+		proc_data_by_pid.GetArchitecture(arch);
 	}
-	else
+	else if (proc_data_by_name.IsValid())
 	{
-		Process_Struct pl = getProcessByPID(ui.txt_pid->text().toInt());
-		arch = pl.Arch;
+		proc_data_by_name.GetArchitecture(arch);
 	}
 
 	if (arch == ARCH::NONE)
@@ -660,10 +681,16 @@ void GuiMain::update_file_list()
 	}
 
 	it = QTreeWidgetItemIterator(ui.tree_files);
-	for (; *it; ++it)
+	for (; (*it) != Q_NULLPTR; ++it)
 	{
+		bool is_dot_net = false;
+		if ((*it)->text(FILE_LIST_IDX_FLAG).toInt() != FILE_LIST_FLAG_NATIVE)
+		{
+			is_dot_net = true;
+		}
+
 		auto f = (*it)->flags();
-		if (StrToArchW((*it)->text(3).toStdWString().c_str()) != arch)
+		if (StrToArchW((*it)->text(FILE_LIST_IDX_PLATFORM).toStdWString()) != arch && (is_dot_net && arch == ARCH::X86 || !is_dot_net) || is_dot_net && ui.cmb_load->currentIndex() == (int)INJECTION_MODE::IM_ManualMap)
 		{
 			if (f & Qt::ItemFlag::ItemIsUserCheckable)
 			{
@@ -674,7 +701,7 @@ void GuiMain::update_file_list()
 		else if (!(f & Qt::ItemFlag::ItemIsUserCheckable))
 		{
 			(*it)->setFlags(f | Qt::ItemFlag::ItemIsUserCheckable);
-			(*it)->setData(0, Qt::CheckStateRole, Qt::CheckState::Unchecked);
+			(*it)->setData(FILE_LIST_IDX_CHECKBOX, Qt::CheckStateRole, Qt::CheckState::Unchecked);
 		}
 	}
 }
@@ -689,6 +716,214 @@ void GuiMain::update_after_height_change()
 	{
 		g_Console->dock(); //dock to update console height
 	}
+}
+
+void GuiMain::dot_net_options()
+{
+	auto list = ui.tree_files->selectedItems();
+	if (list.isEmpty())
+	{
+		return;
+	}
+
+	QTreeWidgetItem * item = Q_NULLPTR;
+
+	for (const auto & i : list)
+	{
+		if (i->text(FILE_LIST_IDX_FLAG).toInt() != FILE_LIST_FLAG_NATIVE)
+		{
+			item = i;
+
+			break;
+		}
+	}
+
+	if (item == Q_NULLPTR)
+	{
+		return;
+	}
+
+	auto old_dot_net_options = item->text(FILE_LIST_IDX_DOTNET_OPTIONS);
+	auto old_options = old_dot_net_options.split('!', Qt::SkipEmptyParts);
+	while (old_options.size() < 3)
+	{
+		old_options.push_back(QString(""));
+	}
+	old_options.push_back(item->text(FILE_LIST_IDX_DOTNET_ARGUMENT));
+
+	bool use_native = false;
+	if (item->text(FILE_LIST_IDX_FLAG).toInt() == FILE_LIST_FLAG_DOTNET_NATIVE)
+	{
+		use_native = true;
+	}
+
+	bool b_ok = false;
+#ifdef _WIN64
+	auto parser = reinterpret_cast<DotNetOptionsTree *>(item->text(FILE_LIST_IDX_DOTNET_PARSER).toULongLong(&b_ok, 0x10));
+#else
+	auto parser = reinterpret_cast<DotNetOptionsTree *>(item->text(FILE_LIST_IDX_DOTNET_PARSER).toULong(&b_ok, 0x10));
+#endif
+
+	auto wnd = new(std::nothrow) DotNetOptionsWindow(QString("Enter .NET options"), old_options, parser, use_native, framelessParent);
+	if (wnd == Q_NULLPTR)
+	{
+		g_print("Failed to open options window");
+
+		return;
+	}
+
+	wnd->show();
+	wnd->exec();
+
+	std::vector<QString> results;
+	wnd->GetResults(results, use_native);
+	if (results.size())
+	{
+		QString dot_net_options = "";
+		for (UINT i = 0; i < 3; ++i)
+		{
+			dot_net_options += results[i] + '!';
+		}
+
+		item->setText(FILE_LIST_IDX_DOTNET_OPTIONS, dot_net_options);
+		item->setText(FILE_LIST_IDX_DOTNET_ARGUMENT, results[3]);
+	}	
+
+	if (use_native)
+	{
+		item->setText(FILE_LIST_IDX_FLAG, QString::number(FILE_LIST_FLAG_DOTNET_NATIVE));
+	}
+	else
+	{
+		item->setText(FILE_LIST_IDX_FLAG, QString::number(FILE_LIST_FLAG_DOTNET));
+	}
+
+	delete wnd;
+}
+
+bool GuiMain::parse_dot_net_data(QTreeWidgetItem * item, DotNetOptionsTree *& out)
+{
+	auto dll_path = item->text(FILE_LIST_IDX_PATH);
+	auto dll_name = item->text(FILE_LIST_IDX_NAME);
+	std::wstring pipe_name = dll_name.toStdWString();
+	std::wstring pipe_name_full = L"\\\\.\\pipe\\" + pipe_name;
+
+	auto hPipe = CreateNamedPipeW(pipe_name_full.c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_NOWAIT, PIPE_UNLIMITED_INSTANCES, 0x1000, 0x10000, 0, nullptr);
+	if (hPipe == INVALID_HANDLE_VALUE)
+	{
+		g_print("Failed to create pipe: %08X\n", GetLastError());
+
+		return false;
+	}
+	
+	ConnectNamedPipe(hPipe, nullptr);
+
+	auto exe_path = g_RootPath + GH_INJ_DOTNET_PARSER;
+	std::wstring CmdLine = L"\"" + exe_path + L"\" \"" + dll_path.toStdWString() + L"\" \"" + pipe_name + L"\"";
+
+	wchar_t * szCmdLine = new(std::nothrow) wchar_t[CmdLine.size() + 1]();
+	if (!szCmdLine)
+	{
+		g_print("Memory allocation failed\n");
+
+		DisconnectNamedPipe(hPipe);
+		CloseHandle(hPipe);
+
+		return false;
+	}
+
+	CmdLine.copy(szCmdLine, CmdLine.length());
+
+	PROCESS_INFORMATION pi{ 0 };
+	STARTUPINFOW		si{ 0 };
+	si.cb			= sizeof(si);
+	si.dwFlags		= STARTF_USESHOWWINDOW;
+	si.wShowWindow	= SW_HIDE;
+
+	auto bRet = CreateProcessW(nullptr, szCmdLine, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+
+	delete[] szCmdLine;
+
+	if (!bRet)
+	{
+		printf("CreateProcessW failed: %08X\n", GetLastError());
+
+		DisconnectNamedPipe(hPipe);
+		CloseHandle(hPipe);
+
+		return false;
+	}
+
+	DWORD dwWaitRet = WaitForSingleObject(pi.hProcess, 1000);
+	if (dwWaitRet != WAIT_OBJECT_0)
+	{
+		printf("GH .NET Parser.exe timed out\n");
+
+		TerminateProcess(pi.hProcess, ERROR_SUCCESS);
+
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+
+		DisconnectNamedPipe(hPipe);
+		CloseHandle(hPipe);
+
+		return false;
+	}
+
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+
+	DWORD DataSize = 0;
+	bRet = PeekNamedPipe(hPipe, nullptr, NULL, nullptr, &DataSize, nullptr);
+	if (!bRet)
+	{
+		printf("Pekk failed: %08X\n", GetLastError());
+	}
+
+	printf("DATASIZE = %08X\n", DataSize);
+
+	char * raw_data = new(std::nothrow) char[DataSize + 1]();
+	if (!raw_data)
+	{
+		g_print("Memory allocation failed\n");
+
+		DisconnectNamedPipe(hPipe);
+		CloseHandle(hPipe);
+
+		return false;
+	}
+
+	bRet = PeekNamedPipe(hPipe, raw_data, DataSize, nullptr, nullptr, nullptr);
+	if (!bRet)
+	{
+		g_print("PeekNamedPipe failed: %08X\n", GetLastError());
+
+		delete[] raw_data;
+
+		DisconnectNamedPipe(hPipe);
+		CloseHandle(hPipe);
+
+		return false;
+	}
+
+	DisconnectNamedPipe(hPipe);
+	CloseHandle(hPipe);
+
+	DotNetOptionsTree * new_tree = new(std::nothrow) DotNetOptionsTree();
+	if (!new_tree)
+	{
+		g_print("Memory allocation failed\n");
+
+		delete[] raw_data;
+
+		return false;
+	}
+
+	new_tree->ParseData(raw_data);
+
+	out = new_tree;
+
+	return true;
 }
 
 void GuiMain::closeEvent(QCloseEvent * event)
@@ -709,7 +944,7 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 				auto * keyEvent = static_cast<QKeyEvent *>(event);
 				if (keyEvent->key() == Qt::Key_Delete)
 				{
-					remove_file();
+					btn_remove_file();
 				}
 				else if (keyEvent->key() == Qt::Key_Space)
 				{
@@ -721,43 +956,70 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 				auto * keyEvent = static_cast<QKeyEvent *>(event);
 				if (keyEvent->key() >= Qt::Key_0 && keyEvent->key() <= Qt::Key_9 || keyEvent->key() == Qt::Key_Backspace || keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Space)
 				{
-					t_OnUserInput->start(10000);
+					t_OnUserInput.start(10000);
 				}
 			}
 
 			if (g_Console->is_open() && !framelessParent->isMinimized())
 			{
 				auto * keyEvent = static_cast<QKeyEvent *>(event);
-				if (keyEvent->modifiers() & Qt::KeyboardModifier::ControlModifier)
+				if (keyEvent->matches(QKeySequence::Copy) || keyEvent->matches(QKeySequence::Cut))
 				{
-					int new_index = -1;
+					g_Console->copy_data();
+				}
+				else if (keyEvent->modifiers() & Qt::KeyboardModifier::ControlModifier)
+				{
+					int new_index = DOCK_NONE;
 
 					switch (keyEvent->key())
 					{
 						case Qt::Key_3:
 						case Qt::Key_Right:
-							new_index = 0;
+							new_index = DOCK_RIGHT;
 							break;
 
 						case Qt::Key_1:
 						case Qt::Key_Left:
-							new_index = 1;
+							new_index = DOCK_LEFT;
 							break;
 						case Qt::Key_5:
 						case Qt::Key_Up:
-							new_index = 2;
+							new_index = DOCK_TOP;
 							break;
 
 						case Qt::Key_2:
 						case Qt::Key_Down:
-							new_index = 3;
+							new_index = DOCK_BOTTOM;
 							break;
 
 						default:
 							break;
 					}
 
-					if (new_index != DOCK_NONE)
+					bool ignore = false;
+					if ((ui.cmb_proc->hasFocus() || ui.txt_pid->hasFocus()) && (new_index == DOCK_RIGHT || new_index == DOCK_LEFT))
+					{
+						auto pos = 0;
+						auto len = 0;
+
+						if (ui.cmb_proc->hasFocus())
+						{
+							pos = ui.cmb_proc->lineEdit()->cursorPosition();
+							len = ui.cmb_proc->lineEdit()->text().length();							
+						}
+						else
+						{
+							pos = ui.txt_pid->cursorPosition();
+							len = ui.txt_pid->text().length();
+						}
+
+						if (pos != len && new_index == DOCK_RIGHT || pos != 0 && new_index == DOCK_LEFT)
+						{
+							ignore = true;
+						}
+					}
+					
+					if (!ignore && new_index != DOCK_NONE && new_index != g_Console->get_dock_index())
 					{
 						dockIndex = new_index;
 						g_Console->dock(dockIndex);
@@ -779,10 +1041,6 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 					pos = ui.tree_files->header()->mapToGlobal(pos);
 					drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, true);
 				}
-
-				auto * resizeEvent = static_cast<QResizeEvent *>(event);
-				ui.tree_files->setColumnWidth(2, resizeEvent->size().width() - 250);
-				ui.tree_files->setColumnWidth(3, 50);
 			}
 		}
 		break;
@@ -825,8 +1083,6 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 			auto * ascEvent = static_cast<QApplicationStateChangeEvent *>(event);
 			if (ascEvent->applicationState() == Qt::ApplicationState::ApplicationActive && framelessParent->isVisible() && drag_drop)
 			{
-				update_proc_icon();
-
 				auto pos = ui.tree_files->header()->pos();
 				pos = ui.tree_files->header()->mapToGlobal(pos);
 
@@ -857,8 +1113,6 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 			{
 				drag_drop->SetPosition(-1, -1, true, false);
 			}
-
-			update_proc_icon();
 		}
 		break;
 
@@ -880,8 +1134,6 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 				auto pos = ui.tree_files->header()->pos();
 				pos = ui.tree_files->header()->mapToGlobal(pos);
 				drag_drop->SetPosition(pos.x() + ui.tree_files->width() - dragdrop_size - dragdrop_offset, pos.y() + ui.tree_files->height() - dragdrop_size - dragdrop_offset, false, false);
-
-				update_proc_icon();
 			}
 		}
 		break;
@@ -961,8 +1213,8 @@ bool GuiMain::eventFilter(QObject * obj, QEvent * event)
 
 void GuiMain::initSetup()
 {
-	t_Update_Proc->start(250);
-	t_SetUp->start(500);
+	t_Update_Proc.start();
+	t_SetUp.start(500);
 }
 
 void GuiMain::toggleSelected()
@@ -993,11 +1245,24 @@ void GuiMain::toggleSelected()
 bool GuiMain::platformCheck()
 {
 #ifdef _WIN64
+	g_IsNative = true;
+
 	return true;
 #else
-	bool bPlatform = IsNativeProcess(GetCurrentProcessId());
-	if (bPlatform == true)
+	BOOL bWOW64 = FALSE;
+	if (!IsWow64Process(GetCurrentProcess(), &bWOW64))
 	{
+		THROW("Critical platform check failed.");
+	}
+
+	if (bWOW64)
+	{
+		g_IsNative = false;
+	}
+	else
+	{
+		g_IsNative = true;
+
 		return true;
 	}
 
@@ -1013,8 +1278,9 @@ bool GuiMain::platformCheck()
 		return true;
 	}
 
-	STARTUPINFOW		si{ 0 };
 	PROCESS_INFORMATION pi{ 0 };
+	STARTUPINFOW		si{ 0 };
+	si.cb = sizeof(si);
 
 	auto x64_path = QCoreApplication::applicationDirPath().toStdWString();
 	x64_path += L"/";
@@ -1044,6 +1310,16 @@ void GuiMain::rb_process_set()
 	ui.rb_proc->setChecked(true);
 	ui.cmb_proc->setEnabled(true);
 	ui.txt_pid->setEnabled(false);
+
+	if (proc_data_by_name.IsRunning())
+	{
+		auto pid = ui.txt_pid->text().toULong();
+		if (pid != CurrentPID)
+		{
+			ui.txt_pid->setText(QString::number(CurrentPID));
+			txt_pid_change();
+		}
+	}
 }
 
 void GuiMain::rb_pid_set()
@@ -1058,7 +1334,6 @@ void GuiMain::rb_unset_all()
 	ui.cmb_proc->setEnabled(false);
 	ui.txt_pid->setEnabled(false);
 
-	// turn off all Radio Buttons
 	ui.rb_pid->setAutoExclusive(false);
 	ui.rb_pid->setChecked(false);
 	ui.rb_proc->setChecked(false);
@@ -1075,32 +1350,18 @@ void GuiMain::btn_pick_process_click()
 	framelessPicker.show();
 	gui_Picker->show();
 
-	emit send_to_picker(pss, ps_picker);
+	emit send_to_picker(&proc_state, &proc_data_by_picker);
 }
 
 void GuiMain::cmb_proc_name_change()
 {
-	QString proc = ui.cmb_proc->currentText();
-	Process_Struct pl = getProcessByNameW(proc.toStdWString().c_str());
+	g_print("Attached to process:\n %ls\n %06X (%d)\n", CurrentName.c_str(), CurrentPID, CurrentPID);
 
-	if (!pl.PID)
-	{
-		return;
-	}
-
-	g_print("Attached to process:\n %ls\n %06X (%d)\n", pl.szName, pl.PID, pl.PID);
-
-	old_raw_pid		= pl.PID;
-	old_byname_pid	= pl.PID;
-	old_bypid_pid	= pl.PID;
-
-	memcpy(ps_picker, &pl, sizeof(Process_Struct));
-
-	ui.txt_pid->setText(QString::number(pl.PID));
-	QString new_pid = QString::asprintf("0x%08X", pl.PID);
+	ui.txt_pid->setText(QString::number(CurrentPID));
+	QString new_pid = QString::asprintf("0x%08X", CurrentPID);
 	ui.txt_pid->setToolTip(new_pid);
 
-	if (pl.Arch == ARCH::X64)
+	if (CurrentArchitecture == ARCH::X64)
 	{
 		ui.txt_arch->setToolTip("The target is a 64-bit process.");
 	}
@@ -1109,7 +1370,7 @@ void GuiMain::cmb_proc_name_change()
 #ifdef _WIN64
 		ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
 #else
-		if (!native)
+		if (!g_IsNative)
 		{
 			ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
 		}
@@ -1120,48 +1381,33 @@ void GuiMain::cmb_proc_name_change()
 #endif
 	}
 
-	if (lstrlenW(pl.szPath))
-	{
-		ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
-		ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
-	}
-	else
-	{
-		ui.cmb_proc->setToolTip("Can't resolve filepath.");
-		ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
-		g_print("Can't resolve filepath\n");
-	}
+	ui.cmb_proc->setToolTip(QString::fromStdWString(CurrentPath));
+	ui.lbl_proc_icon->setToolTip(QString::fromStdWString(CurrentPath));
+	ui.txt_arch->setText(QString::fromStdWString(CurrentArchitecture.ToStdWString()));
 
-	ui.txt_arch->setText(QString::fromStdWString(ArchToStrW(pl.Arch)));
-
-	if (ui.cmb_proc->findText(QString::fromWCharArray(pl.szName)) == -1)
+	auto index = ui.cmb_proc->findText(QString::fromStdWString(CurrentName), Qt::MatchFixedString);
+	if (index == -1)
 	{
-		ui.cmb_proc->addItem(QString::fromWCharArray(pl.szName));
-	}
+		ui.cmb_proc->addItem(QString::fromStdWString(CurrentName));
+
+		QStringList list = mod_CmbProcNameModel.stringList();
+		list.sort(Qt::CaseInsensitive);
+		mod_CmbProcNameModel.setStringList(list);
+
+		index = ui.cmb_proc->findText(QString::fromStdWString(CurrentName), Qt::MatchFixedString);
+	}	
+
+	ui.cmb_proc->setCurrentIndex(index);
 }
 
 void GuiMain::txt_pid_change()
 {
-	QString s_PID = ui.txt_pid->text();
-	Process_Struct pl = getProcessByPID(s_PID.toInt());
+	g_print("Attached to process:\n %ls\n %06X (%d)\n", CurrentName.c_str(), CurrentPID, CurrentPID);
 
-	if (!pl.PID)
-	{
-		return;
-	}
-
-	g_print("Attached to process:\n %ls\n %06X (%d)\n", pl.szName, pl.PID, pl.PID);
-
-	old_raw_pid		= pl.PID;
-	old_byname_pid	= pl.PID;
-	old_bypid_pid	= pl.PID;
-
-	memcpy(ps_picker, &pl, sizeof(Process_Struct));
-
-	QString new_pid = QString::asprintf("0x%08X", pl.PID);
+	QString new_pid = QString::asprintf("0x%08X", CurrentPID);
 	ui.txt_pid->setToolTip(new_pid);
 
-	if (pl.Arch == ARCH::X64)
+	if (CurrentArchitecture == ARCH::X64)
 	{
 		ui.txt_arch->setToolTip("The target is a 64-bit process.");
 	}
@@ -1170,7 +1416,7 @@ void GuiMain::txt_pid_change()
 #ifdef _WIN64
 		ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
 #else
-		if (!native)
+		if (!g_IsNative)
 		{
 			ui.txt_arch->setToolTip("The target is a 32-bit process running under WOW64.");
 		}
@@ -1181,26 +1427,23 @@ void GuiMain::txt_pid_change()
 #endif
 	}
 
-	ui.cmb_proc->setCurrentText(QString::fromWCharArray(pl.szName));
+	ui.cmb_proc->setToolTip(QString::fromStdWString(CurrentPath));
+	ui.lbl_proc_icon->setToolTip(QString::fromStdWString(CurrentPath));
+	ui.txt_arch->setText(QString::fromStdWString(CurrentArchitecture.ToStdWString()));
 
-	if (lstrlenW(pl.szPath))
+	auto index = ui.cmb_proc->findText(QString::fromStdWString(CurrentName), Qt::MatchFixedString);
+	if (index == -1)
 	{
-		ui.cmb_proc->setToolTip(QString::fromWCharArray(pl.szPath));
-		ui.lbl_proc_icon->setToolTip(QString::fromWCharArray(pl.szPath));
-	}
-	else
-	{
-		ui.cmb_proc->setToolTip("Can't resolve filepath.");
-		ui.lbl_proc_icon->setToolTip("Can't resolve filepath.");
-		g_print("Can't resolve filepath\n");
+		ui.cmb_proc->addItem(QString::fromStdWString(CurrentName));
+		
+		QStringList list = mod_CmbProcNameModel.stringList();
+		list.sort(Qt::CaseInsensitive);
+		mod_CmbProcNameModel.setStringList(list);
+
+		index = ui.cmb_proc->findText(QString::fromStdWString(CurrentName), Qt::MatchFixedString);
 	}
 
-	ui.txt_arch->setText(QString::fromStdWString(ArchToStrW(pl.Arch)));
-
-	if (ui.cmb_proc->findText(QString::fromWCharArray(pl.szName)) == -1)
-	{
-		ui.cmb_proc->addItem(QString::fromWCharArray(pl.szName));
-	}
+	ui.cmb_proc->setCurrentIndex(index);
 }
 
 void GuiMain::btn_change()
@@ -1215,49 +1458,38 @@ void GuiMain::btn_change()
 		return;
 	}
 
-	QString s_PID = ui.txt_pid->text();
-	Process_Struct pl = getProcessByPID(s_PID.toInt());
+	ProcessData current_data(CurrentPID);
 
-	if (!pl.PID && ui.btn_hooks->isEnabled())
+	if (!current_data.IsRunning())
 	{
 		ui.btn_hooks->setEnabled(false);
 		ui.btn_inject->setEnabled(false);
 	}
-	else if (pl.PID && !ui.btn_hooks->isEnabled())
+	else
 	{
 		ui.btn_hooks->setEnabled(true);
 		ui.btn_inject->setEnabled(true);
 	}
 
-	if (s_PID.toInt() == 1337)
+	if (CurrentPID == 1337)
 	{
 		ui.btn_inject->setEnabled(true);
 	}
 }
 
-void GuiMain::get_from_picker(Process_State_Struct * procStateStruct, Process_Struct * procStruct)
+void GuiMain::get_from_picker()
 {
-	pss			= procStateStruct;
-	ps_picker	= procStruct;
-
 	framelessPicker.hide();
 
-	if (ps_picker->PID)
+	if (proc_data_by_picker.IsValid())
 	{
+		DWORD new_pid = 0;
+		proc_data_by_picker.GetProcessID(new_pid);
 		rb_unset_all();
-		int index = ui.cmb_proc->findText(QString::fromWCharArray(ps_picker->szName));
-		if (index == -1) // check exists
-		{
-			ui.cmb_proc->addItem(QString::fromWCharArray(ps_picker->szName));
-		}
-
-		ui.cmb_proc->setCurrentIndex(ui.cmb_proc->findText(QString::fromWCharArray(ps_picker->szName)));
-		ui.txt_pid->setText(QString::number(ps_picker->PID));
-		ui.txt_arch->setText(QString::fromStdWString(ArchToStrW(ps_picker->Arch)));
-
-		update_proc_icon();
-		txt_pid_change();
+		ui.txt_pid->setText(QString::number(new_pid));
 		rb_pid_set();
+
+		update_process();
 	}
 
 	btn_change();
@@ -1278,16 +1510,16 @@ void GuiMain::get_from_scan_hook()
 	}
 }
 
-void GuiMain::auto_inject()
+void GuiMain::cb_auto_inject()
 {
 	if (ui.cb_auto->isChecked())
 	{
 		// Restart if running
-		t_Auto_Inj->start(200);
+		t_Auto_Inj.start(200);
 	}
 	else
 	{
-		t_Auto_Inj->stop();
+		t_Auto_Inj.stop();
 	}
 }
 
@@ -1295,24 +1527,21 @@ void GuiMain::auto_loop_inject()
 {
 	if (ui.cb_auto->isChecked())
 	{
-		int pid		= 0;
-		ARCH arch	= ARCH::NONE;
+		DWORD			pid	= 0;
+		ARCHITECTURE	proc_arch = ARCH::NONE;
 
-		if (ui.rb_proc->isChecked())
+		if (ui.rb_proc->isChecked() && proc_data_by_name.IsValid())
 		{
-			QString proc = ui.cmb_proc->currentText();
-			Process_Struct pl = getProcessByNameW(proc.toStdWString().c_str());
-			pid		= pl.PID;
-			arch	= pl.Arch;
+			proc_data_by_name.GetProcessID(pid);
+			proc_data_by_name.GetArchitecture(proc_arch);
 		}
-		else
+		else if (proc_data_by_pid.IsValid())
 		{
-			Process_Struct pl = getProcessByPID(ui.txt_pid->text().toInt());
-			pid		= pl.PID;
-			arch	= pl.Arch;
+			proc_data_by_pid.GetProcessID(pid);
+			proc_data_by_pid.GetArchitecture(proc_arch);
 		}
 
-		if (!pid || arch == ARCH::NONE)
+		if (!pid || proc_arch == ARCH::NONE)
 		{
 			return;
 		}
@@ -1320,22 +1549,45 @@ void GuiMain::auto_loop_inject()
 		bool found = false;
 
 		QTreeWidgetItemIterator it(ui.tree_files);
-		for (; *it; ++it)
+		for (; (*it) != Q_NULLPTR; ++it)
 		{
-			if ((*it)->checkState(0) != Qt::CheckState::Checked)
+			if ((*it)->checkState(FILE_LIST_IDX_CHECKBOX) != Qt::CheckState::Checked)
 			{
 				continue;
 			}
 
-			if (!FileExistsW((*it)->text(2).toStdWString().c_str()))
+			if (!FileExistsW((*it)->text(FILE_LIST_IDX_PATH).toStdWString()))
 			{
 				continue;
 			}
 
-			if (StrToArchW((*it)->text(3).toStdWString().c_str()) != arch)
+			auto file_arch = StrToArchW((*it)->text(FILE_LIST_IDX_PLATFORM).toStdWString());
+			if (file_arch == ARCH::NONE)
 			{
 				continue;
 			}
+
+			bool is_dot_net = false;
+			if ((*it)->text(FILE_LIST_IDX_FLAG).toInt() == FILE_LIST_FLAG_DOTNET)
+			{
+				is_dot_net = true;
+			}
+
+			if (proc_arch != file_arch && (!is_dot_net || proc_arch == ARCH::X86))
+			{
+				continue;
+			}
+
+			if (is_dot_net)
+			{
+				auto dot_net_options		= (*it)->text(FILE_LIST_IDX_DOTNET_OPTIONS);
+				auto dot_net_options_list	= dot_net_options.split('!', Qt::SkipEmptyParts);
+
+				if (dot_net_options_list.length() != 3)
+				{
+					continue;
+				}
+			}			
 
 			found = true;
 			break;
@@ -1347,13 +1599,13 @@ void GuiMain::auto_loop_inject()
 		}
 
 		ui.cb_auto->setChecked(false);
-		t_Auto_Inj->stop();
+		t_Auto_Inj.stop();
 
-		emit delay_inject();
+		emit btn_delay_inject();
 	}
 }
 
-void GuiMain::reset_settings()
+void GuiMain::btn_reset_settings()
 {
 	if (!YesNoBox("Reset", "Are you sure you want to reset all settings?", framelessParent))
 	{
@@ -1362,9 +1614,7 @@ void GuiMain::reset_settings()
 
 	onReset = true;
 
-	QFileDialog fDialog(this, "Select dll files", QApplication::applicationDirPath(), "Dynamic Link Libraries (*.dll)");
-
-	QFile iniFile(GH_SETTINGS_INIA);
+	QFile iniFile(QString::fromStdWString(GH_SETTINGS_INIW));
 	if (iniFile.exists())
 	{
 		iniFile.remove();
@@ -1378,14 +1628,14 @@ void GuiMain::reboot()
 	qApp->exit(GuiMain::EXIT_CODE_REBOOT);
 }
 
-void GuiMain::close_clicked()
+void GuiMain::btn_close_clicked()
 {
 	save_settings();
 
 	qApp->exit(GuiMain::EXIT_CODE_CLOSE);
 }
 
-void GuiMain::minimize_clicked()
+void GuiMain::btn_minimize_clicked()
 {
 	framelessParent->on_minimizeButton_clicked();
 }
@@ -1432,7 +1682,7 @@ void GuiMain::update_height()
 	//force window update beacause it doesn't update properly when decreasing the size after launch but all the other times???
 	framelessParent->move(framelessParent->pos());
 
-	t_Update_DragDrop->start(Height_change_delay);
+	t_Update_DragDrop.start(Height_change_delay);
 }
 
 void GuiMain::save_settings()
@@ -1446,28 +1696,54 @@ void GuiMain::save_settings()
 
 	g_print(" Saving settings\n");
 
-	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
+	QSettings settings(QString::fromStdString(GH_SETTINGS_INIA), QSettings::IniFormat);
 	settings.setIniCodec("UTF-8");
 
 	settings.beginWriteArray("FILES");
 
 	QTreeWidgetItemIterator it(ui.tree_files);
-	for (int i = 0; *it; ++it, ++i)
+	for (int i = 0; (*it) != Q_NULLPTR; ++it, ++i)
 	{
-		if (!FileExistsW((*it)->text(2).toStdWString().c_str()))
+		if (!FileExistsW((*it)->text(FILE_LIST_IDX_PATH).toStdWString()))
 		{
 			continue;
 		}
 
 		settings.setArrayIndex(i);
-		settings.setValue(QString::number(0), (*it)->text(2));
-		settings.setValue(QString::number(1), (*it)->checkState(0) != Qt::CheckState::Unchecked);
+		settings.setValue(QString::number(FILE_SETTINGS_IDX_PATH), (*it)->text(FILE_LIST_IDX_PATH));
+		settings.setValue(QString::number(FILE_SETTINGS_IDX_CHECKED), (*it)->checkState(FILE_LIST_IDX_CHECKBOX) != Qt::CheckState::Unchecked);
+
+		auto flag = (*it)->text(FILE_LIST_IDX_FLAG).toInt();
+		settings.setValue(QString::number(FILE_SETTINGS_IDX_FLAG), flag);
+
+		if (flag == FILE_LIST_FLAG_NATIVE)
+		{
+			continue;
+		}
+
+		auto dot_net_options = (*it)->text(FILE_LIST_IDX_DOTNET_OPTIONS);
+		if (dot_net_options.length())
+		{
+			settings.setValue(QString::number(FILE_SETTINGS_IDX_DOTNET_OPTIONS), dot_net_options);
+		}
+
+		auto dot_net_argument = (*it)->text(FILE_LIST_IDX_DOTNET_ARGUMENT);
+		if (dot_net_argument.length())
+		{
+			settings.setValue(QString::number(FILE_SETTINGS_IDX_DOTNET_ARGUMENT), dot_net_argument);
+		}
 	}
 	settings.endArray();
 
 	settings.beginWriteArray("PROCESS");
 	for (int i = 0; i < ui.cmb_proc->count(); i++)
 	{
+		auto val = ui.cmb_proc->itemText(i);
+		if (!val.length())
+		{
+			continue;
+		}
+
 		settings.setArrayIndex(i);
 		settings.setValue(QString::number(0), ui.cmb_proc->itemText(i));
 	}
@@ -1499,7 +1775,7 @@ void GuiMain::save_settings()
 		settings.setValue("THREADTID", ui.cb_threadTID->isChecked());
 	}
 
-	if (native)
+	if (g_IsNative)
 	{
 		settings.setValue("HIJACK", ui.cb_hijack->isChecked());
 	}
@@ -1521,11 +1797,13 @@ void GuiMain::save_settings()
 	settings.setValue("DLLMAIN", ui.cb_main->isChecked());
 	settings.setValue("LDRLOCK", ui.cb_ldrlock->isChecked());
 	settings.setValue("SHIFT", ui.cb_shift->isChecked());
+	settings.setValue("MEMORY", ui.cb_memory->isChecked());
+	//settings.setValue("LINK", ui.cb_link->isChecked());
 
 	// Process picker
-	settings.setValue("PROCNAMEFILTER", pss->txtFilter);
-	settings.setValue("PROCESSTYPE", pss->cmbArch);
-	settings.setValue("CURRENTSESSION", pss->cbSession);
+	settings.setValue("PROCNAMEFILTER", proc_state.txtFilter);
+	settings.setValue("PROCESSTYPE", proc_state.cmbArch);
+	settings.setValue("CURRENTSESSION", proc_state.cbSession);
 
 	// Info
 	settings.setValue("TOOLTIPSON", tooltipsEnabled);
@@ -1547,7 +1825,7 @@ void GuiMain::load_settings()
 {
 	g_print(" Loading settings\n");
 
-	QFile iniFile(GH_SETTINGS_INIA);
+	QFile iniFile(QString::fromStdString(GH_SETTINGS_INIA));
 	if (!iniFile.exists())
 	{
 		default_settings();
@@ -1555,7 +1833,7 @@ void GuiMain::load_settings()
 		return;
 	}
 
-	QSettings settings(GH_SETTINGS_INIA, QSettings::IniFormat);
+	QSettings settings(QString::fromStdString(GH_SETTINGS_INIA), QSettings::IniFormat);
 	settings.setIniCodec("UTF-8");
 
 	int fileSize = settings.beginReadArray("FILES");
@@ -1563,9 +1841,40 @@ void GuiMain::load_settings()
 	{
 		settings.setArrayIndex(i);
 
-		auto path = settings.value(QString::number(0), "").toString();
+		auto path = settings.value(QString::number(FILE_SETTINGS_IDX_PATH), "").toString();
+		auto flag = settings.value(QString::number(FILE_SETTINGS_IDX_FLAG), "").toInt();
 
-		add_file_to_list(path, settings.value(QString::number(1)).toBool());
+		auto new_item = add_file_to_list(path, settings.value(QString::number(FILE_SETTINGS_IDX_CHECKED)).toBool(), flag);
+		if (!new_item)
+		{
+			continue;
+		}
+
+		if (flag == FILE_LIST_FLAG_NATIVE)
+		{
+			continue;
+		}
+
+		auto dot_net_options = settings.value(QString::number(FILE_SETTINGS_IDX_DOTNET_OPTIONS), "").toString();
+		if (dot_net_options.length() != 0)
+		{
+			new_item->setText(FILE_LIST_IDX_DOTNET_OPTIONS, dot_net_options);
+		}
+
+		auto dot_net_argument = settings.value(QString::number(FILE_SETTINGS_IDX_DOTNET_ARGUMENT), "").toString();
+		if (dot_net_argument.length() != 0)
+		{
+			new_item->setText(FILE_LIST_IDX_DOTNET_ARGUMENT, dot_net_argument);
+		}
+
+		DotNetOptionsTree * new_tree = nullptr;
+
+		if (!parse_dot_net_data(new_item, new_tree))
+		{
+			g_print("Failed to parse .NET data of:\n%ls\n", new_item->text(FILE_LIST_IDX_NAME).toStdWString().c_str());
+		}
+
+		new_item->setText(FILE_LIST_IDX_DOTNET_PARSER, QString::number(reinterpret_cast<UINT_PTR>(new_tree), 0x10));
 	}
 	settings.endArray();
 
@@ -1573,7 +1882,13 @@ void GuiMain::load_settings()
 	for (int i = 0; i < procSize; ++i)
 	{
 		settings.setArrayIndex(i);
-		ui.cmb_proc->addItem(settings.value(QString::number(0), "").toString());
+		auto val = settings.value(QString::number(0), "").toString();
+		if (!val.length())
+		{
+			continue;
+		}
+
+		ui.cmb_proc->addItem(val);
 	}
 
 	settings.endArray();
@@ -1597,6 +1912,7 @@ void GuiMain::load_settings()
 	if (settings.value("PROCESSBYNAME", true).toBool())
 	{
 		rb_process_set();
+		ui.txt_pid->setText(QString::number(0));
 	}
 	else
 	{
@@ -1634,11 +1950,13 @@ void GuiMain::load_settings()
 	ui.cb_main->setChecked(settings.value("DLLMAIN", false).toBool());
 	ui.cb_ldrlock->setChecked(settings.value("LDRLOCK", false).toBool());
 	ui.cb_shift->setChecked(settings.value("SHIFT", false).toBool());
+	ui.cb_memory->setChecked(settings.value("MEMORY", false).toBool());
+	//ui.cb_link->setChecked(settings.value("LINK", false).toBool());
 
 	// Process picker
-	pss->txtFilter	= settings.value("PROCNAMEFILTER", "").toString();
-	pss->cmbArch	= settings.value("PROCESSTYPE", 0).toInt();
-	pss->cbSession	= settings.value("CURRENTSESSION", true).toBool();
+	proc_state.txtFilter	= settings.value("PROCNAMEFILTER", "").toString();
+	proc_state.cmbArch		= settings.value("PROCESSTYPE", 0).toInt();
+	proc_state.cbSession	= settings.value("CURRENTSESSION", true).toBool();
 
 	// Info
 	tooltipsEnabled = !settings.value("TOOLTIPSON", true).toBool();
@@ -1674,16 +1992,16 @@ void GuiMain::default_settings()
 	lastPathStr = QApplication::applicationDirPath();
 	ui.cmb_proc->setEditText("Broihon.exe");
 	ui.txt_pid->setText("1337");
-	ignoreUpdate	= false;
-	tooltipsEnabled = false;
-	dockIndex		= DOCK_RIGHT;
-	pss->cbSession	= true;
-	hijackWarning	= true;
+	ignoreUpdate			= false;
+	tooltipsEnabled			= false;
+	dockIndex				= DOCK_RIGHT;
+	proc_state.cbSession	= true;
+	hijackWarning			= true;
 
 	save_settings();
 }
 
-void GuiMain::load_change(int index)
+void GuiMain::cmb_load_change(int index)
 {
 	Q_UNUSED(index);
 
@@ -1714,7 +2032,7 @@ void GuiMain::load_change(int index)
 	if (mode != INJECTION_MODE::IM_ManualMap && ui.fr_adv->isVisible())
 	{
 		ui.fr_adv->setVisible(false);
-		ui.cb_unlink->setEnabled(true);
+		ui.cb_unlink->setEnabled(true);		
 
 		update_height();
 	}
@@ -1730,7 +2048,7 @@ void GuiMain::load_change(int index)
 	}
 }
 
-void GuiMain::create_change(int index)
+void GuiMain::cmb_create_change(int index)
 {
 	Q_UNUSED(index);
 
@@ -1776,7 +2094,7 @@ void GuiMain::create_change(int index)
 	}
 }
 
-void GuiMain::peh_change(int index)
+void GuiMain::cmb_peh_change(int index)
 {
 	index = ui.cmb_peh->currentIndex();
 	switch (index)
@@ -1845,7 +2163,7 @@ void GuiMain::cb_hijack_clicked()
 {
 	if (hijackWarning && ui.cb_hijack->isChecked())
 	{
-		auto ret = YesNoBox("Warning", "This option will try to hijack a handle from another process\nwhich can be a system process.\nUnder rare circumstances this can cause a crash.\nDo you want to enable this option anyway?", framelessParent);
+		auto ret = YesNoBox("Warning", "This option will try to hijack a handle from another process\nwhich can be a system process.\nUnder rare circumstances this can cause a system crash.\nDo you want to enable this option anyway?", framelessParent, QMessageBox::Icon::Warning);
 		if (!ret)
 		{
 			ui.cb_hijack->setChecked(false);
@@ -1857,7 +2175,7 @@ void GuiMain::cb_hijack_clicked()
 	}
 }
 
-void GuiMain::add_file_dialog()
+void GuiMain::btn_add_file_dialog()
 {
 	QFileDialog fDialog(this, "Select dll files", lastPathStr, "Dynamic Link Libraries (*.dll)");
 	fDialog.setFileMode(QFileDialog::ExistingFiles);
@@ -1880,34 +2198,37 @@ void GuiMain::add_file_dialog()
 	lastPathStr = QFileInfo(fDialog.selectedFiles().first()).path();
 }
 
-void GuiMain::add_file_to_list(QString str, bool active)
+QTreeWidgetItem * GuiMain::add_file_to_list(QString path, bool active, int flag)
 {
 #ifndef _WIN64
-	if (!native)
+	if (!g_IsNative)
 	{
-		str.replace(":/Windows/System32/", ":/Windows/Sysnative/", Qt::CaseSensitivity::CaseInsensitive);
+		path.replace(":/Windows/System32/", ":/Windows/Sysnative/", Qt::CaseSensitivity::CaseInsensitive);
 	}
 #else
-	str.replace(":/Windows/Sysnative/", ":/Windows/System32/", Qt::CaseSensitivity::CaseInsensitive);
+	path.replace(":/Windows/Sysnative/", ":/Windows/System32/", Qt::CaseSensitivity::CaseInsensitive);
 #endif
 
-	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
+	QTreeWidgetItemIterator it(ui.tree_files);
+	for (; (*it) != Q_NULLPTR; ++it)
 	{
-		if ((*it)->text(2) == str)
+		if ((*it)->text(FILE_LIST_IDX_PATH) == path)
 		{
-			g_print("File already in the list: %ls\n", str.toStdWString().c_str());
+			g_print("File already in the list: %ls\n", path.toStdWString().c_str());
 
-			return;
+			return (*it);
 		}
 	}
 
-	QFileInfo fi(str);
+	QFileInfo fi(path);
 	auto abs_path = fi.absoluteFilePath().toStdWString();
 
-	ARCH arch = getFileArchW(abs_path.c_str());
+	bool is_dot_net = false;
+
+	auto arch = GetFileArchitectureW(abs_path.c_str(), is_dot_net);
 	if (arch == ARCH::NONE)
 	{
-		return;
+		return Q_NULLPTR;
 	}
 
 	HANDLE hFile = CreateFileW(abs_path.c_str(), SYNCHRONIZE, FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -1915,7 +2236,7 @@ void GuiMain::add_file_to_list(QString str, bool active)
 	{
 		g_print("CreateFileW failed: %08X\n", GetLastError());
 
-		return;
+		return Q_NULLPTR;
 	}
 
 	auto * item = new(std::nothrow) QTreeWidgetItem(ui.tree_files);
@@ -1925,19 +2246,52 @@ void GuiMain::add_file_to_list(QString str, bool active)
 
 		CloseHandle(hFile);
 
-		return;
+		return Q_NULLPTR;
 	}
 
-	item->setCheckState(0, Qt::CheckState::Unchecked);
-	item->setText(1, fi.fileName());
-	item->setText(2, fi.absoluteFilePath());
-	item->setText(3, QString::fromStdWString(ArchToStrW(arch)));
+	item->setCheckState(FILE_LIST_IDX_CHECKBOX, Qt::CheckState::Unchecked);
+	item->setText(FILE_LIST_IDX_NAME, fi.fileName());
+	item->setText(FILE_LIST_IDX_PATH, fi.absoluteFilePath());
+	item->setText(FILE_LIST_IDX_PLATFORM, QString::fromStdWString(arch.ToStdWString()));
+	item->setText(FILE_LIST_IDX_FLAG, QString::number(flag));
 
-#ifdef _WIN64
-	item->setText(4, QString::number(reinterpret_cast<qulonglong>(hFile), 0x10));
-#else
-	item->setText(4, QString::number(reinterpret_cast<unsigned long>(hFile), 0x10));
-#endif
+	if (is_dot_net)
+	{
+		auto btn_options = new(std::nothrow) QPushButton(this);
+		if (btn_options == Q_NULLPTR)
+		{
+			g_print("Failed to create a button\n");
+
+			SAFE_DELETE(item);
+			CloseHandle(hFile);
+
+			return Q_NULLPTR;
+		}
+
+		btn_options->setFixedWidth(20);
+		btn_options->setFixedHeight(20);
+		btn_options->setIcon(QIcon(":/GuiMain/gh_resource/cog.ico"));
+		btn_options->setToolTip("Configure .NET launch options");
+		
+		ui.tree_files->setItemWidget(item, FILE_LIST_IDX_BUTTON_OPTIONS, btn_options);
+		connect(btn_options, SIGNAL(clicked()), this, SLOT(dot_net_options()));
+
+		if (flag == FILE_LIST_FLAG_NATIVE)
+		{
+			item->setText(FILE_LIST_IDX_FLAG, QString::number(FILE_LIST_FLAG_DOTNET));
+		}
+
+		DotNetOptionsTree * new_tree = nullptr;
+
+		if (!parse_dot_net_data(item, new_tree))
+		{
+			g_print("Failed to parse .NET data of:\n%ls\n", item->text(FILE_LIST_IDX_NAME).toStdWString().c_str());
+		}
+
+		item->setText(FILE_LIST_IDX_DOTNET_PARSER, QString::number(reinterpret_cast<UINT_PTR>(new_tree), 0x10));
+	}
+
+	item->setText(FILE_LIST_IDX_FILEHANDLE, QString::number(reinterpret_cast<UINT_PTR>(hFile), 0x10));
 
 	if (active)
 	{
@@ -1946,35 +2300,37 @@ void GuiMain::add_file_to_list(QString str, bool active)
 
 	if (ui.btn_tooltip->isChecked())
 	{
-		item->setToolTip(1, fi.fileName());
-		item->setToolTip(2, fi.absoluteFilePath());
+		item->setToolTip(FILE_LIST_IDX_NAME, fi.fileName());
+		item->setToolTip(FILE_LIST_IDX_PATH, fi.absoluteFilePath());
 	}
 
 #ifndef _WIN64
 	if (arch != ARCH::X86)
 	{
 		item->setHidden(true);
-		item->setCheckState(0, Qt::CheckState::Unchecked);
+		item->setCheckState(FILE_LIST_IDX_CHECKBOX, Qt::CheckState::Unchecked);
 	}
 #endif
 
 	g_print("Added file: %ls\n", abs_path.c_str());
+
+	return item;
 }
 
-void GuiMain::remove_file()
+void GuiMain::btn_remove_file()
 {
 	QList<QTreeWidgetItem *> item = ui.tree_files->selectedItems();
 
 	for (auto i : item)
 	{
-		g_print("Removed file: %ls\n", i->text(2).toStdWString().c_str());
+		g_print("Removed file: %ls\n", i->text(FILE_LIST_IDX_PATH).toStdWString().c_str());
 
 		bool b_ok = false;
 
 #ifdef _WIN64
-		HANDLE hFile = (HANDLE)(i->text(4).toULongLong(&b_ok, 0x10));
+		HANDLE hFile = (HANDLE)(i->text(FILE_LIST_IDX_FILEHANDLE).toULongLong(&b_ok, 0x10));
 #else
-		HANDLE hFile = (HANDLE)(i->text(4).toULong(&b_ok, 0x10));
+		HANDLE hFile = (HANDLE)(i->text(FILE_LIST_IDX_FILEHANDLE).toULong(&b_ok, 0x10));
 #endif
 
 		if (b_ok)
@@ -1982,11 +2338,24 @@ void GuiMain::remove_file()
 			CloseHandle(hFile);
 		}
 
+		if (i->text(FILE_LIST_IDX_FLAG) != FILE_LIST_FLAG_NATIVE)
+		{
+			b_ok = false;
+
+#ifdef _WIN64
+			auto parser = reinterpret_cast<DotNetOptionsTree *>(i->text(FILE_LIST_IDX_DOTNET_PARSER).toULongLong(&b_ok, 0x10));
+#else
+			auto parser = reinterpret_cast<DotNetOptionsTree *>(i->text(FILE_LIST_IDX_DOTNET_PARSER).toULong(&b_ok, 0x10));
+#endif
+
+			SAFE_DELETE(parser);
+		}
+
 		delete i;
 	}
 }
 
-void GuiMain::select_file()
+void GuiMain::tree_select_file()
 {
 	QList<QTreeWidgetItem *> item = ui.tree_files->selectedItems();
 
@@ -1995,7 +2364,7 @@ void GuiMain::select_file()
 		return;
 	}
 
-	auto path = item[0]->text(2);
+	auto path = item[0]->text(FILE_LIST_IDX_PATH);
 	path.replace('/', '\\');
 	
 	g_print("Opening explorer: %ls\n", path.toStdWString().c_str());
@@ -2015,7 +2384,7 @@ void GuiMain::select_file()
 	}
 }
 
-void GuiMain::delay_inject()
+void GuiMain::btn_delay_inject()
 {
 	int id = ui.txt_pid->text().toInt();
 	if (id == 1337)
@@ -2044,7 +2413,7 @@ void GuiMain::delay_inject()
 	int delay = ui.sp_delay->value();
 	if (delay > 0)
 	{
-		t_Delay_Inj->start(delay);
+		t_Delay_Inj.start(delay);
 	}
 	else
 	{
@@ -2057,19 +2426,21 @@ void GuiMain::inject_file()
 	INJECTIONDATAW inj_data;
 	memset(&inj_data, 0, sizeof(INJECTIONDATAW));
 
-	ARCH file_arch = ARCH::NONE;
-	ARCH proc_arch = ARCH::NONE;
+	DOTNET_INJECTIONDATAW dot_net_inj_data;
+	memset(&dot_net_inj_data, 0, sizeof(DOTNET_INJECTIONDATAW));
 
-	// Process ID
+	MEMORY_INJECTIONDATA memory_inj_data;
+	memset(&memory_inj_data, 0, sizeof(MEMORY_INJECTIONDATA));
+
+	ARCHITECTURE file_arch;
+	ARCHITECTURE proc_arch;
+
 	if (ui.rb_pid->isChecked())
 	{
-		int id = ui.txt_pid->text().toInt();
-		Process_Struct ps = getProcessByPID(id);
-
-		if (ps.PID && ps.Arch != ARCH::NONE)
+		if (proc_data_by_pid.IsValid())
 		{
-			inj_data.ProcessID	= ps.PID;
-			proc_arch			= ps.Arch;
+			proc_data_by_pid.GetProcessID(inj_data.ProcessID);
+			proc_data_by_pid.GetArchitecture(proc_arch);
 		}
 		else
 		{
@@ -2078,15 +2449,12 @@ void GuiMain::inject_file()
 			return;
 		}
 	}
-	else // Process Name
+	else
 	{
-		int index = ui.cmb_proc->currentIndex();
-		Process_Struct ps = getProcessByNameW(ui.cmb_proc->itemText(index).toStdWString().c_str());
-
-		if (ps.PID && ps.Arch != ARCH::NONE)
+		if (proc_data_by_name.IsValid())
 		{
-			inj_data.ProcessID	= ps.PID;
-			proc_arch			= ps.Arch;
+			proc_data_by_name.GetProcessID(inj_data.ProcessID);
+			proc_data_by_name.GetArchitecture(proc_arch);
 		}
 		else
 		{
@@ -2098,21 +2466,21 @@ void GuiMain::inject_file()
 
 	switch (ui.cmb_load->currentIndex())
 	{
-		case 1:  inj_data.Mode = INJECTION_MODE::IM_LdrLoadDll;				break;
-		case 2:  inj_data.Mode = INJECTION_MODE::IM_LdrpLoadDll;			break;
-		case 3:  inj_data.Mode = INJECTION_MODE::IM_LdrpLoadDllInternal;	break;
-		case 4:  inj_data.Mode = INJECTION_MODE::IM_ManualMap;				break;
-		default: inj_data.Mode = INJECTION_MODE::IM_LoadLibraryExW;			break;
+	case 1:  inj_data.Mode = INJECTION_MODE::IM_LdrLoadDll;				break;
+	case 2:  inj_data.Mode = INJECTION_MODE::IM_LdrpLoadDll;			break;
+	case 3:  inj_data.Mode = INJECTION_MODE::IM_LdrpLoadDllInternal;	break;
+	case 4:  inj_data.Mode = INJECTION_MODE::IM_ManualMap;				break;
+	default: inj_data.Mode = INJECTION_MODE::IM_LoadLibraryExW;			break;
 	}
 
 	switch (ui.cmb_create->currentIndex())
 	{
-		case 1:  inj_data.Method = LAUNCH_METHOD::LM_HijackThread;		break;
-		case 2:  inj_data.Method = LAUNCH_METHOD::LM_SetWindowsHookEx;	break;
-		case 3:  inj_data.Method = LAUNCH_METHOD::LM_QueueUserAPC;		break;
-		case 4:  inj_data.Method = LAUNCH_METHOD::LM_KernelCallback;	break;
-		case 5:	 inj_data.Method = LAUNCH_METHOD::LM_FakeVEH;			break;
-		default: inj_data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;	break;
+	case 1:  inj_data.Method = LAUNCH_METHOD::LM_HijackThread;		break;
+	case 2:  inj_data.Method = LAUNCH_METHOD::LM_SetWindowsHookEx;	break;
+	case 3:  inj_data.Method = LAUNCH_METHOD::LM_QueueUserAPC;		break;
+	case 4:  inj_data.Method = LAUNCH_METHOD::LM_KernelCallback;	break;
+	case 5:	 inj_data.Method = LAUNCH_METHOD::LM_FakeVEH;			break;
+	default: inj_data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;	break;
 	}
 
 	if (ui.cmb_peh->currentIndex() == 1)	inj_data.Flags |= INJ_ERASE_HEADER;
@@ -2143,6 +2511,7 @@ void GuiMain::inject_file()
 		if (ui.cb_main->isChecked())		inj_data.Flags |= INJ_MM_RUN_DLL_MAIN;
 		if (ui.cb_ldrlock->isChecked())		inj_data.Flags |= INJ_MM_RUN_UNDER_LDR_LOCK;
 		if (ui.cb_shift->isChecked())		inj_data.Flags |= INJ_MM_SHIFT_MODULE_BASE;
+		if (ui.cb_memory->isChecked())		inj_data.Flags |= INJ_MM_MAP_FROM_MEMORY;
 	}
 
 	inj_data.GenerateErrorLog = ui.cb_error->isChecked();
@@ -2155,6 +2524,25 @@ void GuiMain::inject_file()
 	else
 	{
 		inj_data.Timeout = 2000;
+	}
+
+	if (inj_data.Mode != INJECTION_MODE::IM_ManualMap)
+	{
+		dot_net_inj_data.ProcessID			= inj_data.ProcessID;
+		dot_net_inj_data.Mode				= inj_data.Mode;
+		dot_net_inj_data.Method				= inj_data.Method;
+		dot_net_inj_data.Flags				= inj_data.Flags;
+		dot_net_inj_data.Timeout			= inj_data.Timeout;
+		dot_net_inj_data.GenerateErrorLog	= inj_data.GenerateErrorLog;
+	}
+	else if (inj_data.Flags & INJ_MM_MAP_FROM_MEMORY)
+	{		
+		memory_inj_data.ProcessID			= inj_data.ProcessID;
+		memory_inj_data.Mode				= inj_data.Mode;
+		memory_inj_data.Method				= inj_data.Method;
+		memory_inj_data.Flags				= inj_data.Flags;
+		memory_inj_data.Timeout				= inj_data.Timeout;
+		memory_inj_data.GenerateErrorLog	= inj_data.GenerateErrorLog;
 	}
 
 	if (!InjLib.LoadingStatus())
@@ -2177,39 +2565,63 @@ void GuiMain::inject_file()
 
 		return;
 	}
-	
-	std::vector<std::pair<std::wstring, ARCH>> items;
 
-	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
+	std::vector<std::wstring> items; //native dlls: { path }
+	std::vector<std::pair<std::wstring, std::vector<std::wstring>>> dot_net_items; //dot net dlls: { path, { namespace, class, method, arg }}
+
+	QTreeWidgetItemIterator it(ui.tree_files);
+	for (; (*it) != Q_NULLPTR; ++it)
 	{
-		if ((*it)->checkState(0) != Qt::CheckState::Checked)
+		if ((*it)->checkState(FILE_LIST_IDX_CHECKBOX) != Qt::CheckState::Checked)
 		{
 			continue;
 		}
 
-		file_arch = StrToArchW((*it)->text(3).toStdWString().c_str());
+		file_arch = StrToArchW((*it)->text(FILE_LIST_IDX_PLATFORM).toStdWString());
 		if (file_arch == ARCH::NONE)
 		{
 			continue;
 		}
 
-		if (proc_arch != file_arch)
+		bool is_dot_net = false;
+		if ((*it)->text(FILE_LIST_IDX_FLAG).toInt() == FILE_LIST_FLAG_DOTNET)
+		{
+			is_dot_net = true;
+		}
+
+		if (proc_arch != file_arch && (!is_dot_net || proc_arch == ARCH::X86))
 		{
 			continue;
 		}
 
-		if (!FileExistsW((*it)->text(2).toStdWString().c_str()))
-		{
-			continue;
-		}
-
-		QString fileStr = (*it)->text(2);
+		QString fileStr = (*it)->text(FILE_LIST_IDX_PATH);
 		fileStr.replace('/', '\\');
-	
-		items.push_back(std::pair(fileStr.toStdWString(), file_arch));
+
+		if (!FileExistsW(fileStr.toStdWString()))
+		{
+			continue;
+		}
+
+		if (is_dot_net)
+		{
+			auto dot_net_arg = (*it)->text(FILE_LIST_IDX_DOTNET_ARGUMENT);
+			auto dot_net_options = (*it)->text(FILE_LIST_IDX_DOTNET_OPTIONS);
+			auto dot_net_options_list = dot_net_options.split('!', Qt::SkipEmptyParts);
+
+			if (dot_net_options_list.length() != 3)
+			{
+				continue;
+			}
+
+			dot_net_items.push_back({ fileStr.toStdWString(), { dot_net_options_list.at(0).toStdWString(), dot_net_options_list.at(1).toStdWString(), dot_net_options_list.at(2).toStdWString(), dot_net_arg.toStdWString()} }); //good code
+		}
+		else
+		{
+			items.push_back(fileStr.toStdWString());
+		}
 	}
 
-	if (items.empty())
+	if (items.empty() && dot_net_items.empty())
 	{
 		emit StatusBox(false, "No file(s) selected");
 
@@ -2218,6 +2630,7 @@ void GuiMain::inject_file()
 
 	std::vector<std::string> results;
 	int inj_count = 1;
+	int dot_net_inj_count = 1;
 
 	auto good_sleep = [](DWORD time)
 	{
@@ -2230,7 +2643,7 @@ void GuiMain::inject_file()
 
 		auto current = GetTickCount64();
 		auto t = current + time;
-	
+
 		while (current < t)
 		{
 			QCoreApplication::processEvents();
@@ -2238,28 +2651,97 @@ void GuiMain::inject_file()
 			g_Console->update_external();
 
 			auto elapsed = current - GetTickCount64();
-			
+
 			if (elapsed < 10)
 			{
 				Sleep(10 - (DWORD)elapsed);
 			}
-			
+
 			current += 10;
 		}
 	};
 
+	auto copy_string_w_s = [](const std::wstring & src, wchar_t * dest, size_t cb) -> bool
+	{
+		auto len = src.length();
+		auto max_len = cb / sizeof(wchar_t) - 1;
+
+		if (len >= max_len)
+		{
+			g_print("String exceeds %d characters (%d required):\n\t%ls\n", max_len, len + 1, src.c_str());
+
+			return false;
+		}
+
+		src.copy(dest, src.length());
+		dest[len] = 0;
+
+		return true;
+	};
+
+	auto map_file = [](const INJECTIONDATAW & src, MEMORY_INJECTIONDATA & dest) -> bool
+	{
+		std::ifstream File(src.szDllPath, std::ios::binary | std::ios::ate);
+		if (!File.good())
+		{
+			g_print("Can't open file:\n\t%ls\n", src.szDllPath);
+
+			return false;
+		}
+
+		dest.RawSize = static_cast<DWORD>(File.tellg());
+		dest.RawData = new(std::nothrow) BYTE[dest.RawSize];
+		if (!dest.RawData)
+		{
+			g_print("Memory allocation of %08X bytes failed for:\n\t%ls\n", dest.RawSize, src.szDllPath);
+
+			return false;
+		}
+
+		File.seekg(0, std::ios::beg);
+		File.read(reinterpret_cast<char *>(dest.RawData), dest.RawSize);
+		File.close();
+
+		return true;
+	};
+
+	bool fromMemory = false;
+	if (inj_data.Mode == INJECTION_MODE::IM_ManualMap && (inj_data.Flags & INJ_MM_MAP_FROM_MEMORY))
+	{
+		fromMemory = true;
+	}
+
 	for (const auto & i : items)
 	{
-		wcscpy_s(inj_data.szDllPath, i.first.c_str());
+		if (!copy_string_w_s(i, inj_data.szDllPath, sizeof(inj_data.szDllPath)))
+		{
+			continue;
+		}
 
-		auto dll_name_pos = i.first.find_last_of('\\') + 1;
-		auto dll_name = i.first.substr(dll_name_pos);
+		if (fromMemory)
+		{
+			if (!map_file(inj_data, memory_inj_data))
+			{
+				continue;
+			}
+		}
+
+		auto dll_name_pos = i.find_last_of('\\') + 1;
+		auto dll_name = i.substr(dll_name_pos);
 
 		DWORD res = 0;
 
 		g_print("Launching injection thread\n");
 
-		std::shared_future<DWORD> inj_result = std::async(std::launch::async, &InjectionLib::InjectW, &InjLib, &inj_data);
+		std::shared_future<DWORD> inj_result;
+		if (fromMemory)
+		{
+			inj_result = std::async(std::launch::async, &InjectionLib::Memory_Inject, &InjLib, &memory_inj_data);
+		}
+		else
+		{
+			inj_result = std::async(std::launch::async, &InjectionLib::InjectW, &InjLib, &inj_data);
+		}
 
 		auto end_tick = GetTickCount64() + inj_data.Timeout + 500;
 		while (inj_result.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready && end_tick > GetTickCount64())
@@ -2276,6 +2758,11 @@ void GuiMain::inject_file()
 			if (success)
 			{
 				g_print("Interrupted injection thread successfully\n");
+
+				if (fromMemory)
+				{
+					delete[] memory_inj_data.RawData;
+				}
 			}
 			else
 			{
@@ -2291,6 +2778,11 @@ void GuiMain::inject_file()
 			res = inj_result.get();
 		}
 
+		if (fromMemory)
+		{
+			delete[] memory_inj_data.RawData;
+		}
+
 		char buffer[MAX_PATH * 2]{ 0 };
 
 		if (res != 0)
@@ -2300,7 +2792,13 @@ void GuiMain::inject_file()
 		}
 		else
 		{
-			sprintf_s(buffer, "Injection (%d/%d) succeeded:\n  %ls = %p\n", inj_count, (int)items.size(), dll_name.c_str(), inj_data.hDllOut);
+			auto result = inj_data.hDllOut;
+			if (fromMemory)
+			{
+				result = memory_inj_data.hDllOut;
+			}
+
+			sprintf_s(buffer, "Injection (%d/%d) succeeded:\n  %ls = %p\n", inj_count, (int)items.size(), dll_name.c_str(), result);
 		}
 
 		results.push_back(std::string(buffer));
@@ -2308,6 +2806,96 @@ void GuiMain::inject_file()
 		g_print("Injection %d/%d finished\n", inj_count, items.size());
 
 		++inj_count;
+	}
+
+	for (const auto & i : dot_net_items)
+	{
+		if (!copy_string_w_s(i.first, dot_net_inj_data.szDllPath, sizeof(dot_net_inj_data.szDllPath)))
+		{
+			continue;
+		}
+
+		auto & Namespace	= i.second.at(0);
+		auto & ClassName	= i.second.at(1);
+		auto & MethodName	= i.second.at(2);
+		auto & Argument		= i.second.at(3);
+
+		if (!copy_string_w_s(Namespace, dot_net_inj_data.szNamespace, sizeof(dot_net_inj_data.szNamespace)))
+		{
+			continue;
+		}
+
+		if (!copy_string_w_s(ClassName, dot_net_inj_data.szClassName, sizeof(dot_net_inj_data.szClassName)))
+		{
+			continue;
+		}
+
+		if (!copy_string_w_s(MethodName, dot_net_inj_data.szMethodName, sizeof(dot_net_inj_data.szMethodName)))
+		{
+			continue;
+		}
+
+		if (!copy_string_w_s(Argument, dot_net_inj_data.szArgument, sizeof(dot_net_inj_data.szArgument)))
+		{
+			continue;
+		}
+
+		auto dll_name_pos = i.first.find_last_of('\\') + 1;
+		auto dll_name = i.first.substr(dll_name_pos);
+
+		DWORD res = 0;
+
+		g_print("Launching .NET injection thread\n");
+
+		std::shared_future<DWORD> inj_result = std::async(std::launch::async, &InjectionLib::DotNet_InjectW, &InjLib, &dot_net_inj_data);
+
+		auto end_tick = GetTickCount64() + inj_data.Timeout + 500;
+		while (inj_result.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready && end_tick > GetTickCount64())
+		{
+			good_sleep(50);
+		}
+
+		if (inj_result.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready)
+		{
+			bool success = InjLib.InterruptInjection();
+
+			g_print(".NET injection thread timed out\n");
+
+			if (success)
+			{
+				g_print("Interrupted .NET injection thread successfully\n");
+			}
+			else
+			{
+				g_print("Failed to interrupt .NET injection thread\n");
+			}
+
+			return;
+		}
+		else
+		{
+			g_print(".NET Injection thread returned\n");
+
+			res = inj_result.get();
+		}
+
+		char buffer[MAX_PATH * 2]{ 0 };
+
+		if (res != 0)
+		{
+			sprintf_s(buffer, ".NET injection (%d/%d) failed:\n  Error = %08X\n", dot_net_inj_count, (int)dot_net_items.size(), res);
+			g_print("Check the error log for more information\n");
+		}
+		else
+		{
+			sprintf_s(buffer, ".NET injection (%d/%d) succeeded:\n  %ls = %p\n", dot_net_inj_count, (int)dot_net_items.size(), dll_name.c_str(), dot_net_inj_data.hDllOut);
+		}
+
+		results.push_back(std::string(buffer));
+
+		g_print(".NET injection %d/%d finished\n", dot_net_inj_count, dot_net_items.size());
+
+		++dot_net_inj_count;
 	}
 
 	if (ui.cb_close->isChecked())
@@ -2323,25 +2911,30 @@ void GuiMain::inject_file()
 	}
 }
 
-void GuiMain::tooltip_change()
+void GuiMain::btn_tooltip_change()
 {
 	int duration = 1;
+	int duration_perma = -1;
 
 	if (!tooltipsEnabled)
 	{
 		duration = -1;
-		ui.btn_tooltip->setText("Disable tooltips");
+		ui.btn_tooltip->setText("&Disable tooltips");
 		tooltipsEnabled = true;
 
 		g_print("Tooltips enabled\n");
 	}
 	else
 	{
-		ui.btn_tooltip->setText("Enable tooltips");
+		ui.btn_tooltip->setText("&Enable tooltips");
 		tooltipsEnabled = false;
 
 		g_print("Tooltips disabled\n");
 	}
+
+	//always enabled
+	ui.txt_pid->setToolTipDuration(duration_perma);
+	ui.lbl_proc_icon->setToolTipDuration(duration_perma);
 
 	// Settings
 	ui.lbl_proc->setToolTipDuration(duration);
@@ -2350,11 +2943,9 @@ void GuiMain::tooltip_change()
 
 	ui.lbl_pid->setToolTipDuration(duration);
 	ui.rb_pid->setToolTipDuration(duration);
-	ui.txt_pid->setToolTipDuration(duration);
 	ui.btn_proc->setToolTipDuration(duration);
 	ui.txt_arch->setToolTipDuration(duration);
 	ui.lbl_arch->setToolTipDuration(duration);
-	ui.lbl_proc_icon->setToolTipDuration(duration);
 
 	ui.sp_delay->setToolTipDuration(duration);
 	ui.cb_close->setToolTipDuration(duration);
@@ -2385,6 +2976,8 @@ void GuiMain::tooltip_change()
 	ui.cb_main->setToolTipDuration(duration);
 	ui.cb_ldrlock->setToolTipDuration(duration);
 	ui.cb_shift->setToolTipDuration(duration);
+	ui.cb_memory->setToolTipDuration(duration);
+	ui.cb_link->setToolTipDuration(duration);
 
 	ui.btn_reset->setToolTipDuration(duration);
 	ui.btn_hooks->setToolTipDuration(duration);
@@ -2402,48 +2995,49 @@ void GuiMain::tooltip_change()
 	ui.btn_openlog->setToolTipDuration(duration);
 	ui.btn_console->setToolTipDuration(duration);
 
-	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
+	QTreeWidgetItemIterator it(ui.tree_files);
+	for (; (*it) != Q_NULLPTR; ++it)
 	{
 		if (duration < 0)
 		{
-			(*it)->setToolTip(1, (*it)->text(1));
-			(*it)->setToolTip(2, (*it)->text(2));
+			(*it)->setToolTip(FILE_LIST_IDX_NAME, (*it)->text(FILE_LIST_IDX_NAME));
+			(*it)->setToolTip(FILE_LIST_IDX_PATH, (*it)->text(FILE_LIST_IDX_PATH));
 		}
 		else
 		{
-			(*it)->setToolTip(1, "");
-			(*it)->setToolTip(2, "");
+			(*it)->setToolTip(FILE_LIST_IDX_NAME, "");
+			(*it)->setToolTip(FILE_LIST_IDX_PATH, "");
 		}
 	}
 }
 
-void GuiMain::open_help()
+void GuiMain::btn_open_help()
 {
-	g_print("Openeing help thread: %ls\n", GH_HELP_URLW);
+	g_print("Openeing help thread: %ls\n", GH_HELP_URLW.c_str());
 
-	auto ret = reinterpret_cast<INT_PTR>(ShellExecuteW(0, 0, GH_HELP_URLW, 0, 0, SW_SHOW));
+	auto ret = reinterpret_cast<INT_PTR>(ShellExecuteW(0, 0, GH_HELP_URLW.c_str(), 0, 0, SW_SHOW));
 	if (ret <= 32)
 	{
 		g_print("Failed to open browser:\n Error 1: %08X\n Error 2: %08X\n", ret, GetLastError());
 	}
 }
 
-QPixmap GuiMain::GetIconFromFileW(const wchar_t * szPath, UINT size, int index)
+bool GuiMain::get_icon_from_file(const std::wstring & path, UINT size, int index, QPixmap & pixmap)
 {
 	HICON icon = NULL;
-	auto hr = SHDefExtractIconW(szPath, index, NULL, &icon, nullptr, size & 0xFFFF);
+	auto hr = SHDefExtractIconW(path.c_str(), index, NULL, &icon, nullptr, size & 0xFFFF);
 	if (FAILED(hr))
 	{
-		g_print("Failed to locate icon in file:\n path  = %ls\n error = %08X\n", szPath, hr);
+		g_print("Failed to locate icon in file:\n path  = %ls\n error = %08X\n", path.c_str(), hr);
 
-		return QPixmap();
+		return false;
 	}
 
-	QPixmap pixmap = qt_pixmapFromWinHICON(icon);
+	pixmap = qt_pixmapFromWinHICON(icon);
 
 	DestroyIcon(icon);
 
-	return pixmap;
+	return (pixmap.isNull() == false);
 }
 
 void GuiMain::show()
@@ -2451,51 +3045,56 @@ void GuiMain::show()
 	framelessParent->show();
 }
 
-void GuiMain::generate_shortcut()
+void GuiMain::btn_generate_shortcut()
 {
 	std::wstring shortCut;
 	QString fileName = "Injector_";
 
-	ARCH target_arch = ARCH::NONE;
+	ARCHITECTURE proc_arch;
 
 	if (ui.rb_pid->isChecked())
-	{
-		int id = ui.txt_pid->text().toInt();
-		if (id)
+	{		
+		if (proc_data_by_pid.IsValid())
 		{
-			Process_Struct ps_local = getProcessByPID(id);
-			shortCut += L"-p \"" + std::wstring(ps_local.szName) + L"\"";
-			fileName += QString::fromWCharArray(ps_local.szName);
+			std::wstring name;
+			proc_data_by_pid.GetNameW(name);
+			proc_data_by_pid.GetArchitecture(proc_arch);
 
-			target_arch = ps_local.Arch;
+			shortCut += L"-p \"" + name + L"\"";
+			fileName += QString::fromStdWString(name);
 		}
 		else
 		{
 			emit StatusBox(false, "Invalid PID");
+
 			return;
 		}
 	}
 	else
 	{
-		int index = ui.cmb_proc->currentIndex();
-		auto exeName = ui.cmb_proc->itemText(index).toStdWString();
+		if (proc_data_by_name.IsValid())
+		{
+			std::wstring name;
+			proc_data_by_pid.GetNameW(name);
+			proc_data_by_pid.GetArchitecture(proc_arch);
 
-		Process_Struct ps_local = getProcessByNameW(exeName.c_str());
-
-		if (!ps_local.PID)
+			shortCut += L"-p \"" + name + L"\"";
+			fileName += QString::fromStdWString(name);
+		}
+		else
 		{
 			emit StatusBox(false, "The specified process doesn't exist.");
+
 			return;
 		}
-
-		shortCut += L"-p \"" + exeName + L"\"";
-		fileName += ui.cmb_proc->itemText(index);
-
-		target_arch = ps_local.Arch;
 	}
 
-	bool fileFound = false;
-	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
+	bool is_dot_net = false;
+	bool fileFound	= false;
+	std::vector<std::wstring> DotNetOptions;
+
+	QTreeWidgetItemIterator it(ui.tree_files);
+	for (; (*it) != Q_NULLPTR; ++it)
 	{
 		if ((*it)->checkState(0) != Qt::CheckState::Checked)
 		{
@@ -2510,10 +3109,39 @@ void GuiMain::generate_shortcut()
 			continue;
 		}
 
-		ARCH file_arch = StrToArchW((*it)->text(3).toStdWString().c_str());
-		if (file_arch != target_arch)
+		auto file_arch = StrToArchW((*it)->text(3).toStdWString());
+		if (file_arch == ARCH::NONE)
 		{
 			continue;
+		}
+
+		if ((*it)->text(FILE_LIST_IDX_FLAG).toInt() == FILE_LIST_FLAG_DOTNET)
+		{
+			is_dot_net = true;
+		}
+
+		if (proc_arch != file_arch && (!is_dot_net || proc_arch == ARCH::X86))
+		{
+			continue;
+		}
+
+		if (is_dot_net)
+		{
+			auto dot_net_arg			= (*it)->text(FILE_LIST_IDX_DOTNET_ARGUMENT);
+			auto dot_net_options		= (*it)->text(FILE_LIST_IDX_DOTNET_OPTIONS);
+			auto dot_net_options_list	= dot_net_options.split('!', Qt::SkipEmptyParts);
+
+			if (dot_net_options_list.length() != 3)
+			{
+				continue;
+			}
+
+			DotNetOptions.push_back(dot_net_options_list[0].toStdWString());
+			DotNetOptions.push_back(dot_net_options_list[1].toStdWString());
+			DotNetOptions.push_back(dot_net_options_list[2].toStdWString());
+			DotNetOptions.push_back(dot_net_arg.toStdWString());
+
+			is_dot_net = true;
 		}
 
 		fileName += QString("_") + (*it)->text(1);
@@ -2537,18 +3165,14 @@ void GuiMain::generate_shortcut()
 	if (delay > 0)
 	{
 		shortCut += L" -delay ";
-		std::wstringstream stream;
-		stream << delay;
-		shortCut += stream.str();
+		shortCut += std::format(L"{:d}", delay);
 	}
 
 	int timeout = ui.sp_timeout->value();
 	if (timeout > 0)
 	{
 		shortCut += L" -timeout ";
-		std::wstringstream stream;
-		stream << timeout;
-		shortCut += stream.str();
+		shortCut += std::format(L"{:d}", timeout);
 	}
 
 	if (ui.cb_error->isChecked())
@@ -2595,13 +3219,37 @@ void GuiMain::generate_shortcut()
 		if (ui.cb_cookie->isChecked())		Flags |= INJ_MM_INIT_SECURITY_COOKIE;
 		if (ui.cb_clean->isChecked())		Flags |= INJ_MM_CLEAN_DATA_DIR;
 		if (ui.cb_shift->isChecked())		Flags |= INJ_MM_SHIFT_MODULE_BASE;
+		if (ui.cb_memory->isChecked())		Flags |= INJ_MM_MAP_FROM_MEMORY;
+		//if (ui.cb_link->isChecked())		Flags |= INJ_MM_SHIFT_MODULE_BASE;
 
-		std::wstringstream stream;
-		stream << std::hex << Flags;
-		shortCut += L" -mmflags " + stream.str();
+		shortCut += L" -mmflags ";
+		shortCut += std::format(L"{:X}", Flags);
 	}
 
 	shortCut += L" -wait ";
+
+	if (is_dot_net)
+	{
+		shortCut += L" -dotnet";
+		shortCut += L" -namespace ";
+		shortCut += DotNetOptions[0];
+		shortCut += L" -class ";
+		shortCut += DotNetOptions[1];
+		shortCut += L" -method ";
+		shortCut += DotNetOptions[2];
+
+		if (!DotNetOptions[3].empty())
+		{
+			shortCut += L" -argument ";
+			shortCut += DotNetOptions[3];
+		}
+	}
+
+	auto silent = YesNoBox("Silent mode", "Do you want the shortcut to be in silent mode?\nThis means that no console window will be spawned and\nthere will be no notifications on the injection status.", framelessParent);
+	if (silent)
+	{
+		shortCut += L"-silent ";
+	}
 
 	fileName.replace(".", "_");
 	fileName.replace(" ", "_");
@@ -2617,13 +3265,8 @@ void GuiMain::generate_shortcut()
 			//by user Andreas Rejbrand
 			//Danke dir, Andi!
 
-			auto path = QCoreApplication::applicationDirPath();
-			path.replace('/', '\\');
-
 			std::wstring open_cmd = L"/Select,";
-
-			open_cmd += path.toStdWString();
-			open_cmd += L"\\";
+			open_cmd += g_RootPath;
 			open_cmd += fileName.toStdWString();
 			open_cmd += L".lnk";
 
@@ -2644,7 +3287,7 @@ void GuiMain::generate_shortcut()
 	}
 }
 
-void GuiMain::open_console()
+void GuiMain::btn_open_console()
 {
 	g_Console->open();
 
@@ -2669,11 +3312,11 @@ void GuiMain::open_console()
 	consoleOpen = true;
 }
 
-void GuiMain::open_log()
+void GuiMain::btn_open_log()
 {
 	if (FileExistsW(GH_INJ_LOGW))
 	{
-		auto ret = reinterpret_cast<INT_PTR>(ShellExecuteW(NULL, L"edit", GH_INJ_LOGW, nullptr, nullptr, SW_SHOW));
+		auto ret = reinterpret_cast<INT_PTR>(ShellExecuteW(NULL, L"edit", GH_INJ_LOGW.c_str(), nullptr, nullptr, SW_SHOW));
 		if (ret <= 32)
 		{
 			g_print("Failed to open log file:\n Error 1: %08X\n Error 2: %08X\n", ret, GetLastError());
@@ -2693,11 +3336,8 @@ void GuiMain::setup()
 	}
 	else
 	{
-		open_console();
+		btn_open_console();
 	}
-		
-	char user_agent[] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (JHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36";
-	UrlMkSetSessionOption(URLMON_OPTION_USERAGENT, user_agent, sizeof(user_agent), NULL);
 
 	if (updateCheck)
 	{
@@ -2722,7 +3362,6 @@ void GuiMain::setup()
 
 		msg += "MB.\n\nDo you want to download the files now?";
 		
-
 		if (YesNoBox("PDB Download", msg, framelessParent))
 		{
 			InjLib.StartDownload();
@@ -2745,7 +3384,7 @@ void GuiMain::setup()
 		g_print("Injector ready\n");
 	}
 
-	t_Update_Files->start(500);
+	t_Update_Files.start(200);
 
 	setupDone = true;
 }
@@ -2783,7 +3422,7 @@ void GuiMain::update()
 	}
 }
 
-void GuiMain::update_clicked()
+void GuiMain::btn_update_clicked()
 {
 	save_settings();
 

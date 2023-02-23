@@ -261,7 +261,7 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 		QString qDrop = QString::fromWCharArray(Drops[i]);
 		qDrop.replace("\\", "/");
 
-		m_Callback(qDrop);
+		m_pCallback(qDrop);
 
 		delete[] Drops[i];
 	}
@@ -269,9 +269,9 @@ void DragDropWindow::HandleDrop(HDROP hDrop)
 	delete[] Drops;
 }
 
-void DragDropWindow::SetCallback(std::function<void(const QString &)> Callback)
+void DragDropWindow::SetCallback(const decltype(m_pCallback) & callback)
 {
-	m_Callback = Callback;
+	m_pCallback = callback;
 }
 
 LRESULT CALLBACK DragDropWindow::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)

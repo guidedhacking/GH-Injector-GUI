@@ -13,11 +13,11 @@
 //but there's a problem with icon extraction returning invalid sizes so here we are
 Q_GUI_EXPORT QPixmap qt_pixmapFromWinHICON(HICON icon);
 
-struct Process_State_Struct
+struct ProcessState
 {
-	QString			txtFilter	= QString("");
-	int				cmbArch		= 0;
-	bool			cbSession	= false;
+	QString	txtFilter	= QString("");
+	int		cmbArch		= 0;
+	bool	cbSession	= false;
 };
 
 class TreeWidgetItem : public QTreeWidgetItem 
@@ -40,16 +40,16 @@ public:
 private:
 
 	Ui::frm_proc ui;
-	FramelessWindow * frameless_parent;
+	FramelessWindow * m_FramelessParent;
 
-	Process_State_Struct	*		m_ProcessState;
-	Process_Struct			*		m_ProcessStruct;
-	QTimer					*		m_TmrUpdateList;
-	QTimer					*		m_TmrFilterFocus;
-	SORT_SENSE						m_SortSense;
-	ULONG							m_OwnSessionID;
-	std::vector<Process_Struct *>	m_ProcList;
-	bool							m_bSelectedFromList;
+	ProcessState	* m_ProcessState	= nullptr;
+	ProcessData		* m_ProcessData		= nullptr;
+
+	QTimer						m_TmrUpdateList;
+	QTimer						m_TmrFilterFocus;
+	SORT_SENSE					m_SortSense;
+	std::vector<ProcessData *>	m_ProcList;
+	bool						m_bSelectedFromList;
 
 	QPixmap m_pxmError;
 	QPixmap m_pxmGeneric;
@@ -58,10 +58,10 @@ protected:
 	bool eventFilter(QObject * obj, QEvent * event) override;
 
 signals:
-	void send_to_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
+	void send_to_inj();
 
 public slots:
-	void get_from_inj(Process_State_Struct * procStateStruct, Process_Struct * procStruct);
+	void get_from_inj(ProcessState * proc_state, ProcessData * proc_data);
 
 private slots:
 	void refresh_gui();

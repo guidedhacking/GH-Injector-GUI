@@ -84,16 +84,10 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 	m_FramelessParent->setWindowTitle(title);
 	m_FramelessParent->setContent(this);
 
-	m_TmrCallback = new(std::nothrow) QTimer(this);
-	if (m_TmrCallback == Q_NULLPTR)
-	{
-		THROW("Failed to create timer object for download window.");
-	}
-
 	connect(m_FramelessParent, SIGNAL(closeButton_clicked()), this, SLOT(on_close_button_clicked()));
-	connect(m_TmrCallback, SIGNAL(timeout()), this, SLOT(on_timer_callback()));
+	connect(&m_TmrCallback, SIGNAL(timeout()), this, SLOT(on_timer_callback()));
 
-	m_TmrCallback->setInterval(100);
+	m_TmrCallback.setInterval(100);
 
 	m_FramelessParent->installEventFilter(this);
 	installEventFilter(this);
@@ -101,12 +95,7 @@ DownloadProgressWindow::DownloadProgressWindow(QString title, std::vector<QStrin
 
 DownloadProgressWindow::~DownloadProgressWindow()
 {
-	if (m_FramelessParent)
-	{
-		m_FramelessParent->close();
-	}
-
-	SAFE_DELETE(m_TmrCallback);
+	m_FramelessParent->close();
 }
 
 void DownloadProgressWindow::on_close_button_clicked()
@@ -138,12 +127,12 @@ bool DownloadProgressWindow::eventFilter(QObject * obj, QEvent * event)
 	{
 		m_bTimerRunning = true;
 
-		m_TmrCallback->start();
+		m_TmrCallback.start();
 	}
 
 	if (event->type() == QEvent::Close && obj == m_FramelessParent)
 	{
-		m_TmrCallback->stop();
+		m_TmrCallback.stop();
 
 		m_bTimerRunning = false;
 	}
@@ -222,7 +211,7 @@ void DownloadProgressWindow::SetDone(int code)
 
 void DownloadProgressWindow::SetCallbackFrequency(int frequency)
 {
-	m_TmrCallback->setInterval(1000 / frequency);
+	m_TmrCallback.setInterval(1000 / frequency);
 }
 
 void DownloadProgressWindow::SetCallbackArg(void * argument)
@@ -230,7 +219,7 @@ void DownloadProgressWindow::SetCallbackArg(void * argument)
 	m_pCustomArg = argument;
 }
 
-void DownloadProgressWindow::SetCallback(f_DPW_Callback callback)
+void DownloadProgressWindow::SetCallback(const decltype(m_pCallback) & callback)
 {
 	m_pCallback = callback;
 }

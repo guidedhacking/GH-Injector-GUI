@@ -5,10 +5,6 @@
 #include "framelesswindow.h"
 #include "InjectionLib.h"
 
-class DownloadProgressWindow;
-
-using f_DPW_Callback = void(__stdcall *)(DownloadProgressWindow * hProgressWindow, void * custom_arg);
-
 class DownloadProgressWindow : public QDialog
 {
 	Q_OBJECT
@@ -32,14 +28,14 @@ private:
 	QString				m_NewStatus = QString("");
 	std::vector<float>	m_NewProgress;
 
-	int					m_NewDone				= 0;
+	int					m_NewDone			= 0;
 	int					m_CustomCloseValue	= 0;
 
-	bool m_bTimerRunning	= false;
-	QTimer * m_TmrCallback	= Q_NULLPTR;
+	bool	m_bTimerRunning	= false;
+	QTimer	m_TmrCallback;
 
-	void * m_pCustomArg			= nullptr;
-	f_DPW_Callback m_pCallback	= nullptr;
+	void * m_pCustomArg													= nullptr;
+	std::function<void(DownloadProgressWindow *, void *)> m_pCallback	= nullptr;
 
 private slots:
 	void on_close_button_clicked();
@@ -55,7 +51,7 @@ public:
 
 	void SetCallbackFrequency(int frequency);
 	void SetCallbackArg(void * argument);
-	void SetCallback(f_DPW_Callback callback);
+	void SetCallback(const decltype(m_pCallback) & callback);
 
 	void SetCloseValue(int value);
 

@@ -10,26 +10,6 @@
 
 #include "DebugConsole.h"
 
-enum class ARCH : int
-{
-	NONE,
-	X64,
-	X86
-};
-
-struct Process_Struct
-{
-	DWORD	PID;
-	wchar_t	szName[100];
-	wchar_t szPath[MAX_PATH];
-	ARCH	Arch;
-	int     Session;
-	HICON	hIcon;
-
-	Process_Struct();
-	~Process_Struct();
-};
-
 enum class SORT_SENSE : int
 {
 	SS_PID_LO,
@@ -55,38 +35,124 @@ using f_NtQueryInformationProcess = NTSTATUS(__stdcall *)
 (
 	HANDLE					hTargetProc,
 	PROCESSINFOCLASS		PIC,
-	void *					pBuffer,
+	void				*	pBuffer,
 	ULONG					BufferSize,
-	ULONG *					SizeOut
+	ULONG				*	SizeOut
 );
 
-ARCH getFileArchA(const char	* szDllFile);
-ARCH getFileArchW(const wchar_t * szDllFile);
-ARCH getProcArch(const int PID);
+enum class ARCH : int
+{
+	NONE,
+	X64,
+	X86
+};
 
-ARCH StrToArchA(const char * szStr);
-ARCH StrToArchW(const wchar_t * szStr);
+struct ARCHITECTURE
+{
+	ARCH arch = ARCH::NONE;
 
-std::string ArchToStrA(ARCH arch);
-std::wstring ArchToStrW(ARCH arch);
+	std::wstring ToStdWString();
+	std::string ToStdString();
 
-ULONG getProcSession(const int PID);
-bool getProcFullPathA(char		* szFullPath, DWORD BufferSize, int PID);
-bool getProcFullPathW(wchar_t	* szfullPath, DWORD BufferSize, int PID);
+	ARCHITECTURE();
+	ARCHITECTURE(UINT in);
+	ARCHITECTURE(ARCH in);
 
-Process_Struct getProcessByNameA(const char		* szExeName);
-Process_Struct getProcessByNameW(const wchar_t	* szExeName);
-Process_Struct getProcessByPID(const int PID);
+	bool operator== (const ARCH & rhs) const;
+	bool operator== (const ARCHITECTURE & rhs) const;
+};
 
-bool getProcessList(std::vector<Process_Struct *> & list, bool get_icon = false);
-bool sortProcessList(std::vector<Process_Struct *> & pl, SORT_SENSE sort);
+ARCHITECTURE StrToArchA(const std::string & Str);
+ARCHITECTURE StrToArchW(const std::wstring & Str);
+
+class ProcessData
+{
+	static f_NtQueryInformationProcess m_pNtQueryInformationProcess;
+
+#ifndef _WIN64
+	static const std::wstring system32;
+	static const std::wstring sysnative;
+	static const std::wstring syswow64;
+#endif
+
+	std::wstring	m_ExeName;
+	std::wstring	m_ExePath;
+
+	DWORD			m_PID			= 0;
+	HANDLE			m_Handle		= NULL;
+	ARCHITECTURE	m_Architecture	= ARCHITECTURE(ARCH::NONE);
+	bool			m_Native		= false;
+	ULONG			m_SessionID		= INVALID_SESSION_ID;
+	HICON			m_Icon			= NULL;
+	bool			m_Valid			= false;
+
+	bool get_pid();
+	bool get_name();
+	bool get_handle();
+
+	bool load_remaining_data();
+
+	bool get_path();
+	bool get_arch();
+	bool get_session();
+	void get_icon();
+
+	void clean_up();
+
+public:
+	ProcessData();
+	ProcessData(DWORD PID);
+	ProcessData(const std::string & ExeName);
+	ProcessData(const std::wstring & ExeName);
+	~ProcessData();
+
+	bool IsValid() const;
+
+	bool GetProcessID(DWORD & PID) const;
+
+	bool GetNameA(std::string & ExeName) const;
+	bool GetNameW(std::wstring & ExeName) const;
+
+	bool GetFullPathA(std::string & ExePath) const;
+	bool GetFullPathW(std::wstring & ExePath) const;
+
+	bool GetArchitecture(ARCHITECTURE & Architecture) const;
+	bool IsNativeProcess(bool & Native) const;
+
+	bool GetSessionID(ULONG & SessionID) const;
+
+	bool GetIcon(HICON & hIcon) const;
+
+	bool UpdateData(DWORD PID);
+	bool UpdateData(const std::string & ExeName);
+	bool UpdateData(const std::wstring & ExeName);
+	bool UpdateData(const ProcessData & Data);
+
+	bool IsRunning();
+
+	bool operator== (const ProcessData & rhs) const;
+	bool operator== (const DWORD & rhs) const;
+	bool operator== (const tagPROCESSENTRY32 & rhs) const;
+	bool operator== (const tagPROCESSENTRY32W & rhs) const;
+
+	bool operator< (const ProcessData & rhs) const;
+	bool operator> (const ProcessData & rhs) const;
+};
+
+bool FileExistsA(const std::string & FilePath);
+bool FileExistsW(const std::wstring & FilePath);
+ARCHITECTURE GetFileArchitectureA(const std::string & DllFile, bool & IsDotNet);
+ARCHITECTURE GetFileArchitectureW(const std::wstring & DllFile, bool & IsDotNet);
+
+#ifdef UNICODE
+#define FileExists FileExistsW
+#define GetFileArchitecture GetFileArchitectureW
+#else
+#define FileExists FileExistsA
+#define GetFileArchitecture GetFileArchitectureA
+#endif
+
+bool GetProcessList(std::vector<ProcessData *> & list);
+bool SortProcessList(std::vector<ProcessData *> & list, SORT_SENSE sort);
 
 bool SetDebugPrivilege(bool Enable);
-bool IsNativeProcess(const int PID);
-
-bool FileExistsW(const wchar_t * szFile);
-bool FileExistsA(const char * szFile);
-bool FileExists(const TCHAR * szFile);
-
-int strcicmpA(const char * a, const char * b);
-int strcicmpW(const wchar_t * a, const wchar_t * b);

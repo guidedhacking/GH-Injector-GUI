@@ -1,0 +1,69 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\konra\\Documents\\Visual Studio 2022\\Projects\\GH Injector 3.4\\GH Injector GUI\\GH .NET Parser\\GH .NET Parser.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\konra\\Documents\\Visual Studio 2022\\Projects\\GH Injector 3.4\\GH Injector GUI\\GH .NET Parser\\GH .NET Parser.csproj": {
+      "version": "4.8.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\konra\\Documents\\Visual Studio 2022\\Projects\\GH Injector 3.4\\GH Injector GUI\\GH .NET Parser\\GH .NET Parser.csproj",
+        "projectName": "GH .NET Parser",
+        "projectPath": "C:\\Users\\konra\\Documents\\Visual Studio 2022\\Projects\\GH Injector 3.4\\GH Injector GUI\\GH .NET Parser\\GH .NET Parser.csproj",
+        "packagesPath": "C:\\Users\\konra\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\konra\\Documents\\Visual Studio 2022\\Projects\\GH Injector 3.4\\GH Injector GUI\\GH .NET Parser\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\konra\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net7.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net7.0": {
+            "targetAlias": "net7.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "net7.0": {
+          "targetAlias": "net7.0",
+          "dependencies": {
+            "System.Reflection.MetadataLoadContext": {
+              "target": "Package",
+              "version": "[7.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.100\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

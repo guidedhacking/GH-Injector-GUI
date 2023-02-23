@@ -10,7 +10,7 @@
 #include "Zip.h"
 
 std::wstring get_newest_version();
-bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * Lib);
+bool update_injector(const std::wstring & newest_version, bool & ignore, InjectionLib * Lib);
 
 #define UPDATE_ERR_SUCCESS				0
 #define UPDATE_ERR_DOWNLOAD_FAIL		-1

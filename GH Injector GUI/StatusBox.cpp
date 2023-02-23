@@ -36,16 +36,6 @@ void StatusBox(bool ok, const QString & msg)
 	}
 
 	f_parent.setContent(box);
-	f_parent.setFixedWidth(box->width());	
-
-	HWND hwnd = reinterpret_cast<HWND>(f_parent.winId());
-	if (hwnd)
-	{
-		SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		f_parent.setWindowModality(Qt::WindowModality::ApplicationModal);
-	}
-
-	f_parent.show();
 
 	auto buttons = box->buttons();
 	for (const auto & i : buttons)
@@ -58,6 +48,16 @@ void StatusBox(bool ok, const QString & msg)
 		}
 	}
 
+	f_parent.setFixedWidth(box->width());
+	f_parent.show();
+
+	HWND hwnd = reinterpret_cast<HWND>(f_parent.winId());
+	if (hwnd)
+	{
+		SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		f_parent.setWindowModality(Qt::WindowModality::ApplicationModal);
+	}
+	
 	box->exec();
 
 	f_parent.close();
@@ -65,7 +65,7 @@ void StatusBox(bool ok, const QString & msg)
 	delete box;
 }
 
-bool YesNoBox(const QString & title, const QString & msg, QWidget * parent)
+bool YesNoBox(const QString & title, const QString & msg, QWidget * parent, QMessageBox::Icon icon)
 {
 	FramelessWindow f_parent;
 	f_parent.setMinimizeButton(false);
@@ -73,7 +73,7 @@ bool YesNoBox(const QString & title, const QString & msg, QWidget * parent)
 	f_parent.setWindowTitle(title);
 	f_parent.setWindowModality(Qt::WindowModality::ApplicationModal);
 
-	auto box = new(std::nothrow) QMessageBox(QMessageBox::Icon::Question, "", msg, QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, &f_parent, Qt::WindowType::FramelessWindowHint);
+	auto box = new(std::nothrow) QMessageBox(icon, "", msg, QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, &f_parent, Qt::WindowType::FramelessWindowHint);
 	if (box == Q_NULLPTR)
 	{
 		HWND hwnd_parent = NULL;

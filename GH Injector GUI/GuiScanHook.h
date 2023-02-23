@@ -26,7 +26,7 @@ private:
 
 	int m_PID = 0;
 
-	void setItem(const std::vector<std::string> & item);
+	void setItem(const std::vector<std::wstring> & item);
 	std::vector<int> get_selected_indices() const;
 
 signals:

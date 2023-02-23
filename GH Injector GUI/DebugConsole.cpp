@@ -44,7 +44,6 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 	m_FramelessParent->setResizeBottom(true);
 	m_FramelessParent->setWindowTitle("Debug data");
 	m_FramelessParent->setContent(this);
-	m_FramelessParent->installEventFilter(this);
 	m_FramelessParent->setWindowIcon(QIcon(":/GuiMain/gh_resource/GH Icon.ico"));
 	m_FramelessParent->resize(QSize(150, 350));
 
@@ -69,14 +68,9 @@ DebugConsole::DebugConsole(FramelessWindow * dock_parent, QWidget * parent)
 
 DebugConsole::~DebugConsole()
 {
-	if (m_Layout)
+	if (m_Docker)
 	{
-		delete m_Layout;
-	}
-
-	if (m_Content)
-	{
-		delete m_Content;
+		delete m_Docker;
 	}
 }
 
@@ -211,12 +205,23 @@ void DebugConsole::print_raw(const char * szText)
 #endif
 
 	QListWidgetItem * new_item = new(std::nothrow) QListWidgetItem();
+	if (new_item == nullptr)
+	{
+		if (use_copy)
+		{
+			delete[] copy;
+		}
+
+		return;
+	}
+
 	new_item->setText(szText);
 	m_Content->addItem(new_item);
 
 	while (m_Content->count() > 200)
 	{
-		delete m_Content->item(0);
+		auto first_item = m_Content->takeItem(0);
+		delete first_item;
 	}
 
 	if (use_copy)
@@ -345,6 +350,37 @@ void DebugConsole::dock(int direction)
 	}
 }
 
+void DebugConsole::copy_data()
+{
+	auto selected = m_Content->selectedItems();
+
+	if (!selected.isEmpty())
+	{
+		std::vector<QListWidgetItem *> selection_sorted;
+		for (int i = 0; i < m_Content->count(); ++i)
+		{
+			QListWidgetItem * it = m_Content->item(i);
+			if (it->isSelected())
+			{
+				selection_sorted.push_back(it);
+			}
+		}
+
+		QString cb_data;
+		for (const auto & i : selection_sorted)
+		{
+			cb_data += i->text() + "\n";
+		}
+
+		if (cb_data != m_OldSelection)
+		{
+			qApp->clipboard()->setText(cb_data);
+			printf("Copied selection to clipboard.\n");
+			m_OldSelection = cb_data;
+		}
+	}
+}
+
 int DebugConsole::get_dock_index() const
 {
 	if (m_Docker)
@@ -381,43 +417,7 @@ void DebugConsole::ImTheTrashMan(const wchar_t * expression, const wchar_t * fun
 
 bool DebugConsole::eventFilter(QObject * obj, QEvent * event)
 {
-	if (event->type() == QEvent::KeyPress)
-	{
-		auto * keyEvent = static_cast<QKeyEvent *>(event);
-		if (keyEvent->matches(QKeySequence::Copy) || keyEvent->matches(QKeySequence::Cut))
-		{
-			auto selected = m_Content->selectedItems();
-			
-			if (!selected.isEmpty())
-			{
-				std::vector<QListWidgetItem *> selection_sorted;
-				for (int i = 0; i < m_Content->count(); ++i)
-				{
-					QListWidgetItem * it = m_Content->item(i);
-					if (it->isSelected())
-					{
-						selection_sorted.push_back(it);
-					}
-				}
-
-				QString cb_data;
-				for (const auto & i : selection_sorted)
-				{
-					cb_data += i->text() + "\n";
-				}
-
-				if (cb_data != m_OldSelection)
-				{
-					qApp->clipboard()->setText(cb_data);
-
-					m_OldSelection = cb_data;
-				}
-
-				return true;
-			}
-		}
-	}
-	else if (event->type() == QEvent::FocusOut)
+	if (event->type() == QEvent::FocusOut)
 	{
 		m_OldSelection = "";
 	}

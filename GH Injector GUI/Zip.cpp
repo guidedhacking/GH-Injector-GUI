@@ -2,10 +2,13 @@
 
 #include "Zip.h"
 
-int Unzip(const wchar_t * szSrcPath, const wchar_t * szDstPath)
+int Unzip(const std::wstring & SrcPath, const std::wstring & DestPath)
 {
-	wchar_t szCommand[MAX_PATH * 3];
-	swprintf_s(szCommand, sizeof(szCommand) / sizeof(szCommand[0]), L"\"Powershell.exe Expand-Archive -Path '%s' -DestinationPath '%s' -Force\"", szSrcPath, szDstPath);
+	std::wstring command = L"\"Powershell.exe Expand-Archive -Path '";
+	command += SrcPath;
+	command += L"' -DestinationPath '";
+	command += DestPath;
+	command += L"' -Force\"";
 
-	return _wsystem(szCommand);
+	return _wsystem(command.c_str());
 }

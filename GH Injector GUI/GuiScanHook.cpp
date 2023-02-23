@@ -39,16 +39,16 @@ GuiScanHook::GuiScanHook(QWidget * parent, FramelessWindow * FramelessParent, In
 
 GuiScanHook::~GuiScanHook()
 {
-	SAFE_DELETE(m_Model);
+
 }
 
-void GuiScanHook::setItem(const std::vector<std::string> & item)
+void GuiScanHook::setItem(const std::vector<std::wstring> & item)
 {
 	m_HookList.clear();
 
 	for (const auto & i : item)
 	{
-		m_HookList << QString::fromStdString(i);
+		m_HookList << QString::fromStdWString(i);
 	}
 
 	m_Model->setStringList(m_HookList);
@@ -81,7 +81,7 @@ void GuiScanHook::scan_clicked()
 
 	if (!m_InjectionLib->LoadingStatus())
 	{
-		setItem({ "Injection library not loaded" });
+		setItem({ L"Injection library not loaded" });
 		g_print("Injection library not loaded\n");
 
 		return;
@@ -89,7 +89,7 @@ void GuiScanHook::scan_clicked()
 
 	if (m_PID == 0)
 	{
-		setItem({ "Please select a process" });
+		setItem({ L"Please select a process" });
 		g_print("No process selected\n");
 
 		return;
@@ -98,7 +98,7 @@ void GuiScanHook::scan_clicked()
 	HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, m_PID);
 	if (!hProc)
 	{
-		setItem({ "Please select a process" });
+		setItem({ L"Please select a process" });
 		g_print("Invalid process id\n");
 
 		return;
@@ -107,7 +107,7 @@ void GuiScanHook::scan_clicked()
 	DWORD dwExitCode = STILL_ACTIVE;
 	if (!GetExitCodeProcess(hProc, &dwExitCode))
 	{
-		setItem({ "Please select a process" });
+		setItem({ L"Please select a process" });
 		g_print("Process doesn't exist\n");
 
 		return;
@@ -117,24 +117,24 @@ void GuiScanHook::scan_clicked()
 
 	if (dwExitCode != STILL_ACTIVE)
 	{
-		setItem({ "Please select a process" });
+		setItem({ L"Please select a process" });
 		g_print("Process doesn't exist\n");
 
 		return;
 	}
 
-	std::vector<std::string> tempHookList;
+	std::vector<std::wstring> tempHookList;
 
 	bool val_ret = m_InjectionLib->ValidateInjectionFunctions(m_PID, tempHookList);
 	if (!val_ret)
 	{
 		ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
-		setItem({ "Failed to scan for hooks" });
+		setItem({ L"Failed to scan for hooks" });
 	}
 	else if (tempHookList.empty())
 	{
 		ui.lv_scanhook->setSelectionMode(QAbstractItemView::SelectionMode::NoSelection);
-		setItem({ "No hooks found" });
+		setItem({ L"No hooks found" });
 	}
 	else
 	{

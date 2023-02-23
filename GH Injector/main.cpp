@@ -23,8 +23,9 @@ int main()
 		return ERROR_FILE_NOT_FOUND;
 	}
 
-	STARTUPINFO			si{ 0 };
 	PROCESS_INFORMATION pi{ 0 };
+	STARTUPINFO			si{ 0 };
+	si.cb = sizeof(si);
 
 	auto bRet = CreateProcess(szExe, nullptr, nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi);
 	if (!bRet)

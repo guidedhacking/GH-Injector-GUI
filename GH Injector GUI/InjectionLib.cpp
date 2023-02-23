@@ -23,7 +23,7 @@ InjectionLib::~InjectionLib()
 
 bool InjectionLib::Init()
 {
-	m_hInjectionMod = LoadLibraryA(GH_INJ_MOD_NAMEA);
+	m_hInjectionMod = LoadLibraryW(GH_INJ_MOD_NAMEW.c_str());
 
 	if (m_hInjectionMod == NULL)
 	{
@@ -53,6 +53,9 @@ bool InjectionLib::Init()
 
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, InjectA);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, InjectW);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, DotNet_InjectA);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, DotNet_InjectW);
+	LOAD_INJECTION_FUNCTION(m_hInjectionMod, Memory_Inject);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, ValidateInjectionFunctions);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, RestoreInjectionFunctions);
 	LOAD_INJECTION_FUNCTION(m_hInjectionMod, GetVersionA);
@@ -77,6 +80,9 @@ bool InjectionLib::LoadingStatus() const
 
 	IS_VALID_FUNCTION_POINTER(InjectA,						false);
 	IS_VALID_FUNCTION_POINTER(InjectW,						false);
+	IS_VALID_FUNCTION_POINTER(DotNet_InjectA,				false);
+	IS_VALID_FUNCTION_POINTER(DotNet_InjectW,				false);
+	IS_VALID_FUNCTION_POINTER(Memory_Inject,				false);
 	IS_VALID_FUNCTION_POINTER(ValidateInjectionFunctions,	false);
 	IS_VALID_FUNCTION_POINTER(RestoreInjectionFunctions,	false);
 	IS_VALID_FUNCTION_POINTER(GetVersionA,					false);
@@ -100,6 +106,9 @@ void InjectionLib::Unload()
 
 	m_InjectA						= nullptr;
 	m_InjectW						= nullptr;
+	m_DotNet_InjectA				= nullptr;
+	m_DotNet_InjectW				= nullptr;
+	m_Memory_Inject					= nullptr;
 	m_ValidateInjectionFunctions	= nullptr;
 	m_RestoreInjectionFunctions		= nullptr;
 	m_GetVersionA					= nullptr;
@@ -134,7 +143,28 @@ DWORD InjectionLib::InjectW(INJECTIONDATAW * pData) const
 	return m_InjectW(pData);
 }
 
-bool InjectionLib::ValidateInjectionFunctions(int PID, std::vector<std::string> & hList)
+DWORD InjectionLib::DotNet_InjectA(DOTNET_INJECTIONDATAA * pData) const
+{
+	IS_VALID_FUNCTION_POINTER(DotNet_InjectA, (DWORD)-1);
+
+	return m_DotNet_InjectA(pData);
+}
+
+DWORD InjectionLib::DotNet_InjectW(DOTNET_INJECTIONDATAW * pData) const
+{
+	IS_VALID_FUNCTION_POINTER(DotNet_InjectW, (DWORD)-1);
+
+	return m_DotNet_InjectW(pData);
+}
+
+DWORD InjectionLib::Memory_Inject(MEMORY_INJECTIONDATA * pData) const
+{
+	IS_VALID_FUNCTION_POINTER(DotNet_InjectW, (DWORD)-1);
+
+	return m_Memory_Inject(pData);
+}
+
+bool InjectionLib::ValidateInjectionFunctions(int PID, std::vector<std::wstring> & hList)
 {	
 	IS_VALID_FUNCTION_POINTER(ValidateInjectionFunctions, false);
 
@@ -157,9 +187,9 @@ bool InjectionLib::ValidateInjectionFunctions(int PID, std::vector<std::string> 
 	{
 		if (m_HookInfo[i].ChangeCount && !m_HookInfo[i].ErrorCode)
 		{
-			std::string s_ModName = m_StringConverter.to_bytes(m_HookInfo[i].ModuleName);
-
-			hList.push_back(s_ModName + "->" + std::string(m_HookInfo[i].FunctionName));
+			std::wstring s_ModName	= m_HookInfo[i].ModuleName;
+			std::wstring s_FuncName = CharArrayToStdWString(m_HookInfo[i].FunctionName);
+			hList.push_back(s_ModName + L"->" + s_FuncName);
 
 			++m_Changed;
 		}

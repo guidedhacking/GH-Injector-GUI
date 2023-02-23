@@ -1,10 +1,15 @@
 .vs/
-GH Injector GUI/x64/
-GH Injector/Release/
 Static/
 Debug/
-GH Injector GUI/GH Injector - x64.ini
-GH Injector GUI/GH Injector.zip
 Release/
-GH Injector GUI/GH Injector - x86.ini
+GH Injector/Release/
+GH Injector GUI/x64/
+GH Injector GUI/x86/
+GH Injector GUI/Debug/
+GH Injector GUI/Release/
+GH Injector GUI/Static/
+GH Injector GUI/GH Injector.zip
 GH Injector GUI/Settings.ini
+GH Injector GUI/GH_Inj_Log.txt
+GH .NET Parser/obj/publish/
+GH .NET Parser/bin/

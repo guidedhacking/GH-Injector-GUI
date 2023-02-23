@@ -13,7 +13,7 @@
 #undef APSTUDIO_READONLY_SYMBOLS
 
 /////////////////////////////////////////////////////////////////////////////
-// Deutsch (Deutschland) resources
+// German (Germany) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_DEU)
 LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
@@ -63,8 +63,8 @@ IDI_ICON2               ICON                    "gh_resource\\DragDrop Icon.ico"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 4,7,0,0
- PRODUCTVERSION 4,7,0,0
+ FILEVERSION 4,8,0,0
+ PRODUCTVERSION 4,8,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -81,10 +81,10 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Guided Hacking"
             VALUE "FileDescription", "GUI of the GH Injector"
-            VALUE "FileVersion", "4.7.0.0"
+            VALUE "FileVersion", "4.8.0.0"
             VALUE "LegalCopyright", "Broihon (C) 1987 - 2035"
             VALUE "ProductName", "GH Injector GUI"
-            VALUE "ProductVersion", "4.7.0.0"
+            VALUE "ProductVersion", "4.8.0.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -93,7 +93,7 @@ BEGIN
     END
 END
 
-#endif    // Deutsch (Deutschland) resources
+#endif    // German (Germany) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

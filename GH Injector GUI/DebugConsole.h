@@ -4,8 +4,6 @@
 
 #include "framelesswindow.h"
 
-//#define DEBUG_CONSOLE_TO_CMD
-
 class DebugConsole : public QWidget
 {
 	Q_OBJECT
@@ -40,6 +38,9 @@ public:
 
 	//updates the dock position to the specified direction
 	void dock(int direction);
+
+	//copies selected data to clipboard
+	void copy_data();
 
 private:
 	WindowDocker * m_Docker = nullptr;

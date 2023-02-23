@@ -23,7 +23,7 @@ struct CallbackData_Update
 	ULONGLONG timer = 0;
 };
 
-void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, void * pData);
+void update_update_callback(DownloadProgressWindow * hProgressWindow, void * pData);
 HRESULT download_thread(CallbackData_Update * data);
 
 std::wstring get_newest_version()
@@ -31,7 +31,7 @@ std::wstring get_newest_version()
 	DownloadProgress progress(true);
 
 	TCHAR szCacheFile[MAX_PATH]{ 0 };
-	auto hr = URLDownloadToCacheFile(nullptr, GH_VERSION_URL, szCacheFile, sizeof(szCacheFile) / sizeof(szCacheFile[0]), 0, &progress);
+	auto hr = URLDownloadToCacheFile(nullptr, GH_VERSION_URL.c_str(), szCacheFile, sizeof(szCacheFile) / sizeof(szCacheFile[0]), 0, &progress);
 
 	if (FAILED(hr))
 	{
@@ -61,7 +61,7 @@ std::wstring get_newest_version()
 	return strVer;
 }
 
-bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * Lib)
+bool update_injector(const std::wstring & newest_version, bool & ignore, InjectionLib * Lib)
 {
 	std::wstring update_msg;
 
@@ -139,8 +139,7 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 		return false;
 	}
 
-	auto root_path	= QCoreApplication::applicationDirPath().toStdWString() + L"/";
-	auto zip_path	= root_path + GH_INJ_ZIPW;
+	auto zip_path = g_RootPath + GH_INJ_ZIPW;
 
 	DeleteFileW(zip_path.c_str());
 
@@ -155,7 +154,7 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 
 	CallbackData_Update data{ };
 	data.download_url	= download_url;
-	data.path			= root_path;
+	data.path			= g_RootPath;
 	data.zip_path		= zip_path;
 	data.pInjLib		= Lib;
 	data.pProgress		= &progress;
@@ -188,10 +187,10 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 			case UPDATE_ERR_DOWNLOAD_FAIL:
 			{
 				HRESULT hr = data.download_thread_ret.get();
-				std::stringstream stream;
-				stream << std::hex << hr;
+				auto s_hr = std::format("{:08X}", (DWORD)hr);
+
 				error_msg = "URLDownloadToFileW failed with 0x";
-				error_msg += QString::fromStdString(stream.str());
+				error_msg += QString::fromStdString(s_hr);
 			}
 			break;
 
@@ -233,9 +232,7 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 
 			if (ret == UPDATE_ERR_LAUNCH_FAIL)
 			{
-				QString q_root_path = QString::fromStdWString(root_path);
-				q_root_path.replace('/', '\\');
-				open_cmd += q_root_path.toStdWString();
+				open_cmd += g_RootPath;
 				open_cmd += GH_INJ_EXE_LAUNCHW;
 			}
 			else
@@ -271,9 +268,7 @@ bool update_injector(std::wstring newest_version, bool & ignore, InjectionLib * 
 	return true;
 }
 
-int epic = 0;
-
-void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, void * pData)
+void update_update_callback(DownloadProgressWindow * hProgressWindow, void * pData)
 {
 	if (!hProgressWindow || !pData)
 	{
@@ -313,10 +308,8 @@ void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, 
 			}
 			else
 			{
-				std::stringstream stream;
-				stream << std::hex << hr;
 				std::string new_status = "URLDownloadToFileW failed with 0x";
-				new_status += stream.str();
+				new_status += std::format("{:08X}", (DWORD)hr);
 
 				hProgressWindow->SetStatus(new_status.c_str());
 				hProgressWindow->SetDone(UPDATE_ERR_DOWNLOAD_FAIL);
@@ -335,57 +328,53 @@ void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, 
 
 		if (FileExistsW(GH_INJ_EXE_LAUNCHW))
 		{
-			bRet &= DeleteFile(GH_INJ_LAUNCHER_EXE);
+			bRet &= DeleteFile(GH_INJ_LAUNCHER_EXE.c_str());
 		}
 
 		if (FileExistsW(GH_INJ_MOD_NAME86W))
 		{
-			bRet &= DeleteFile(GH_INJ_MOD_NAME86);
+			bRet &= DeleteFile(GH_INJ_MOD_NAME86.c_str());
 		}
 
 		if (FileExistsW(GH_INJ_MOD_NAME64W))
 		{
-			bRet &= DeleteFile(GH_INJ_MOD_NAME64);
+			bRet &= DeleteFile(GH_INJ_MOD_NAME64.c_str());
 		}
 
 		if (FileExistsW(GH_INJ_SM_NAME86W))
 		{
-			bRet &= DeleteFile(GH_INJ_SM_NAME86);
+			bRet &= DeleteFile(GH_INJ_SM_NAME86.c_str());
 		}
 
 		if (FileExistsW(GH_INJ_SM_NAME64W))
 		{
-			bRet &= DeleteFile(GH_INJ_SM_NAME64);
+			bRet &= DeleteFile(GH_INJ_SM_NAME64.c_str());
 		}
 
 #ifdef _WIN64
 		if (FileExistsW(GH_INJ_EXE_NAME86W))
 		{
-			bRet &= DeleteFile(GH_INJ_EXE_NAME86);
+			bRet &= DeleteFile(GH_INJ_EXE_NAME86.c_str());
 		}
 #else
 		if (FileExistsW(GH_INJ_EXE_NAME64W))
 		{
-			bRet &= DeleteFile(GH_INJ_EXE_NAME64);
+			bRet &= DeleteFile(GH_INJ_EXE_NAME64.c_str());
 		}
 #endif
 
 		if (!bRet)
 		{
-			std::stringstream stream;
-			stream << std::hex << GetLastError();
 			std::string new_status = "DeleteFile failed with 0x%08X";
-			new_status += stream.str();
+			new_status += std::format("{:08X}", GetLastError());
 
 			hProgressWindow->SetStatus(new_status.c_str());
 			hProgressWindow->SetDone(UPDATE_ERR_DELETE_FAIL);
 		}
 		else if (!MoveFileW(QCoreApplication::applicationFilePath().toStdWString().c_str(), old_path.c_str()))
 		{
-			std::stringstream stream;
-			stream << std::hex << GetLastError();
 			std::string new_status = "MoveFileW failed with 0x%08X";
-			new_status += stream.str();
+			new_status += std::format("{:08X}", GetLastError());
 
 			hProgressWindow->SetStatus(new_status.c_str());
 			hProgressWindow->SetDone(UPDATE_ERR_RENAME_FAIL);
@@ -399,7 +388,7 @@ void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, 
 	}
 	else if (!data->unzip_started)
 	{
-		if (Unzip(data->zip_path.c_str(), data->path.c_str()) != 0)
+		if (Unzip(data->zip_path, data->path) != 0)
 		{
 			hProgressWindow->SetStatus("Failed to unzip files...");
 
@@ -427,13 +416,13 @@ void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, 
 		{
 			bool all_files_unzipped = true;
 
-			all_files_unzipped &= FileExistsW(GH_INJ_EXE_LAUNCHW);
-			all_files_unzipped &= FileExistsW(GH_INJ_MOD_NAME86);
-			all_files_unzipped &= FileExistsW(GH_INJ_MOD_NAME64);
-			all_files_unzipped &= FileExistsW(GH_INJ_SM_NAME86);
-			all_files_unzipped &= FileExistsW(GH_INJ_SM_NAME64);
-			all_files_unzipped &= FileExistsW(GH_INJ_EXE_NAME86);
-			all_files_unzipped &= FileExistsW(GH_INJ_EXE_NAME64);
+			all_files_unzipped &= FileExists(GH_INJ_LAUNCHER_EXE);
+			all_files_unzipped &= FileExists(GH_INJ_MOD_NAME86);
+			all_files_unzipped &= FileExists(GH_INJ_MOD_NAME64);
+			all_files_unzipped &= FileExists(GH_INJ_SM_NAME86);
+			all_files_unzipped &= FileExists(GH_INJ_SM_NAME64);
+			all_files_unzipped &= FileExists(GH_INJ_EXE_NAME86);
+			all_files_unzipped &= FileExists(GH_INJ_EXE_NAME64);
 
 			data->unzip_finished = all_files_unzipped;
 
@@ -448,13 +437,11 @@ void __stdcall update_update_callback(DownloadProgressWindow * hProgressWindow, 
 	else if (!data->launch_finished)
 	{
 		auto new_path = data->path + L"GH Injector.exe ";
+		new_path += std::format(L"{:d}", GetCurrentProcessId());
 
-		STARTUPINFOW		si{ 0 };
 		PROCESS_INFORMATION pi{ 0 };
-
-		std::wstringstream stream;
-		stream << GetCurrentProcessId();
-		new_path += stream.str();
+		STARTUPINFOW		si{ 0 };
+		si.cb = sizeof(si);
 
 		if (CreateProcessW(nullptr, const_cast<wchar_t *>(new_path.c_str()), nullptr, nullptr, FALSE, NULL, nullptr, nullptr, &si, &pi))
 		{

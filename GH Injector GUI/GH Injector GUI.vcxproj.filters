@@ -67,6 +67,9 @@
     <ClCompile Include="PDB_Download.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="DotNetOptions.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DownloadProgress.h">
@@ -151,6 +154,9 @@
     <QtMoc Include="WindowDocker.h">
       <Filter>Headerdateien</Filter>
     </QtMoc>
+    <QtMoc Include="DotNetOptions.h">
+      <Filter>Headerdateien</Filter>
+    </QtMoc>
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="framelesswindow\framelesswindow.ui">
@@ -203,8 +209,5 @@
     <QtRcc Include="mainwindow.qrc">
       <Filter>Ressourcendateien</Filter>
     </QtRcc>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="ToDo.txt" />
   </ItemGroup>
 </Project>

@@ -18,7 +18,7 @@ class DragDropWindow
 	const static TCHAR m_szClassName[];
 	static int m_ClassRefCount;
 
-	std::function<void(const QString &)> m_Callback;
+	std::function<void(const QString &)> m_pCallback;
 
 	void DrawIcon();
 
@@ -36,7 +36,7 @@ public:
 	void SetPosition(int x, int y, bool hide, bool active);
 
 	void HandleDrop(HDROP hDrop);
-	void SetCallback(std::function<void(const QString &)> callback);
+	void SetCallback(const decltype(m_pCallback) & callback);
 
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
