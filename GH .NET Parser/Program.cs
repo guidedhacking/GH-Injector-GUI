@@ -1,6 +1,10 @@
-﻿using System.Reflection;
+﻿/*
+ * Author:       Broihon
+ * Copyright:    Guided Hacking™ © 2012-2023 Guided Hacking LLC
+*/
+
+using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Xml;
 using System.IO.Pipes;
 
 namespace GH_DotNet_Parser
