@@ -1,8 +1,10 @@
 # Qt GH DLL Injector GUI Interface
-- This is the GUI Interface for the Guided Hacking DLL Injector
+- This is the GUI Interface for the [Guided Hacking DLL Injector](https://guidedhacking.com/resources/guided-hacking-dll-injector.4/)
 - This Version works with MSVC2019/MSVC2022 and QT 5.15.2
 
-# Modified version of this repo by multikill
+## Initial Qt GUI Interace by Kage/Multikill
+
+The original GH Injector used AutoIt as a GUI frontend.  [Kage](https://guidedhacking.com/members/kage.109622/) / [Multikill](https://github.com/multikill) developed the initial version of Qt front end in 2020, and Broihon has continued development ever since then.
 https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
 
 ## Picture
