@@ -4,8 +4,7 @@
 
 ## Initial Qt GUI Interace by Kage/Multikill
 
-The original GH Injector used AutoIt as a GUI frontend.  [Kage](https://guidedhacking.com/members/kage.109622/) / [Multikill](https://github.com/multikill) developed the initial version of Qt front end in 2020, and Broihon has continued development ever since then.
-https://github.com/multikill/GH_Injector_MSVC_2019_QT_5_15_0
+The original GH Injector used AutoIt as a GUI frontend.  [Kage](https://guidedhacking.com/members/kage.109622/) / [Multikill](https://github.com/multikill) developed the initial version of Qt front end in 2020, which Broihon has continued to improve over the past 5 years.
 
 ## Picture
 ![image](https://github.com/guided-hacking/GH-Injector-GUI/assets/15186628/81f934c8-b319-4058-928c-69d8c971672a)
