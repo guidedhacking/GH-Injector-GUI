@@ -66,3 +66,4 @@ The original GH Injector used AutoIt as a GUI frontend.  [Kage](https://guidedha
 All original licenses of all used components Qt are respected with the additional exception that compiling, linking or using is allowed. Go to Qt website and check for License.
 
 
+GuidedHacking® - The Game Hacking Bible® - © 2025 Guided Hacking LLC. All Rights Reserved.
